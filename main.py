@@ -1,10 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import weather
+from app.routers import weather, auth
+from app.database import engine
+from app.models import Base
+
+# 데이터베이스 테이블 생성
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Weather Flick API",
-    description="Weather Flick Backend API",
+    description="Weather Flick Backend API with Authentication",
     version="1.0.0"
 )
 
@@ -18,6 +23,7 @@ app.add_middleware(
 )
 
 # 라우터 포함
+app.include_router(auth.router)
 app.include_router(weather.router)
 
 @app.get("/")

@@ -14,9 +14,26 @@ class Settings(BaseSettings):
     # CORS 설정
     cors_origins: list = ["*"]
 
-    # 외부 API 설정 (향후 사용)
-    weather_api_key: Optional[str] = None
-    weather_api_url: Optional[str] = None
+    # JWT 설정
+    secret_key: str = "your-secret-key-here"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
+    # PostgreSQL 데이터베이스 설정
+    database_host: str
+    database_port: int
+    database_user: str
+    database_password: str
+    database_name: str
+
+    # WeatherAPI 설정
+    weather_api_key: str = "your_weather_api_key_here"
+    weather_api_url: str = "http://api.weatherapi.com/v1"
+
+    @property
+    def database_url(self) -> str:
+        """PostgreSQL 데이터베이스 URL 생성"""
+        return f"postgresql://{self.database_user}:{self.database_password}@{self.database_host}:{self.database_port}/{self.database_name}"
 
     class Config:
         env_file = ".env"
