@@ -2,18 +2,11 @@
 
 ## 개요
 
-Weather Flick API는 [미세미세](https://www.misemise.co.kr/) API와 공공데이터포털 API를 통합하여 실시간 대기질 정보, 예보, 건강 조언 등을 제공합니다.
+Weather Flick API는 **공공데이터포털 API**와 **WeatherAPI**를 통합하여 실시간 대기질 정보, 예보, 건강 조언 등을 제공합니다.
 
 ## API 키 발급
 
-### 1. 미세미세 API 키 발급
-
-1. [미세미세](https://www.misemise.co.kr/)에 가입
-2. API 서비스 신청
-3. API 키 발급
-4. `.env` 파일의 `MISEMISE_API_KEY`에 발급받은 키 입력
-
-### 2. 공공데이터포털 API 키 발급
+### 1. 공공데이터포털 API 키 발급 (한국 대기질 정보)
 
 1. [공공데이터포털](https://www.data.go.kr/)에 가입
 2. 다음 API 서비스 신청:
@@ -22,19 +15,33 @@ Weather Flick API는 [미세미세](https://www.misemise.co.kr/) API와 공공�
    - 측정소 정보 조회서비스
 3. `.env` 파일의 `PUBLIC_DATA_API_KEY`에 발급받은 키 입력
 
+### 2. WeatherAPI 키 발급 (전 세계 대기질 정보)
+
+1. [WeatherAPI](https://www.weatherapi.com/)에 가입
+2. 무료 API 키 발급 (월 1,000,000 요청)
+3. `.env` 파일의 `WEATHER_API_KEY`에 발급받은 키 입력
+
 ### 3. 환경 변수 설정
 
 `.env` 파일에 다음 내용을 추가하세요:
 
 ```env
-# 미세미세 API 설정 (대기질 정보)
-MISEMISE_API_KEY=your_misemise_api_key_here
-MISEMISE_API_URL=https://www.misemise.co.kr/api
+# WeatherAPI 설정 (날씨 및 대기질 정보)
+WEATHER_API_KEY=your_weather_api_key_here
+WEATHER_API_URL=http://api.weatherapi.com/v1
 
 # 공공데이터포털 API 설정 (대기질 정보)
 PUBLIC_DATA_API_KEY=your_public_data_api_key_here
 PUBLIC_DATA_API_URL=http://apis.data.go.kr/B552584
 ```
+
+## API 우선순위
+
+대기질 정보는 다음 순서로 조회됩니다:
+
+1. **공공데이터포털 API** (한국 실시간 데이터) - 우선순위 1
+2. **WeatherAPI** (전 세계 데이터) - 우선순위 2
+3. **내장 데이터** (기본 정보) - 우선순위 3
 
 ## API 엔드포인트
 
@@ -52,7 +59,7 @@ curl -X GET "http://localhost:8000/air-quality/current/서울" \
 ```json
 {
   "city": "서울",
-  "source": "미세미세",
+  "source": "공공데이터포털",
   "timestamp": "2024-01-01T12:00:00",
   "pm10": {
     "value": 45,
@@ -179,13 +186,13 @@ curl -X GET "http://localhost:8000/air-quality/info"
   "description": "대기질 정보 API",
   "sources": [
     {
-      "name": "미세미세",
-      "description": "미세미세 API를 통한 실시간 대기질 정보",
+      "name": "공공데이터포털",
+      "description": "환경부 대기질 정보 API (한국 실시간 데이터)",
       "priority": 1
     },
     {
-      "name": "공공데이터포털",
-      "description": "환경부 대기질 정보 API",
+      "name": "WeatherAPI",
+      "description": "WeatherAPI 대기질 정보 (전 세계 데이터)",
       "priority": 2
     },
     {
@@ -270,11 +277,11 @@ curl -X GET "http://localhost:8000/air-quality/compare/서울" \
   "city": "서울",
   "timestamp": "2024-01-01T12:00:00",
   "sources": {
-    "misemise": {
+    "public_data": {
       "pm10": { "value": 45, "grade": "보통" },
       "pm25": { "value": 25, "grade": "보통" }
     },
-    "public_data": {
+    "weather_api": {
       "pm10": { "value": 48, "grade": "보통" },
       "pm25": { "value": 27, "grade": "보통" }
     },
@@ -285,7 +292,7 @@ curl -X GET "http://localhost:8000/air-quality/compare/서울" \
   },
   "summary": {
     "available_sources": 3,
-    "primary_source": "misemise"
+    "primary_source": "public_data"
   }
 }
 ```
@@ -611,8 +618,8 @@ export default AirQualityWidget;
 
 ### API 제한
 
-- **미세미세 API**: 일일 요청 제한 (API 제공업체 정책에 따라 다름)
 - **공공데이터포털 API**: 일 1,000 요청
+- **WeatherAPI**: 월 1,000,000 요청 (무료 플랜)
 - **내장 데이터**: 제한 없음
 
 ### 사용 시 주의사항

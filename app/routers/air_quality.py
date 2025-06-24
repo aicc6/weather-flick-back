@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
+from datetime import datetime
 from app.models import User
 from app.auth import get_current_active_user
 from app.services.air_quality_service import air_quality_service
@@ -66,13 +67,13 @@ async def get_air_quality_info():
         "description": "대기질 정보 API",
         "sources": [
             {
-                "name": "미세미세",
-                "description": "미세미세 API를 통한 실시간 대기질 정보",
+                "name": "공공데이터포털",
+                "description": "환경부 대기질 정보 API (한국 실시간 데이터)",
                 "priority": 1
             },
             {
-                "name": "공공데이터포털",
-                "description": "환경부 대기질 정보 API",
+                "name": "WeatherAPI",
+                "description": "WeatherAPI 대기질 정보 (전 세계 데이터)",
                 "priority": 2
             },
             {
@@ -190,15 +191,15 @@ async def compare_air_quality_sources(
     current_user: User = Depends(get_current_active_user)
 ):
     """여러 소스의 대기질 정보 비교"""
-    # 미세미세 API 데이터
-    misemise_data = None
-    if air_quality_service.misemise_api_key:
-        misemise_data = await air_quality_service._get_misemise_air_quality(city)
-
     # 공공데이터포털 API 데이터
     public_data = None
     if air_quality_service.public_data_api_key:
         public_data = await air_quality_service._get_public_data_air_quality(city)
+
+    # WeatherAPI 데이터
+    weather_data = None
+    if air_quality_service.weather_api_key:
+        weather_data = await air_quality_service._get_weather_api_air_quality(city)
 
     # 내장 데이터
     local_data = await air_quality_service._get_local_air_quality(city)
@@ -207,13 +208,13 @@ async def compare_air_quality_sources(
         "city": city,
         "timestamp": datetime.now().isoformat(),
         "sources": {
-            "misemise": misemise_data,
             "public_data": public_data,
+            "weather_api": weather_data,
             "local_data": local_data
         },
         "summary": {
-            "available_sources": len([d for d in [misemise_data, public_data, local_data] if d]),
-            "primary_source": "misemise" if misemise_data else "public_data" if public_data else "local_data"
+            "available_sources": len([d for d in [public_data, weather_data, local_data] if d]),
+            "primary_source": "public_data" if public_data else "weather_api" if weather_data else "local_data"
         }
     }
 

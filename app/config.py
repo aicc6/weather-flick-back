@@ -46,17 +46,13 @@ class Settings(BaseSettings):
     google_api_key: str = "your_google_api_key_here"
     google_places_url: str = "https://maps.googleapis.com/maps/api/place"
 
-    # 공공데이터포털 API 설정 (관광정보)
+    # 공공데이터포털 API 설정 (관광정보, 대기질 정보)
     public_data_api_key: str = "your_public_data_api_key_here"
     public_data_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
 
     # 한국관광공사 API 설정
     korea_tourism_api_key: str = "your_korea_tourism_api_key_here"
     korea_tourism_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
-
-    # 미세미세 API 설정 (대기질 정보)
-    misemise_api_key: str = "your_misemise_api_key_here"
-    misemise_api_url: str = "https://www.misemise.co.kr/api"
 
     @property
     def database_url(self) -> str:

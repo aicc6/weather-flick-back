@@ -52,17 +52,13 @@ NAVER_API_URL=https://openapi.naver.com/v1
 GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_PLACES_URL=https://maps.googleapis.com/maps/api/place
 
-# 공공데이터포털 API 설정 (관광정보)
+# 공공데이터포털 API 설정 (관광정보, 대기질 정보)
 PUBLIC_DATA_API_KEY=your_public_data_api_key_here
 PUBLIC_DATA_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
 
 # 한국관광공사 API 설정
 KOREA_TOURISM_API_KEY=your_korea_tourism_api_key_here
 KOREA_TOURISM_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
-
-# 미세미세 API 설정 (대기질 정보)
-MISEMISE_API_KEY=your_misemise_api_key_here
-MISEMISE_API_URL=https://www.misemise.co.kr/api
 ```
 
 ### 3. API 키 발급
@@ -107,12 +103,14 @@ MISEMISE_API_URL=https://www.misemise.co.kr/api
    - 키워드 검색 조회서비스
 3. `.env` 파일의 `KOREA_TOURISM_API_KEY`에 발급받은 키 입력
 
-#### 미세미세 API 키 발급
+#### 공공데이터포털 API 키 발급 (대기질 정보)
 
-1. [미세미세](https://www.misemise.co.kr/)에 가입
-2. API 서비스 신청
-3. API 키 발급
-4. `.env` 파일의 `MISEMISE_API_KEY`에 발급받은 키 입력
+1. [공공데이터포털](https://www.data.go.kr/)에 가입
+2. 대기질 관련 API 신청:
+   - 실시간 대기질 조회서비스
+   - 대기질 예보 조회서비스
+   - 측정소 정보 조회서비스
+3. `.env` 파일의 `PUBLIC_DATA_API_KEY`에 발급받은 키 입력
 
 ### 4. 데이터베이스 설정
 
@@ -494,7 +492,7 @@ curl -X GET "http://localhost:8000/air-quality/stations/nearby?latitude=37.5665&
 ```json
 {
   "city": "서울",
-  "source": "미세미세",
+  "source": "공공데이터포털",
   "timestamp": "2024-01-01T12:00:00",
   "pm10": {
     "value": 45,
@@ -746,8 +744,8 @@ stations = await air_quality_service.get_nearby_stations(37.5665, 126.9780, 5000
 
 ### 대기질 API
 
-- **미세미세 API**: 일일 요청 제한 (API 제공업체 정책에 따라 다름)
-- **공공데이터포털 API**: 일 1,000 요청
+- **공공데이터포털 API**: 일 1,000 요청 (한국 실시간 데이터)
+- **WeatherAPI**: 월 1,000,000 요청 (전 세계 데이터)
 - **내장 데이터**: 제한 없음
 - **대기질 등급**: 좋음, 보통, 나쁨, 매우나쁨
 - **주요 오염물질**: PM10, PM2.5, O3, NO2, CO, SO2

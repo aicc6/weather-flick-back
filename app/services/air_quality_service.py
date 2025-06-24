@@ -6,19 +6,26 @@ from app.config import settings
 
 class AirQualityService:
     def __init__(self):
-        self.misemise_api_key = getattr(settings, 'misemise_api_key', None)
-        self.misemise_api_url = "https://www.misemise.co.kr/api"
         self.public_data_api_key = getattr(settings, 'public_data_api_key', None)
+        self.weather_api_key = getattr(settings, 'weather_api_key', None)
+        self.weather_api_url = getattr(settings, 'weather_api_url', 'http://api.weatherapi.com/v1')
 
     async def get_current_air_quality(self, city: str) -> Optional[Dict]:
         """현재 대기질 정보 조회"""
-        # 미세미세 API가 없으면 공공데이터포털 API 사용
-        if self.misemise_api_key:
-            return await self._get_misemise_air_quality(city)
-        elif self.public_data_api_key:
-            return await self._get_public_data_air_quality(city)
-        else:
-            return await self._get_local_air_quality(city)
+        # 공공데이터포털 API 우선 사용
+        if self.public_data_api_key:
+            result = await self._get_public_data_air_quality(city)
+            if result:
+                return result
+
+        # WeatherAPI 대기질 정보 사용
+        if self.weather_api_key:
+            result = await self._get_weather_api_air_quality(city)
+            if result:
+                return result
+
+        # 내장 데이터 사용
+        return await self._get_local_air_quality(city)
 
     async def get_air_quality_forecast(self, city: str) -> Optional[Dict]:
         """대기질 예보 조회"""
@@ -34,49 +41,81 @@ class AirQualityService:
         else:
             return await self._get_local_stations(latitude, longitude, radius)
 
-    async def _get_misemise_air_quality(self, city: str) -> Optional[Dict]:
-        """미세미세 API를 사용한 대기질 정보 조회"""
-        if not self.misemise_api_key:
+    async def _get_weather_api_air_quality(self, city: str) -> Optional[Dict]:
+        """WeatherAPI를 사용한 대기질 정보 조회"""
+        if not self.weather_api_key:
             return None
 
-        # 미세미세 API 엔드포인트 (실제 API 문서에 따라 수정 필요)
         async with httpx.AsyncClient() as client:
-            headers = {
-                "Authorization": f"Bearer {self.misemise_api_key}",
-                "Content-Type": "application/json"
-            }
-
             params = {
-                "city": city,
-                "format": "json"
+                "key": self.weather_api_key,
+                "q": city,
+                "aqi": "yes"  # 대기질 정보 포함
             }
 
             try:
                 response = await client.get(
-                    f"{self.misemise_api_url}/air-quality/current",
-                    headers=headers,
+                    f"{self.weather_api_url}/current.json",
                     params=params
                 )
                 response.raise_for_status()
                 data = response.json()
 
+                current = data.get("current", {})
+                air_quality = current.get("air_quality", {})
+
+                if not air_quality:
+                    return None
+
+                # WeatherAPI의 AQI를 한국 기준으로 변환
+                us_aqi = air_quality.get("us-epa-index", 0)
+                korean_grade = self._convert_us_aqi_to_korean(us_aqi)
+
                 return {
                     "city": city,
-                    "source": "미세미세",
+                    "source": "WeatherAPI",
                     "timestamp": datetime.now().isoformat(),
-                    "pm10": data.get("pm10", {}),
-                    "pm25": data.get("pm25", {}),
-                    "o3": data.get("o3", {}),
-                    "no2": data.get("no2", {}),
-                    "co": data.get("co", {}),
-                    "so2": data.get("so2", {}),
-                    "air_quality_index": data.get("aqi", {}),
-                    "station_name": data.get("station_name", ""),
-                    "latitude": data.get("latitude"),
-                    "longitude": data.get("longitude")
+                    "pm10": {
+                        "value": air_quality.get("pm10", 0),
+                        "grade": korean_grade,
+                        "unit": "㎍/㎥"
+                    },
+                    "pm25": {
+                        "value": air_quality.get("pm2_5", 0),
+                        "grade": korean_grade,
+                        "unit": "㎍/㎥"
+                    },
+                    "o3": {
+                        "value": air_quality.get("o3", 0),
+                        "grade": korean_grade,
+                        "unit": "ppm"
+                    },
+                    "no2": {
+                        "value": air_quality.get("no2", 0),
+                        "grade": korean_grade,
+                        "unit": "ppm"
+                    },
+                    "co": {
+                        "value": air_quality.get("co", 0),
+                        "grade": korean_grade,
+                        "unit": "ppm"
+                    },
+                    "so2": {
+                        "value": air_quality.get("so2", 0),
+                        "grade": korean_grade,
+                        "unit": "ppm"
+                    },
+                    "air_quality_index": {
+                        "value": us_aqi,
+                        "grade": korean_grade,
+                        "color": self._get_grade_color(korean_grade)
+                    },
+                    "station_name": f"{city} WeatherAPI",
+                    "latitude": data.get("location", {}).get("lat"),
+                    "longitude": data.get("location", {}).get("lon")
                 }
             except Exception as e:
-                print(f"미세미세 API 오류: {e}")
+                print(f"WeatherAPI 대기질 API 오류: {e}")
                 return None
 
     async def _get_public_data_air_quality(self, city: str) -> Optional[Dict]:
@@ -334,6 +373,27 @@ class AirQualityService:
                 station["distance"] = distance
 
         return stations_data.get("서울", [])
+
+    def _convert_us_aqi_to_korean(self, us_aqi: int) -> str:
+        """미국 AQI를 한국 대기질 등급으로 변환"""
+        if us_aqi <= 50:
+            return "좋음"
+        elif us_aqi <= 100:
+            return "보통"
+        elif us_aqi <= 150:
+            return "나쁨"
+        else:
+            return "매우나쁨"
+
+    def _get_grade_color(self, grade: str) -> str:
+        """등급에 따른 색상 반환"""
+        colors = {
+            "좋음": "#00E400",
+            "보통": "#FFFF00",
+            "나쁨": "#FF7E00",
+            "매우나쁨": "#FF0000"
+        }
+        return colors.get(grade, "#FFFF00")
 
     def _calculate_aqi(self, item: Dict) -> Dict:
         """공공데이터포털 데이터로 AQI 계산"""
