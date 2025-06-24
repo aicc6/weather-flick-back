@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     weather_api_key: str = "your_weather_api_key_here"
     weather_api_url: str = "http://api.weatherapi.com/v1"
 
+    # 기상청 API 설정
+    kma_api_key: str = "your_kma_api_key_here"
+
     @property
     def database_url(self) -> str:
         """PostgreSQL 데이터베이스 URL 생성"""

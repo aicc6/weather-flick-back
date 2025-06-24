@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import weather, auth
+from app.routers import weather, auth, kma_weather
 from app.database import engine
 from app.models import Base
 
@@ -25,6 +25,7 @@ app.add_middleware(
 # 라우터 포함
 app.include_router(auth.router)
 app.include_router(weather.router)
+app.include_router(kma_weather.router)
 
 @app.get("/")
 async def root():

@@ -27,3 +27,6 @@ DATABASE_NAME=weather_flick
 # WeatherAPI 설정
 WEATHER_API_KEY=your_weather_api_key_here
 WEATHER_API_URL=http://api.weatherapi.com/v1
+
+# 기상청 API 설정
+KMA_API_KEY=your_kma_api_key_here
