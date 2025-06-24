@@ -1,6 +1,6 @@
 # Weather Flick Backend API
 
-FastAPI를 사용한 날씨 정보 API 서버입니다. JWT 기반 인증 시스템, WeatherAPI, 기상청 API 연동, 지역 정보 서비스, 네이버 지도 API, 그리고 강력한 관리자 기능을 포함합니다.
+FastAPI를 사용한 날씨 정보 API 서버입니다. JWT 기반 인증 시스템, WeatherAPI, 기상청 API 연동, 지역 정보 서비스, 네이버 지도 API, 대기질 정보 API, 그리고 강력한 관리자 기능을 포함합니다.
 
 ## 설치 및 실행
 
@@ -59,6 +59,10 @@ PUBLIC_DATA_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
 # 한국관광공사 API 설정
 KOREA_TOURISM_API_KEY=your_korea_tourism_api_key_here
 KOREA_TOURISM_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
+
+# 미세미세 API 설정 (대기질 정보)
+MISEMISE_API_KEY=your_misemise_api_key_here
+MISEMISE_API_URL=https://www.misemise.co.kr/api
 ```
 
 ### 3. API 키 발급
@@ -102,6 +106,13 @@ KOREA_TOURISM_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorServic
    - 지역기반 관광정보 조회서비스
    - 키워드 검색 조회서비스
 3. `.env` 파일의 `KOREA_TOURISM_API_KEY`에 발급받은 키 입력
+
+#### 미세미세 API 키 발급
+
+1. [미세미세](https://www.misemise.co.kr/)에 가입
+2. API 서비스 신청
+3. API 키 발급
+4. `.env` 파일의 `MISEMISE_API_KEY`에 발급받은 키 입력
 
 ### 4. 데이터베이스 설정
 
@@ -227,6 +238,17 @@ python main.py
 - `GET /map/search/coordinates` - 좌표 기반 장소 검색
 - `GET /map/cities` - 지원되는 도시 목록
 - `GET /map/categories` - 검색 카테고리 목록
+
+### 대기질 API
+
+- `GET /air-quality/current/{city}` - 현재 대기질 정보 조회 (인증 필요)
+- `GET /air-quality/forecast/{city}` - 대기질 예보 조회 (인증 필요)
+- `GET /air-quality/stations/nearby` - 주변 측정소 조회 (인증 필요)
+- `GET /air-quality/cities` - 지원되는 도시 목록
+- `GET /air-quality/info` - 대기질 정보 안내
+- `GET /air-quality/health/{city}` - 대기질 건강 조언 (인증 필요)
+- `GET /air-quality/compare/{city}` - 여러 소스의 대기질 정보 비교 (인증 필요)
+- `GET /air-quality/trends/{city}` - 대기질 추세 분석 (인증 필요)
 
 ## 사용자 역할 (User Roles)
 
@@ -386,6 +408,34 @@ curl -X GET "http://localhost:8000/map/route?start=강남역&goal=홍대입구&m
 curl -X GET "http://localhost:8000/map/embed?latitude=37.5665&longitude=126.9780&zoom=15&width=600&height=400"
 ```
 
+### 19. 대기질 - 현재 대기질 정보 조회
+
+```bash
+curl -X GET "http://localhost:8000/air-quality/current/서울" \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### 20. 대기질 - 대기질 예보 조회
+
+```bash
+curl -X GET "http://localhost:8000/air-quality/forecast/서울" \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### 21. 대기질 - 건강 조언 조회
+
+```bash
+curl -X GET "http://localhost:8000/air-quality/health/서울" \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### 22. 대기질 - 주변 측정소 조회
+
+```bash
+curl -X GET "http://localhost:8000/air-quality/stations/nearby?latitude=37.5665&longitude=126.9780&radius=5000" \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
 ## 기상청 API 응답 예시
 
 ### 현재 날씨
@@ -437,6 +487,82 @@ curl -X GET "http://localhost:8000/map/embed?latitude=37.5665&longitude=126.9780
 }
 ```
 
+## 대기질 API 응답 예시
+
+### 현재 대기질
+
+```json
+{
+  "city": "서울",
+  "source": "미세미세",
+  "timestamp": "2024-01-01T12:00:00",
+  "pm10": {
+    "value": 45,
+    "grade": "보통",
+    "unit": "㎍/㎥"
+  },
+  "pm25": {
+    "value": 25,
+    "grade": "보통",
+    "unit": "㎍/㎥"
+  },
+  "o3": {
+    "value": 0.03,
+    "grade": "좋음",
+    "unit": "ppm"
+  },
+  "no2": {
+    "value": 0.02,
+    "grade": "좋음",
+    "unit": "ppm"
+  },
+  "co": {
+    "value": 0.5,
+    "grade": "좋음",
+    "unit": "ppm"
+  },
+  "so2": {
+    "value": 0.005,
+    "grade": "좋음",
+    "unit": "ppm"
+  },
+  "air_quality_index": {
+    "value": 45,
+    "grade": "보통",
+    "color": "#FFFF00"
+  },
+  "station_name": "종로구",
+  "latitude": 37.5704,
+  "longitude": 126.9997
+}
+```
+
+### 대기질 예보
+
+```json
+{
+  "city": "서울",
+  "source": "공공데이터포털",
+  "forecast_date": "2024-01-01",
+  "forecasts": [
+    {
+      "date": "2024-01-01 00:00",
+      "pm10_grade": "보통",
+      "pm25_grade": "보통",
+      "pm10_value": "45",
+      "pm25_value": "25"
+    },
+    {
+      "date": "2024-01-01 01:00",
+      "pm10_grade": "보통",
+      "pm25_grade": "보통",
+      "pm10_value": "50",
+      "pm25_value": "28"
+    }
+  ]
+}
+```
+
 ## 프로젝트 구조
 
 ```
@@ -456,7 +582,8 @@ weather-flick-back/
 │   │   ├── weather_service.py      # WeatherAPI 서비스
 │   │   ├── kma_weather_service.py  # 기상청 API 서비스
 │   │   ├── local_info_service.py   # 지역 정보 서비스
-│   │   └── naver_map_service.py    # 네이버 지도 API 서비스
+│   │   ├── naver_map_service.py    # 네이버 지도 API 서비스
+│   │   └── air_quality_service.py  # 대기질 API 서비스
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   └── kma_utils.py  # 기상청 API 유틸리티
@@ -467,11 +594,13 @@ weather-flick-back/
 │       ├── kma_weather.py # 기상청 API 라우터
 │       ├── admin.py     # 관리자 라우터
 │       ├── local_info.py # 지역 정보 라우터
-│       └── naver_map.py # 네이버 지도 API 라우터
+│       ├── naver_map.py # 네이버 지도 API 라우터
+│       └── air_quality.py # 대기질 API 라우터
 ├── README.md
 ├── ADMIN_GUIDE.md       # 관리자 기능 가이드
 ├── KMA_API_GUIDE.md     # 기상청 API 가이드
-└── NAVER_MAP_GUIDE.md   # 네이버 지도 API 가이드
+├── NAVER_MAP_GUIDE.md   # 네이버 지도 API 가이드
+└── AIR_QUALITY_GUIDE.md # 대기질 API 가이드
 ```
 
 ## 개발 가이드
@@ -566,6 +695,21 @@ restaurants = await naver_map_service.search_restaurants_nearby(37.5665, 126.978
 route = await naver_map_service.get_route_guidance("강남역", "홍대입구")
 ```
 
+### 대기질 API 서비스 사용
+
+```python
+from app.services.air_quality_service import air_quality_service
+
+# 현재 대기질 정보 조회
+air_quality = await air_quality_service.get_current_air_quality("서울")
+
+# 대기질 예보 조회
+forecast = await air_quality_service.get_air_quality_forecast("서울")
+
+# 주변 측정소 조회
+stations = await air_quality_service.get_nearby_stations(37.5665, 126.9780, 5000)
+```
+
 ### 설정 추가
 
 1. `app/config.py`의 `Settings` 클래스에 새 설정 추가
@@ -600,6 +744,14 @@ route = await naver_map_service.get_route_guidance("강남역", "홍대입구")
 - 격자 좌표 기반 (nx, ny)
 - 지역 코드 기반 (regId)
 
+### 대기질 API
+
+- **미세미세 API**: 일일 요청 제한 (API 제공업체 정책에 따라 다름)
+- **공공데이터포털 API**: 일 1,000 요청
+- **내장 데이터**: 제한 없음
+- **대기질 등급**: 좋음, 보통, 나쁨, 매우나쁨
+- **주요 오염물질**: PM10, PM2.5, O3, NO2, CO, SO2
+
 ## 기상청 API 격자 좌표
 
 기상청 API는 격자 좌표(nx, ny)를 사용합니다. 주요 도시의 좌표:
@@ -619,10 +771,31 @@ route = await naver_map_service.get_route_guidance("강남역", "홍대입구")
 - 포항: nx=102, ny=94
 - 제주: nx=53, ny=38
 
+## 대기질 등급 기준
+
+### 미세먼지 (PM10)
+
+| 등급     | 농도 (㎍/㎥) | 색상    | 설명                    |
+| -------- | ------------ | ------- | ----------------------- |
+| 좋음     | 0-30         | #00E400 | 대기질이 양호한 상태    |
+| 보통     | 31-80        | #FFFF00 | 대기질이 보통인 상태    |
+| 나쁨     | 81-150       | #FF7E00 | 대기질이 나쁜 상태      |
+| 매우나쁨 | 151+         | #FF0000 | 대기질이 매우 나쁜 상태 |
+
+### 초미세먼지 (PM2.5)
+
+| 등급     | 농도 (㎍/㎥) | 색상    | 설명                    |
+| -------- | ------------ | ------- | ----------------------- |
+| 좋음     | 0-15         | #00E400 | 대기질이 양호한 상태    |
+| 보통     | 16-35        | #FFFF00 | 대기질이 보통인 상태    |
+| 나쁨     | 36-75        | #FF7E00 | 대기질이 나쁜 상태      |
+| 매우나쁨 | 76+          | #FF0000 | 대기질이 매우 나쁜 상태 |
+
 ## 추가 문서
 
 - [관리자 기능 가이드](ADMIN_GUIDE.md) - 관리자 기능 상세 사용법
 - [기상청 API 가이드](KMA_API_GUIDE.md) - 기상청 API 상세 사용법
 - [네이버 지도 API 가이드](NAVER_MAP_GUIDE.md) - 네이버 지도 API 상세 사용법
+- [대기질 API 가이드](AIR_QUALITY_GUIDE.md) - 대기질 API 상세 사용법
 - [API 문서](http://localhost:8000/docs) - Swagger UI
 - [API 문서 (ReDoc)](http://localhost:8000/redoc) - ReDoc

@@ -51,3 +51,7 @@ PUBLIC_DATA_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
 # 한국관광공사 API 설정
 KOREA_TOURISM_API_KEY=your_korea_tourism_api_key_here
 KOREA_TOURISM_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
+
+# 미세미세 API 설정 (대기질 정보)
+MISEMISE_API_KEY=your_misemise_api_key_here
+MISEMISE_API_URL=https://www.misemise.co.kr/api

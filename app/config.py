@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     korea_tourism_api_key: str = "your_korea_tourism_api_key_here"
     korea_tourism_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
 
+    # 미세미세 API 설정 (대기질 정보)
+    misemise_api_key: str = "your_misemise_api_key_here"
+    misemise_api_url: str = "https://www.misemise.co.kr/api"
+
     @property
     def database_url(self) -> str:
         """PostgreSQL 데이터베이스 URL 생성"""
