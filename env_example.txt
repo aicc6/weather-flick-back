@@ -17,37 +17,37 @@ SECRET_KEY=your-super-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# PostgreSQL 데이터베이스 설정
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=your_db_user
-DATABASE_PASSWORD=your_db_password
-DATABASE_NAME=weather_flick
+# PostgreSQL 데이터베이스 설정 (선택적 - 설정하지 않으면 SQLite 사용)
+# DATABASE_HOST=localhost
+# DATABASE_PORT=5432
+# DATABASE_USER=your_db_user
+# DATABASE_PASSWORD=your_db_password
+# DATABASE_NAME=weather_flick
 
 # WeatherAPI 설정
-WEATHER_API_KEY=your_weather_api_key_here
+WEATHER_API_KEY=실제_발급받은_키_입력
 WEATHER_API_URL=http://api.weatherapi.com/v1
 
 # 기상청 API 설정
-KMA_API_KEY=your_kma_api_key_here
+KMA_API_KEY=실제_발급받은_키_입력
 
 # 카카오 API 설정 (맛집, 장소 검색)
-KAKAO_API_KEY=your_kakao_api_key_here
+KAKAO_API_KEY=실제_발급받은_키_입력
 KAKAO_API_URL=https://dapi.kakao.com/v2/local
 
 # 네이버 API 설정 (지도, 블로그, 뉴스 검색)
-NAVER_CLIENT_ID=your_naver_client_id_here
-NAVER_CLIENT_SECRET=your_naver_client_secret_here
+NAVER_CLIENT_ID=실제_발급받은_키_입력
+NAVER_CLIENT_SECRET=실제_발급받은_키_입력
 NAVER_API_URL=https://openapi.naver.com/v1
 
 # 구글 Places API 설정 (장소 검색)
-GOOGLE_API_KEY=your_google_api_key_here
+GOOGLE_API_KEY=실제_발급받은_키_입력
 GOOGLE_PLACES_URL=https://maps.googleapis.com/maps/api/place
 
 # 공공데이터포털 API 설정 (관광정보, 대기질 정보)
-PUBLIC_DATA_API_KEY=your_public_data_api_key_here
+PUBLIC_DATA_API_KEY=실제_발급받은_키_입력
 PUBLIC_DATA_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService
 
 # 한국관광공사 API 설정
-KOREA_TOURISM_API_KEY=your_korea_tourism_api_key_here
+KOREA_TOURISM_API_KEY=실제_발급받은_키_입력
 KOREA_TOURISM_API_URL=http://api.visitkorea.or.kr/openapi/service/rest/KorService

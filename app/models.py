@@ -437,3 +437,142 @@ class FavoritePlace(Base):
     place_type = Column(String(50), nullable=False)  # restaurant, transportation, accommodation
     city = Column(String(100), nullable=False, index=True)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# 대기질 관련 모델들
+class AirQualityRecord(Base):
+    __tablename__ = "air_quality_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    city = Column(String(100), nullable=False, index=True)
+    source = Column(String(50), nullable=False)  # public_data, weather_api, local_data
+    pm10_value = Column(Float, nullable=True)
+    pm25_value = Column(Float, nullable=True)
+    o3_value = Column(Float, nullable=True)
+    no2_value = Column(Float, nullable=True)
+    co_value = Column(Float, nullable=True)
+    so2_value = Column(Float, nullable=True)
+    aqi_value = Column(Integer, nullable=True)
+    aqi_grade = Column(String(20), nullable=True)  # 좋음, 보통, 나쁨, 매우나쁨
+    station_name = Column(String(200), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class AirQualityFavorite(Base):
+    __tablename__ = "air_quality_favorites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    city = Column(String(100), nullable=False, index=True)
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class AirQualityAlert(Base):
+    __tablename__ = "air_quality_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    city = Column(String(100), nullable=False, index=True)
+    alert_type = Column(String(50), nullable=False)  # daily_report, grade_change, health_advice
+    threshold_grade = Column(String(20), nullable=True)  # 나쁨, 매우나쁨
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class AirQualityHealthProfile(Base):
+    __tablename__ = "air_quality_health_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True, unique=True)
+    has_respiratory_condition = Column(Boolean, default=False)
+    has_heart_condition = Column(Boolean, default=False)
+    is_pregnant = Column(Boolean, default=False)
+    age_group = Column(String(20), nullable=True)  # child, adult, elderly
+    sensitivity_level = Column(String(20), default="normal")  # low, normal, high
+    preferred_activities = Column(Text, nullable=True)  # JSON string
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# Pydantic 모델 - 대기질 관련
+class AirQualityRecordResponse(BaseModel):
+    id: int
+    user_id: int
+    city: str
+    source: str
+    pm10_value: Optional[float] = None
+    pm25_value: Optional[float] = None
+    o3_value: Optional[float] = None
+    no2_value: Optional[float] = None
+    co_value: Optional[float] = None
+    so2_value: Optional[float] = None
+    aqi_value: Optional[int] = None
+    aqi_grade: Optional[str] = None
+    station_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AirQualityFavoriteResponse(BaseModel):
+    id: int
+    user_id: int
+    city: str
+    added_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AirQualityAlertCreate(BaseModel):
+    city: str
+    alert_type: str
+    threshold_grade: Optional[str] = None
+
+class AirQualityAlertResponse(BaseModel):
+    id: int
+    user_id: int
+    city: str
+    alert_type: str
+    threshold_grade: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class AirQualityHealthProfileCreate(BaseModel):
+    has_respiratory_condition: bool = False
+    has_heart_condition: bool = False
+    is_pregnant: bool = False
+    age_group: Optional[str] = None
+    sensitivity_level: str = "normal"
+    preferred_activities: Optional[List[str]] = None
+
+class AirQualityHealthProfileResponse(BaseModel):
+    id: int
+    user_id: int
+    has_respiratory_condition: bool
+    has_heart_condition: bool
+    is_pregnant: bool
+    age_group: Optional[str] = None
+    sensitivity_level: str
+    preferred_activities: Optional[List[str]] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class AirQualityHistoryResponse(BaseModel):
+    city: str
+    records: List[AirQualityRecordResponse]
+    summary: dict
+
+class AirQualityUserStats(BaseModel):
+    total_queries: int
+    favorite_cities: List[str]
+    most_queried_city: Optional[str] = None
+    average_aqi: Optional[float] = None
+    health_profile: Optional[AirQualityHealthProfileResponse] = None
