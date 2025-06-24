@@ -20,11 +20,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
 
     # PostgreSQL 데이터베이스 설정
-    database_host: str
-    database_port: int
-    database_user: str
-    database_password: str
-    database_name: str
+    database_host: Optional[str] = None
+    database_port: Optional[int] = None
+    database_user: Optional[str] = None
+    database_password: Optional[str] = None
+    database_name: Optional[str] = None
 
     # WeatherAPI 설정
     weather_api_key: str = "your_weather_api_key_here"
