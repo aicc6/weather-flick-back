@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import weather, auth, kma_weather
+from app.routers import weather, auth, kma_weather, admin
 from app.database import engine
 from app.models import Base
 
@@ -9,7 +9,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Weather Flick API",
-    description="Weather Flick Backend API with Authentication",
+    description="Weather Flick Backend API with Authentication and Admin Management",
     version="1.0.0"
 )
 
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(weather.router)
 app.include_router(kma_weather.router)
+app.include_router(admin.router)
 
 @app.get("/")
 async def root():
