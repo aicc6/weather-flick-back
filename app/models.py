@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from pydantic import BaseModel, EmailStr
@@ -185,3 +185,255 @@ class UserActivityResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Pydantic 모델 - 지역 정보
+class LocationInfo(BaseModel):
+    city: str
+    region: str
+    latitude: float
+    longitude: float
+    description: Optional[str] = None
+
+# Pydantic 모델 - 맛집 정보
+class RestaurantBase(BaseModel):
+    name: str
+    address: str
+    phone: Optional[str] = None
+    category: str  # 한식, 중식, 일식, 양식, 카페, 기타
+    rating: Optional[float] = None
+    price_range: Optional[str] = None  # 저렴, 보통, 고급
+    description: Optional[str] = None
+    operating_hours: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class RestaurantCreate(RestaurantBase):
+    city: str
+    region: str
+
+class RestaurantResponse(RestaurantBase):
+    id: int
+    city: str
+    region: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 교통 정보
+class TransportationBase(BaseModel):
+    name: str
+    type: str  # 지하철, 버스, 택시, 기차, 공항
+    description: str
+    route_info: Optional[str] = None
+    operating_hours: Optional[str] = None
+    fare_info: Optional[str] = None
+    contact: Optional[str] = None
+
+class TransportationCreate(TransportationBase):
+    city: str
+    region: str
+
+class TransportationResponse(TransportationBase):
+    id: int
+    city: str
+    region: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 숙소 정보
+class AccommodationBase(BaseModel):
+    name: str
+    address: str
+    phone: Optional[str] = None
+    type: str  # 호텔, 펜션, 게스트하우스, 모텔, 리조트
+    rating: Optional[float] = None
+    price_range: Optional[str] = None  # 저렴, 보통, 고급, 럭셔리
+    amenities: Optional[List[str]] = None  # 편의시설 목록
+    description: Optional[str] = None
+    check_in: Optional[str] = None
+    check_out: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class AccommodationCreate(AccommodationBase):
+    city: str
+    region: str
+
+class AccommodationResponse(AccommodationBase):
+    id: int
+    city: str
+    region: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 지역 통합 정보
+class CityInfoSchema(BaseModel):
+    city: str
+    region: str
+    description: str
+    attractions: Optional[List[str]] = None
+    best_time_to_visit: Optional[str] = None
+    population: Optional[int] = None
+    area: Optional[float] = None
+
+class CityInfoResponse(CityInfoSchema):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 검색 요청
+class SearchRequest(BaseModel):
+    city: str
+    category: Optional[str] = None  # restaurant, transportation, accommodation
+    keyword: Optional[str] = None
+    price_range: Optional[str] = None
+    rating_min: Optional[float] = None
+
+# Pydantic 모델 - 검색 결과
+class SearchResult(BaseModel):
+    restaurants: List[RestaurantResponse] = []
+    transportations: List[TransportationResponse] = []
+    accommodations: List[AccommodationResponse] = []
+    city_info: Optional[CityInfoResponse] = None
+
+# Pydantic 모델 - 즐겨찾기
+class FavoritePlaceSchema(BaseModel):
+    place_id: int
+    place_type: str  # restaurant, transportation, accommodation
+    city: str
+    added_at: datetime
+
+class FavoritePlaceResponse(BaseModel):
+    id: int
+    user_id: int
+    place_id: int
+    place_type: str
+    city: str
+    added_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 리뷰
+class ReviewBase(BaseModel):
+    rating: int  # 1-5
+    comment: str
+    place_id: int
+    place_type: str  # restaurant, transportation, accommodation
+
+class ReviewCreate(ReviewBase):
+    pass
+
+class ReviewResponse(ReviewBase):
+    id: int
+    user_id: int
+    username: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# 맛집 정보 모델
+class Restaurant(Base):
+    __tablename__ = "restaurants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False, index=True)
+    address = Column(String(500), nullable=False)
+    phone = Column(String(50), nullable=True)
+    category = Column(String(50), nullable=False, index=True)  # 한식, 중식, 일식, 양식, 카페, 기타
+    rating = Column(Float, nullable=True)
+    price_range = Column(String(20), nullable=True)  # 저렴, 보통, 고급
+    description = Column(Text, nullable=True)
+    operating_hours = Column(String(200), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    city = Column(String(100), nullable=False, index=True)
+    region = Column(String(100), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# 교통 정보 모델
+class Transportation(Base):
+    __tablename__ = "transportations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False, index=True)
+    type = Column(String(50), nullable=False, index=True)  # 지하철, 버스, 택시, 기차, 공항
+    description = Column(Text, nullable=False)
+    route_info = Column(Text, nullable=True)
+    operating_hours = Column(String(200), nullable=True)
+    fare_info = Column(String(200), nullable=True)
+    contact = Column(String(100), nullable=True)
+    city = Column(String(100), nullable=False, index=True)
+    region = Column(String(100), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# 숙소 정보 모델
+class Accommodation(Base):
+    __tablename__ = "accommodations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False, index=True)
+    address = Column(String(500), nullable=False)
+    phone = Column(String(50), nullable=True)
+    type = Column(String(50), nullable=False, index=True)  # 호텔, 펜션, 게스트하우스, 모텔, 리조트
+    rating = Column(Float, nullable=True)
+    price_range = Column(String(20), nullable=True)  # 저렴, 보통, 고급, 럭셔리
+    amenities = Column(Text, nullable=True)  # JSON string
+    description = Column(Text, nullable=True)
+    check_in = Column(String(50), nullable=True)
+    check_out = Column(String(50), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    city = Column(String(100), nullable=False, index=True)
+    region = Column(String(100), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# 리뷰 모델
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    place_id = Column(Integer, nullable=False, index=True)
+    place_type = Column(String(50), nullable=False)  # restaurant, transportation, accommodation
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# 지역 정보 모델
+class CityInfo(Base):
+    __tablename__ = "city_info"
+
+    id = Column(Integer, primary_key=True, index=True)
+    city = Column(String(100), nullable=False, index=True)
+    region = Column(String(100), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    attractions = Column(Text, nullable=True)  # JSON string
+    best_time_to_visit = Column(String(200), nullable=True)
+    population = Column(Integer, nullable=True)
+    area = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# 즐겨찾기 모델
+class FavoritePlace(Base):
+    __tablename__ = "favorite_places"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    place_id = Column(Integer, nullable=False)
+    place_type = Column(String(50), nullable=False)  # restaurant, transportation, accommodation
+    city = Column(String(100), nullable=False, index=True)
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
