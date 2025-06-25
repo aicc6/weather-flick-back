@@ -21,7 +21,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)  # 구글 로그인의 경우 NULL 가능
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
@@ -29,6 +29,12 @@ class User(Base):
     bio = Column(Text, nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
     login_count = Column(Integer, default=0)
+
+    # 구글 OAuth 관련 필드
+    google_id = Column(String(100), unique=True, index=True, nullable=True)
+    auth_provider = Column(String(20), default="email")  # email, google
+    email_verified = Column(Boolean, default=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -576,3 +582,45 @@ class AirQualityUserStats(BaseModel):
     most_queried_city: Optional[str] = None
     average_aqi: Optional[float] = None
     health_profile: Optional[AirQualityHealthProfileResponse] = None
+
+# 구글 OAuth 관련 모델
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+class GoogleLoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+    user_info: UserResponse
+    is_new_user: bool
+
+class GoogleAuthUrlResponse(BaseModel):
+    auth_url: str
+    state: str
+
+# 이메일 인증 관련 모델
+class EmailVerificationRequest(BaseModel):
+    email: str
+    username: Optional[str] = None
+
+class EmailVerificationConfirm(BaseModel):
+    email: str
+    verification_code: str
+
+class EmailVerificationResponse(BaseModel):
+    message: str
+    success: bool
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+# 이메일 인증 모델
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    verification_code = Column(String(10), nullable=False)
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

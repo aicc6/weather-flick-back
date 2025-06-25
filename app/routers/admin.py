@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_
 from typing import List, Optional, Dict, Any
@@ -20,8 +20,6 @@ async def get_admin_dashboard(
     db: Session = Depends(get_db)
 ):
     """관리자 대시보드 메인 정보"""
-    from datetime import datetime, timedelta
-
     now = datetime.utcnow()
     today = now.date()
     week_ago = now - timedelta(days=7)
@@ -107,8 +105,6 @@ async def get_user_analytics(
     db: Session = Depends(get_db)
 ):
     """사용자 분석 데이터"""
-    from datetime import datetime, timedelta
-
     now = datetime.utcnow()
 
     if period == "day":
@@ -295,7 +291,7 @@ async def deactivate_user(
 @router.post("/users/{user_id}/promote")
 async def promote_user(
     user_id: int,
-    role: UserRole,
+    role: UserRole = Body(..., embed=True),
     current_admin: User = Depends(get_current_super_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -330,13 +326,24 @@ async def get_system_info(
 ):
     """시스템 정보"""
     import platform
-    import psutil
 
-    return {
-        "platform": platform.platform(),
-        "python_version": platform.python_version(),
-        "cpu_count": psutil.cpu_count(),
-        "memory_total": psutil.virtual_memory().total,
-        "memory_available": psutil.virtual_memory().available,
-        "disk_usage": psutil.disk_usage('/').percent
-    }
+    try:
+        import psutil
+        return {
+            "platform": platform.platform(),
+            "python_version": platform.python_version(),
+            "cpu_count": psutil.cpu_count(),
+            "memory_total": psutil.virtual_memory().total,
+            "memory_available": psutil.virtual_memory().available,
+            "disk_usage": psutil.disk_usage('/').percent
+        }
+    except ImportError:
+        return {
+            "platform": platform.platform(),
+            "python_version": platform.python_version(),
+            "cpu_count": "N/A",
+            "memory_total": "N/A",
+            "memory_available": "N/A",
+            "disk_usage": "N/A",
+            "note": "psutil not available"
+        }

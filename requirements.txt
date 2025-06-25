@@ -9,3 +9,7 @@ httpx
 psycopg2-binary
 python-dotenv
 psutil
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+fastapi-mail
