@@ -2,20 +2,17 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
-from typing import List, Optional
+from typing import Optional
 from app.database import get_db
 from app.models import (
-    User, UserCreate, UserResponse, UserListResponse, Token, UserUpdate,
-    UserAdminUpdate, PasswordChange, PasswordReset, PasswordResetConfirm,
-    AdminStats, UserActivityResponse, UserRole, GoogleLoginRequest,
+    User, UserCreate, UserResponse, Token, UserUpdate,
+    PasswordChange, GoogleLoginRequest,
     GoogleLoginResponse, GoogleAuthUrlResponse, EmailVerificationRequest,
     EmailVerificationConfirm, EmailVerificationResponse, ResendVerificationRequest
 )
 from app.auth import (
     authenticate_user, create_access_token, get_password_hash,
-    get_current_active_user, get_current_admin_user, get_current_super_admin_user,
-    update_user_login_info, log_user_activity, check_password_strength,
+    get_current_active_user, update_user_login_info, log_user_activity, check_password_strength,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from app.services.google_oauth_service import google_oauth_service
@@ -196,196 +193,6 @@ async def change_password(
     db.commit()
 
     return {"message": "Password changed successfully"}
-
-# 관리자 전용 엔드포인트
-@router.get("/admin/users", response_model=List[UserListResponse])
-async def get_all_users(
-    skip: int = 0,
-    limit: int = 100,
-    search: Optional[str] = None,
-    role: Optional[UserRole] = None,
-    is_active: Optional[bool] = None,
-    current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
-):
-    """모든 사용자 목록 조회 (관리자 전용)"""
-    query = db.query(User)
-
-    if search:
-        query = query.filter(
-            (User.email.contains(search)) |
-            (User.username.contains(search))
-        )
-
-    if role:
-        query = query.filter(User.role == role)
-
-    if is_active is not None:
-        query = query.filter(User.is_active == is_active)
-
-    users = query.offset(skip).limit(limit).all()
-    return users
-
-@router.get("/admin/users/{user_id}", response_model=UserResponse)
-async def get_user_by_id(
-    user_id: int,
-    current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
-):
-    """특정 사용자 정보 조회 (관리자 전용)"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return user
-
-@router.put("/admin/users/{user_id}", response_model=UserResponse)
-async def update_user_by_admin(
-    user_id: int,
-    user_update: UserAdminUpdate,
-    current_admin: User = Depends(get_current_super_admin_user),
-    db: Session = Depends(get_db)
-):
-    """사용자 정보 관리자 수정 (슈퍼 관리자 전용)"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-    # 이메일 변경 시 중복 확인
-    if user_update.email and user_update.email != user.email:
-        existing_user = db.query(User).filter(User.email == user_update.email).first()
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
-        user.email = user_update.email
-
-    # 사용자명 변경 시 중복 확인
-    if user_update.username and user_update.username != user.username:
-        existing_user = db.query(User).filter(User.username == user_update.username).first()
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already taken"
-            )
-        user.username = user_update.username
-
-    # 다른 필드들 업데이트
-    if user_update.is_active is not None:
-        user.is_active = user_update.is_active
-
-    if user_update.is_verified is not None:
-        user.is_verified = user_update.is_verified
-
-    if user_update.role is not None:
-        user.role = user_update.role
-
-    if user_update.bio is not None:
-        user.bio = user_update.bio
-
-    if user_update.profile_image is not None:
-        user.profile_image = user_update.profile_image
-
-    db.commit()
-    db.refresh(user)
-    return user
-
-@router.delete("/admin/users/{user_id}")
-async def delete_user_by_admin(
-    user_id: int,
-    current_admin: User = Depends(get_current_super_admin_user),
-    db: Session = Depends(get_db)
-):
-    """사용자 삭제 (슈퍼 관리자 전용)"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-    # 자기 자신은 삭제할 수 없음
-    if user.id == current_admin.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete yourself"
-        )
-
-    db.delete(user)
-    db.commit()
-
-    return {"message": "User deleted successfully"}
-
-@router.get("/admin/stats", response_model=AdminStats)
-async def get_admin_stats(
-    current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
-):
-    """관리자 통계 조회"""
-    from datetime import datetime, timedelta
-
-    now = datetime.utcnow()
-    today = now.date()
-    week_ago = now - timedelta(days=7)
-    month_ago = now - timedelta(days=30)
-
-    total_users = db.query(User).count()
-    active_users = db.query(User).filter(User.is_active == True).count()
-    verified_users = db.query(User).filter(User.is_verified == True).count()
-    admin_users = db.query(User).filter(User.role == UserRole.ADMIN).count()
-    moderator_users = db.query(User).filter(User.role == UserRole.MODERATOR).count()
-
-    today_logins = db.query(User).filter(
-        User.last_login >= today
-    ).count()
-
-    this_week_logins = db.query(User).filter(
-        User.last_login >= week_ago
-    ).count()
-
-    this_month_logins = db.query(User).filter(
-        User.last_login >= month_ago
-    ).count()
-
-    return AdminStats(
-        total_users=total_users,
-        active_users=active_users,
-        verified_users=verified_users,
-        admin_users=admin_users,
-        moderator_users=moderator_users,
-        today_logins=today_logins,
-        this_week_logins=this_week_logins,
-        this_month_logins=this_month_logins
-    )
-
-@router.get("/admin/activities", response_model=List[UserActivityResponse])
-async def get_user_activities(
-    skip: int = 0,
-    limit: int = 100,
-    user_id: Optional[int] = None,
-    activity_type: Optional[str] = None,
-    current_admin: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
-):
-    """사용자 활동 로그 조회 (관리자 전용)"""
-    from app.models import UserActivity
-
-    query = db.query(UserActivity)
-
-    if user_id:
-        query = query.filter(UserActivity.user_id == user_id)
-
-    if activity_type:
-        query = query.filter(UserActivity.activity_type == activity_type)
-
-    activities = query.order_by(desc(UserActivity.created_at)).offset(skip).limit(limit).all()
-    return activities
 
 # 구글 OAuth 엔드포인트들
 @router.get("/google/auth-url", response_model=GoogleAuthUrlResponse)
