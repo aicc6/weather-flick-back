@@ -5,6 +5,7 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 sqlalchemy
+alembic
 httpx
 psycopg2-binary
 python-dotenv

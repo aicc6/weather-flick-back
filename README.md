@@ -124,13 +124,25 @@ DATABASE_PASSWORD=your_db_password
 DATABASE_NAME=weather_flick
 ```
 
-### 5. 관리자 계정 생성
+### 5. 데이터베이스 마이그레이션
+
+데이터베이스 스키마를 최신 상태로 업데이트합니다:
+
+```bash
+# 마이그레이션 적용
+python scripts/run_migrations.py
+
+# 또는 직접 alembic 명령어 사용
+alembic upgrade head
+```
+
+### 6. 관리자 계정 생성
 
 ```bash
 python create_admin.py
 ```
 
-### 6. 서버 실행
+### 7. 서버 실행
 
 ```bash
 # 개발 모드
@@ -567,8 +579,16 @@ curl -X GET "http://localhost:8000/air-quality/stations/nearby?latitude=37.5665&
 weather-flick-back/
 ├── main.py              # 메인 애플리케이션
 ├── requirements.txt     # 의존성 목록
+├── alembic.ini          # Alembic 마이그레이션 설정
 ├── create_admin.py      # 관리자 계정 생성 스크립트
 ├── test_kma_api.py      # 기상청 API 테스트 스크립트
+├── scripts/
+│   ├── run_migrations.py    # 마이그레이션 실행 스크립트
+│   └── create_migration.py  # 마이그레이션 생성 스크립트
+├── migrations/
+│   ├── env.py           # Alembic 환경 설정
+│   ├── script.py.mako   # 마이그레이션 템플릿
+│   └── versions/        # 마이그레이션 파일들
 ├── app/
 │   ├── __init__.py
 │   ├── config.py        # 설정 관리
@@ -788,6 +808,154 @@ stations = await air_quality_service.get_nearby_stations(37.5665, 126.9780, 5000
 | 보통     | 16-35        | #FFFF00 | 대기질이 보통인 상태    |
 | 나쁨     | 36-75        | #FF7E00 | 대기질이 나쁜 상태      |
 | 매우나쁨 | 76+          | #FF0000 | 대기질이 매우 나쁜 상태 |
+
+## 데이터베이스 마이그레이션 가이드
+
+이 프로젝트는 Alembic을 사용하여 데이터베이스 스키마 변경을 관리합니다.
+
+### 마이그레이션 기본 사용법
+
+#### 1. 마이그레이션 적용
+```bash
+# 스크립트 사용 (권장)
+python scripts/run_migrations.py
+
+# 직접 alembic 명령어 사용
+alembic upgrade head
+```
+
+#### 2. 새 마이그레이션 생성
+모델을 변경한 후 마이그레이션 파일을 생성합니다:
+
+```bash
+# 스크립트 사용 (권장)
+python scripts/create_migration.py "User 모델에 phone_number 필드 추가"
+
+# 직접 alembic 명령어 사용
+alembic revision --autogenerate -m "User 모델에 phone_number 필드 추가"
+```
+
+#### 3. 마이그레이션 상태 확인
+```bash
+# 현재 적용된 마이그레이션 버전 확인
+alembic current
+
+# 마이그레이션 히스토리 확인
+alembic history --verbose
+
+# 적용 대기 중인 마이그레이션 확인
+alembic show head
+```
+
+#### 4. 마이그레이션 롤백
+```bash
+# 이전 버전으로 롤백
+alembic downgrade -1
+
+# 특정 버전으로 롤백
+alembic downgrade <revision_id>
+
+# 모든 마이그레이션 롤백 (주의!)
+alembic downgrade base
+```
+
+### 마이그레이션 실행 시점
+
+#### 개발 중
+1. 모델 변경
+2. 마이그레이션 생성: `python scripts/create_migration.py "변경 내용"`
+3. 즉시 적용: `python scripts/run_migrations.py`
+
+#### Git Pull 후
+```bash
+# 다른 개발자의 마이그레이션이 있는 경우
+git pull origin main
+alembic upgrade head  # 새로운 마이그레이션 적용
+```
+
+#### 배포 시점
+```bash
+# 배포 전 마이그레이션 적용 (필수!)
+alembic upgrade head
+# 그 다음 애플리케이션 시작
+python main.py
+```
+
+#### CI/CD 파이프라인 예시
+```yaml
+# GitHub Actions 예시
+- name: Run migrations
+  run: alembic upgrade head
+- name: Start application
+  run: uvicorn main:app
+```
+
+### 주의사항
+
+#### 개발 환경
+- 모델 변경 후 즉시 마이그레이션 생성 및 적용
+- 데이터 손실 걱정 없이 실험 가능
+
+#### 스테이징/프로덕션 환경
+- **반드시 배포 전에 마이그레이션 적용**
+- 데이터 백업 후 실행
+- 다운타임 고려 필요
+- 마이그레이션 실패 시 롤백 계획 수립
+
+#### 팀 작업 시
+- Pull 후 마이그레이션 상태 확인: `alembic current`
+- 마이그레이션 충돌 발생 시 해결 후 적용
+- 마이그레이션 파일도 버전 관리 대상 (반드시 커밋!)
+
+### 버전 관리
+
+#### 포함해야 하는 파일
+```
+✅ migrations/
+  ✅ env.py
+  ✅ script.py.mako  
+  ✅ versions/*.py (모든 마이그레이션 파일)
+✅ alembic.ini
+✅ scripts/run_migrations.py
+✅ scripts/create_migration.py
+```
+
+#### 제외해야 하는 파일
+```
+❌ migrations/__pycache__/
+❌ *.pyc
+❌ .env (데이터베이스 연결 정보)
+```
+
+### 문제 해결
+
+#### 마이그레이션 충돌 해결
+```bash
+# 현재 상태 확인
+alembic current
+alembic history
+
+# 충돌하는 마이그레이션 파일 수동 수정
+# down_revision을 올바른 부모로 설정
+
+# 수정 후 적용
+alembic upgrade head
+```
+
+#### 마이그레이션 초기화 (개발 환경에서만!)
+```bash
+# 데이터베이스 완전 초기화
+# 주의: 모든 데이터 손실!
+alembic downgrade base
+alembic upgrade head
+```
+
+### 핵심 원칙
+1. **개발**: 모델 변경 → 마이그레이션 생성 → 즉시 적용
+2. **배포**: 코드 배포 전에 마이그레이션 먼저 적용
+3. **협업**: Pull 받은 후 마이그레이션 상태 확인
+4. **버전 관리**: 마이그레이션 파일은 반드시 커밋
+5. **백업**: 프로덕션에서는 반드시 백업 후 실행
 
 ## 추가 문서
 

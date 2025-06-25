@@ -1,11 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import weather, auth, kma_weather, admin, local_info, naver_map, air_quality
-from app.database import engine
-from app.models import Base
-
-# 데이터베이스 테이블 생성
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Weather Flick API",
