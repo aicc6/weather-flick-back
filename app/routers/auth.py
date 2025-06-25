@@ -236,7 +236,7 @@ async def google_login(
         return GoogleLoginResponse(
             access_token=access_token,
             token_type="bearer",
-            expires_in=settings.access_token_expire_minutes * 60,
+            expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user_info=user,
             is_new_user=is_new_user
         )
