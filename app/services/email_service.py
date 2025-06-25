@@ -18,8 +18,8 @@ class EmailService:
             MAIL_FROM=settings.mail_from,
             MAIL_PORT=settings.mail_port,
             MAIL_SERVER=settings.mail_server,
-            MAIL_TLS=settings.mail_tls,
-            MAIL_SSL=settings.mail_ssl,
+            MAIL_STARTTLS=settings.mail_starttls,
+            MAIL_SSL_TLS=settings.mail_ssl_tls,
             MAIL_FROM_NAME=settings.mail_from_name,
             USE_CREDENTIALS=True,
             VALIDATE_CERTS=True

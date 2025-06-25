@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     mail_from: str = "noreply@weatherflick.com"
     mail_port: int = 587
     mail_server: str = "smtp.gmail.com"
-    mail_tls: bool = True
-    mail_ssl: bool = False
+    mail_starttls: bool = True
+    mail_ssl_tls: bool = False
     mail_from_name: str = "Weather Flick"
 
     # WeatherAPI 설정
