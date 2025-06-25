@@ -15,4 +15,4 @@ google-auth-oauthlib
 google-auth-httplib2
 fastapi-mail
 requests
-bcrypt
+bcrypt==3.2.2
