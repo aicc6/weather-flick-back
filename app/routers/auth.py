@@ -22,6 +22,7 @@ from app.services.google_oauth_service import google_oauth_service
 from app.services.email_service import email_verification_service, email_service
 import secrets
 import httpx
+import requests
 
 router = APIRouter(
     prefix="/auth",
@@ -646,3 +647,45 @@ async def resend_verification(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to resend verification: {str(e)}"
         )
+
+@router.post("/google", response_model=Token)
+def google_login(data: dict, db: Session = Depends(get_db)):
+    """구글 소셜 로그인/회원가입"""
+    access_token = data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=400, detail="No access token provided")
+
+    # 구글에서 사용자 정보 가져오기
+    userinfo_response = requests.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    if not userinfo_response.ok:
+        raise HTTPException(status_code=400, detail="Invalid Google token")
+
+    userinfo = userinfo_response.json()
+    email = userinfo["email"]
+    username = userinfo.get("name", email.split("@")[0])
+
+    # 이미 가입된 사용자면 로그인, 아니면 회원가입
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        from app.auth import get_password_hash
+        user = User(
+            email=email,
+            username=username,
+            hashed_password=get_password_hash(access_token),  # 소셜 로그인은 access_token 등으로 대체
+            is_verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    from app.auth import create_access_token
+    token = create_access_token(data={"sub": user.email, "role": user.role.value})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user_info": user
+    }
