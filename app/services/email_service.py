@@ -170,7 +170,7 @@ class EmailVerificationService:
         try:
             # 기존 미사용 인증 코드 삭제
             db.query(EmailVerification).filter(
-                EmailVerification.email == email, EmailVerification.is_used == False
+                EmailVerification.email == email, not EmailVerification.is_used
             ).delete()
 
             # 새 인증 코드 생성
@@ -209,7 +209,7 @@ class EmailVerificationService:
                 .filter(
                     EmailVerification.email == email,
                     EmailVerification.verification_code == code,
-                    EmailVerification.is_used == False,
+                    not EmailVerification.is_used,
                     EmailVerification.expires_at > datetime.utcnow(),
                 )
                 .first()
@@ -232,9 +232,7 @@ class EmailVerificationService:
         try:
             verification = (
                 db.query(EmailVerification)
-                .filter(
-                    EmailVerification.email == email, EmailVerification.is_used == True
-                )
+                .filter(EmailVerification.email == email, EmailVerification.is_used)
                 .first()
             )
 

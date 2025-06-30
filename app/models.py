@@ -222,6 +222,7 @@ class EmailVerification(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, nullable=False, index=True)
     code = Column(String, nullable=False)
+    is_used = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
