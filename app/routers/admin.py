@@ -4,7 +4,11 @@ from sqlalchemy import func, desc, and_
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import User, UserActivity, UserRole
+from app.models import (
+    User, UserActivity, UserRole, TravelPlan, Destination, Review,
+    DashboardStats, UserAnalytics, SystemMetrics, ContentStats,
+    StandardResponse
+)
 from app.auth import get_current_super_admin_user
 from app.services.weather_service import weather_service
 from app.services.kma_weather_service import kma_weather_service
@@ -14,12 +18,168 @@ router = APIRouter(
     tags=["admin"]
 )
 
+def create_standard_response(success: bool, data=None, error=None, pagination=None):
+    """표준 응답 형식 생성"""
+    return {
+        "success": success,
+        "data": data,
+        "error": error,
+        "pagination": pagination,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+@router.get("/dashboard/stats", response_model=dict)
+async def get_dashboard_stats(
+    current_admin: User = Depends(get_current_super_admin_user),
+    db: Session = Depends(get_db)
+):
+    """관리자 대시보드 통계 정보"""
+    try:
+        now = datetime.utcnow()
+        today = now.date()
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+
+        # 실시간 메트릭
+        total_users = db.query(User).count()
+        active_users = db.query(User).filter(User.is_active == True).count()
+        
+        # 여행 계획 통계 (테이블이 존재하는 경우)
+        try:
+            total_travel_plans = db.query(TravelPlan).count()
+            active_travel_plans = db.query(TravelPlan).filter(
+                TravelPlan.status.in_(["draft", "confirmed"])
+            ).count()
+        except:
+            total_travel_plans = 0
+            active_travel_plans = 0
+
+        # 여행지 통계 (테이블이 존재하는 경우)
+        try:
+            total_destinations = db.query(Destination).count()
+            active_destinations = db.query(Destination).filter(
+                Destination.status == "active"
+            ).count()
+        except:
+            total_destinations = 0
+            active_destinations = 0
+
+        realtime_metrics = {
+            "active_users": active_users,
+            "server_load": 67.5,  # 추후 실제 시스템 메트릭 연동
+            "api_response_time": 120,
+            "error_rate": 0.02
+        }
+
+        # 일일 통계
+        new_users_today = db.query(User).filter(
+            func.date(User.created_at) == today
+        ).count()
+        
+        daily_stats = {
+            "new_users": new_users_today,
+            "total_recommendations": total_travel_plans,
+            "weather_queries": 0,  # 추후 날씨 쿼리 로그 테이블 추가 시 연동
+            "avg_session_time": 342
+        }
+
+        # 알림 (예시)
+        alerts = []
+        if active_users > 1000:
+            alerts.append({
+                "type": "info",
+                "severity": "info",
+                "message": f"현재 활성 사용자 수: {active_users}명"
+            })
+
+        dashboard_data = {
+            "realtime_metrics": realtime_metrics,
+            "daily_stats": daily_stats,
+            "alerts": alerts
+        }
+
+        return create_standard_response(
+            success=True,
+            data=dashboard_data
+        )
+        
+    except Exception as e:
+        return create_standard_response(
+            success=False,
+            error={
+                "code": "DASHBOARD_ERROR",
+                "message": "대시보드 통계 조회에 실패했습니다.",
+                "details": [{"field": "general", "message": str(e)}]
+            }
+        )
+
+@router.get("/analytics/users", response_model=dict)
+async def get_user_analytics(
+    current_admin: User = Depends(get_current_super_admin_user),
+    db: Session = Depends(get_db)
+):
+    """사용자 분석 데이터"""
+    try:
+        now = datetime.utcnow()
+        today = now.date()
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+
+        # 기본 사용자 통계
+        total_users = db.query(User).count()
+        active_users = db.query(User).filter(User.is_active == True).count()
+        
+        new_users_today = db.query(User).filter(
+            func.date(User.created_at) == today
+        ).count()
+        
+        new_users_week = db.query(User).filter(
+            User.created_at >= week_ago
+        ).count()
+        
+        new_users_month = db.query(User).filter(
+            User.created_at >= month_ago
+        ).count()
+
+        # 성장률 계산 (간단한 예시)
+        previous_month_users = db.query(User).filter(
+            User.created_at >= month_ago - timedelta(days=30),
+            User.created_at < month_ago
+        ).count()
+        
+        growth_rate = ((new_users_month - previous_month_users) / max(previous_month_users, 1)) * 100
+
+        user_analytics_data = {
+            "total_users": total_users,
+            "active_users": active_users,
+            "new_users_today": new_users_today,
+            "new_users_this_week": new_users_week,
+            "new_users_this_month": new_users_month,
+            "user_growth_rate": round(growth_rate, 2),
+            "retention_rate": 85.5  # 추후 실제 리텐션 계산 로직 추가
+        }
+
+        return create_standard_response(
+            success=True,
+            data=user_analytics_data
+        )
+        
+    except Exception as e:
+        return create_standard_response(
+            success=False,
+            error={
+                "code": "ANALYTICS_ERROR",
+                "message": "사용자 분석 데이터 조회에 실패했습니다.",
+                "details": [{"field": "general", "message": str(e)}]
+            }
+        )
+
 @router.get("/dashboard")
 async def get_admin_dashboard(
     current_admin: User = Depends(get_current_super_admin_user),
     db: Session = Depends(get_db)
 ):
-    """관리자 대시보드 메인 정보"""
+    """관리자 대시보드 메인 정보 (기존 호환성 유지)"""
     now = datetime.utcnow()
     today = now.date()
     week_ago = now - timedelta(days=7)

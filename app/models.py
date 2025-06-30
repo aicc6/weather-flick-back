@@ -1,10 +1,12 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, Float, DECIMAL
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 import enum
+import uuid
 
 Base = declarative_base()
 
@@ -18,73 +20,103 @@ class UserRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    username = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=True)  # 구글 로그인의 경우 NULL 가능
+    password_hash = Column(String(255), nullable=True)  # 구글 로그인의 경우 NULL 가능
+    nickname = Column(String(50), nullable=True)
+    profile_image_url = Column(Text, nullable=True)
+    region = Column(String(100), nullable=True)
+    birth_year = Column(Integer, nullable=True)
+    status = Column(String(20), default="active")
+    
+    # 사용자 선호도 및 설정 (JSONB)
+    preferences = Column(JSONB, nullable=True)  # {"travel_style": [], "interests": [], "budget_range": ""}
+    notification_settings = Column(JSONB, nullable=True)
+    
+    # 인증 관련
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
-    profile_image = Column(String(500), nullable=True)
-    bio = Column(Text, nullable=True)
-    last_login = Column(DateTime(timezone=True), nullable=True)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # 활동 통계
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
     login_count = Column(Integer, default=0)
 
     # 구글 OAuth 관련 필드
     google_id = Column(String(100), unique=True, index=True, nullable=True)
     auth_provider = Column(String(20), default="email")  # email, google
-    email_verified = Column(Boolean, default=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 # 사용자 활동 로그 모델
 class UserActivity(Base):
-    __tablename__ = "user_activities"
+    __tablename__ = "user_activity_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False)
-    activity_type = Column(String(100), nullable=False)  # login, logout, api_call, etc.
-    description = Column(Text, nullable=True)
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(Text, nullable=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    activity_type = Column(String(50), nullable=False)  # login, logout, api_call, etc.
+    resource_type = Column(String(50), nullable=True)
+    details = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # Pydantic 모델 - 사용자 인증
 class UserBase(BaseModel):
     email: EmailStr
-    username: str
+    nickname: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
+    region: Optional[str] = None
+    birth_year: Optional[int] = None
     role: Optional[UserRole] = UserRole.USER
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class UserPreferences(BaseModel):
+    travel_style: Optional[List[str]] = None  # ["adventure", "relaxation", "culture", "nature"]
+    interests: Optional[List[str]] = None     # ["beach", "mountain", "city", "historic"]
+    budget_range: Optional[str] = None        # "low", "medium", "high", "luxury"
+
+class UserNotificationSettings(BaseModel):
+    email_notifications: bool = True
+    push_notifications: bool = True
+    weather_alerts: bool = True
+    travel_reminders: bool = True
+
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    bio: Optional[str] = None
-    profile_image: Optional[str] = None
+    nickname: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    region: Optional[str] = None
+    birth_year: Optional[int] = None
+    preferences: Optional[UserPreferences] = None
+    notification_settings: Optional[UserNotificationSettings] = None
 
 class UserAdminUpdate(BaseModel):
-    username: Optional[str] = None
+    nickname: Optional[str] = None
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
     role: Optional[UserRole] = None
-    bio: Optional[str] = None
-    profile_image: Optional[str] = None
+    status: Optional[str] = None
+    region: Optional[str] = None
 
 class UserResponse(UserBase):
-    id: int
+    id: str  # UUID as string
+    nickname: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    region: Optional[str] = None
+    birth_year: Optional[int] = None
+    status: str
     is_active: bool
     is_verified: bool
     role: UserRole
-    profile_image: Optional[str] = None
-    bio: Optional[str] = None
-    last_login: Optional[datetime] = None
+    preferences: Optional[Dict[str, Any]] = None
+    notification_settings: Optional[Dict[str, Any]] = None
+    last_login_at: Optional[datetime] = None
     login_count: int
     created_at: datetime
 
@@ -92,13 +124,15 @@ class UserResponse(UserBase):
         from_attributes = True
 
 class UserListResponse(BaseModel):
-    id: int
+    id: str  # UUID as string
     email: str
-    username: str
+    nickname: Optional[str] = None
+    region: Optional[str] = None
     is_active: bool
     is_verified: bool
     role: UserRole
-    last_login: Optional[datetime] = None
+    status: str
+    last_login_at: Optional[datetime] = None
     login_count: int
     created_at: datetime
 
@@ -583,6 +617,155 @@ class AirQualityUserStats(BaseModel):
     average_aqi: Optional[float] = None
     health_profile: Optional[AirQualityHealthProfileResponse] = None
 
+# 여행 계획 관련 모델
+class TravelPlan(Base):
+    __tablename__ = "travel_plans"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    start_date = Column(String, nullable=False)  # Date string (YYYY-MM-DD)
+    end_date = Column(String, nullable=False)  # Date string (YYYY-MM-DD)
+    budget = Column(DECIMAL(10,2), nullable=True)
+    participants = Column(Integer, default=1)
+    transportation = Column(String(50), nullable=True)
+    status = Column(String(20), default="draft")  # draft, confirmed, completed, cancelled
+    itinerary = Column(JSONB, nullable=True)  # 여행 일정 상세 정보
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Destination(Base):
+    __tablename__ = "destinations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String(255), nullable=False)
+    category = Column(String(100), nullable=True)
+    region = Column(String(100), nullable=True)
+    address = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    latitude = Column(DECIMAL(10, 8), nullable=True)
+    longitude = Column(DECIMAL(11, 8), nullable=True)
+    rating = Column(DECIMAL(3, 1), default=0.0)
+    image_url = Column(Text, nullable=True)
+    gallery_urls = Column(ARRAY(Text), nullable=True)  # PostgreSQL array
+    status = Column(String(20), default="active")
+    recommendation_weight = Column(DECIMAL(3, 2), default=1.0)
+    weather_tags = Column(ARRAY(String(50)), nullable=True)  # PostgreSQL array
+    activity_tags = Column(ARRAY(String(50)), nullable=True)  # PostgreSQL array
+    season_preferences = Column(JSONB, nullable=True)
+    popularity_score = Column(DECIMAL(5, 2), default=0.0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class WeatherData(Base):
+    __tablename__ = "weather_data"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    destination_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    forecast_date = Column(String, nullable=False)  # Date string (YYYY-MM-DD)
+    temperature_max = Column(Float, nullable=True)
+    temperature_min = Column(Float, nullable=True)
+    humidity = Column(Float, nullable=True)
+    weather_condition = Column(String(100), nullable=True)
+    precipitation_prob = Column(Float, nullable=True)
+    wind_speed = Column(Float, nullable=True)
+    uv_index = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# Pydantic 모델 - 여행 계획
+class TravelPlanCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: str
+    budget: Optional[float] = None
+    participants: int = 1
+    transportation: Optional[str] = None
+
+class TravelPlanUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    budget: Optional[float] = None
+    participants: Optional[int] = None
+    transportation: Optional[str] = None
+    status: Optional[str] = None
+    itinerary: Optional[dict] = None
+
+class TravelPlanResponse(BaseModel):
+    id: str  # UUID as string
+    user_id: str  # UUID as string
+    title: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: str
+    budget: Optional[float] = None
+    participants: int
+    transportation: Optional[str] = None
+    status: str
+    itinerary: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 여행지
+class DestinationCreate(BaseModel):
+    name: str
+    category: Optional[str] = None
+    region: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    image_url: Optional[str] = None
+    gallery_urls: Optional[List[str]] = None
+    weather_tags: Optional[List[str]] = None
+    activity_tags: Optional[List[str]] = None
+    season_preferences: Optional[dict] = None
+
+class DestinationResponse(BaseModel):
+    id: str  # UUID as string
+    name: str
+    category: Optional[str] = None
+    region: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    rating: float
+    image_url: Optional[str] = None
+    gallery_urls: Optional[List[str]] = None
+    status: str
+    recommendation_weight: float
+    weather_tags: Optional[List[str]] = None
+    activity_tags: Optional[List[str]] = None
+    season_preferences: Optional[Dict[str, Any]] = None
+    popularity_score: float
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Pydantic 모델 - 여행지 추천
+class RecommendationRequest(BaseModel):
+    travel_dates: List[str]  # ["2024-08-01", "2024-08-03"]
+    origin: Dict[str, float]  # {"latitude": 37.5665, "longitude": 126.978}
+    preferences: Optional[Dict[str, Any]] = None  # 사용자 선호도
+    weather_preferences: Optional[Dict[str, Any]] = None  # 날씨 선호도
+    max_distance: Optional[int] = 500  # km
+    budget_range: Optional[str] = None  # "low", "medium", "high"
+
+class RecommendationResponse(BaseModel):
+    destinations: List[DestinationResponse]
+    weather_forecast: Optional[Dict[str, Any]] = None
+    total_results: int
+    recommendation_score: Optional[float] = None
+
 # 구글 OAuth 관련 모델
 class GoogleLoginRequest(BaseModel):
     id_token: str
@@ -614,6 +797,111 @@ class EmailVerificationResponse(BaseModel):
 class ResendVerificationRequest(BaseModel):
     email: str
 
+# 관리자 관련 모델
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(100), nullable=False)
+    phone = Column(String(20), nullable=True)
+    status = Column(String(20), default="active")
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    login_count = Column(Integer, default=0)
+    failed_login_attempts = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False)
+    display_name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class AdminRole(Base):
+    __tablename__ = "admin_roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, nullable=False, index=True)
+    role_id = Column(Integer, nullable=False, index=True)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_active = Column(Boolean, default=True)
+
+class SystemLog(Base):
+    __tablename__ = "system_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    level = Column(String(20), nullable=False)
+    source = Column(String(100), nullable=False)
+    message = Column(Text, nullable=False)
+    context = Column(Text, nullable=True)  # JSON string
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# Pydantic 모델 - 관리자 시스템
+class AdminCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    phone: Optional[str] = None
+
+class AdminLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class AdminResponse(BaseModel):
+    id: int
+    email: str
+    name: str
+    phone: Optional[str] = None
+    status: str
+    last_login_at: Optional[datetime] = None
+    login_count: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AdminToken(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+    admin_info: AdminResponse
+
+# Pydantic 모델 - 대시보드 통계
+class DashboardStats(BaseModel):
+    realtime_metrics: dict
+    daily_stats: dict
+    alerts: List[dict] = []
+
+class UserAnalytics(BaseModel):
+    total_users: int
+    active_users: int
+    new_users_today: int
+    new_users_this_week: int
+    new_users_this_month: int
+    user_growth_rate: float
+    retention_rate: float
+
+class SystemMetrics(BaseModel):
+    api_response_time: float
+    database_query_time: float
+    cache_hit_ratio: float
+    error_rate: float
+    uptime_percentage: float
+
+class ContentStats(BaseModel):
+    total_destinations: int
+    active_destinations: int
+    total_travel_plans: int
+    completed_travel_plans: int
+    total_reviews: int
+    average_rating: float
+
 # 이메일 인증 모델
 class EmailVerification(Base):
     __tablename__ = "email_verifications"
@@ -624,3 +912,22 @@ class EmailVerification(Base):
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# API 표준 응답 형식
+class StandardResponse(BaseModel):
+    success: bool
+    data: Optional[dict] = None
+    error: Optional[dict] = None
+    pagination: Optional[dict] = None
+    timestamp: str
+
+class PaginationInfo(BaseModel):
+    page: int
+    limit: int
+    total: int
+    total_pages: int
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+    details: Optional[List[dict]] = None
