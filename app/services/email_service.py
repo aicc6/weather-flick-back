@@ -6,7 +6,6 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import EmailVerification
-from app.database import get_db
 
 
 class EmailService:
@@ -178,7 +177,7 @@ class EmailVerificationService:
             expires_at = datetime.utcnow() + timedelta(minutes=10)
 
             verification = EmailVerification(
-                email=email, verification_code=verification_code, expires_at=expires_at
+                email=email, code=verification_code, expires_at=expires_at
             )
 
             db.add(verification)
