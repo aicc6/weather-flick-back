@@ -41,14 +41,14 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     """회원가입 (이메일 인증 필요)"""
     # 이메일 중복 확인
-    db_user = db.query(User).filter(User.email == user.email).first()
+    db_user = db.query(User.email).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
 
     # 사용자명 중복 확인
-    db_user = db.query(User).filter(User.nickname == user.nickname).first()
+    db_user = db.query(User.nickname).filter(User.nickname == user.nickname).first()
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
@@ -373,7 +373,7 @@ async def send_email_verification(
     """이메일 인증 코드 발송"""
     try:
         # 이미 가입된 이메일인지 확인
-        existing_user = db.query(User).filter(User.email == request.email).first()
+        existing_user = db.query(User.email).filter(User.email == request.email).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -441,7 +441,7 @@ async def resend_verification(
     """인증 코드 재발송"""
     try:
         # 이미 가입된 이메일인지 확인
-        existing_user = db.query(User).filter(User.email == request.email).first()
+        existing_user = db.query(User.email).filter(User.email == request.email).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -492,7 +492,8 @@ def google_login(data: dict, db: Session = Depends(get_db)):
     username = userinfo.get("name", email.split("@")[0])
 
     # 이미 가입된 사용자면 로그인, 아니면 회원가입
-    user = db.query(User).filter(User.email == email).first()
+    existing_user_check = db.query(User.email).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == email).first() if existing_user_check else None
     if not user:
         from app.auth import get_password_hash
 

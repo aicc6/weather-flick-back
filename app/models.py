@@ -18,6 +18,8 @@ from sqlalchemy.sql import func
 import enum
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+from datetime import datetime
+import uuid
 
 
 Base = declarative_base()
@@ -44,12 +46,12 @@ class UserRole(enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'extend_existing': True, 'autoload_replace': False}
     user_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
-    hashed_password = Column(String, nullable=False)  # auth.py에서 사용하는 필드명
+    hashed_password = Column(String, nullable=False)
     nickname = Column(String)
     profile_image = Column(String)
     preferences = Column(JSONB)
@@ -346,13 +348,13 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    user_id: str
+    user_id: uuid.UUID
     email: str
     nickname: Optional[str] = None
     profile_image: Optional[str] = None
     role: str
     is_active: bool
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -424,7 +426,7 @@ class PaginationInfo(BaseModel):
 
 
 class DestinationResponse(BaseModel):
-    destination_id: str
+    destination_id: uuid.UUID
     name: str
     region: Optional[str] = None
     category: Optional[str] = None
@@ -472,8 +474,8 @@ class TravelPlanUpdate(BaseModel):
 
 
 class TravelPlanResponse(BaseModel):
-    plan_id: str
-    user_id: str
+    plan_id: uuid.UUID
+    user_id: uuid.UUID
     title: str
     description: Optional[str] = None
     start_date: str
@@ -481,7 +483,7 @@ class TravelPlanResponse(BaseModel):
     budget: Optional[float] = None
     status: str
     itinerary: Optional[Dict[str, Any]] = None
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -555,29 +557,29 @@ class FavoritePlaceResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     description: Optional[str] = None
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
 
 
 class ReviewCreate(BaseModel):
-    destination_id: str
-    travel_plan_id: Optional[str] = None
+    destination_id: uuid.UUID
+    travel_plan_id: Optional[uuid.UUID] = None
     rating: int
     content: Optional[str] = None
     photos: Optional[List[str]] = None
 
 
 class ReviewResponse(BaseModel):
-    review_id: str
-    user_id: str
-    destination_id: str
-    travel_plan_id: Optional[str] = None
+    review_id: uuid.UUID
+    user_id: uuid.UUID
+    destination_id: uuid.UUID
+    travel_plan_id: Optional[uuid.UUID] = None
     rating: int
     content: Optional[str] = None
     photos: Optional[List[str]] = None
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

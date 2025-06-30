@@ -14,6 +14,16 @@ engine = create_engine(
     echo=settings.debug  # 디버그 모드에서 SQL 로그 출력
 )
 
+# SQLAlchemy 메타데이터 캐시 강제 새로고침
+from sqlalchemy import MetaData
+metadata = MetaData()
+try:
+    metadata.reflect(bind=engine)
+    # Clear any cached metadata
+    metadata.clear()
+except Exception as e:
+    print(f"Metadata reflection warning: {e}")
+
 # 세션 팩토리 생성
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
