@@ -1,6 +1,5 @@
 import uuid
 from sqlalchemy import (
-    create_engine,
     Column,
     Integer,
     String,
@@ -12,8 +11,6 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     DECIMAL,
-    UniqueConstraint,
-    PrimaryKeyConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
@@ -24,11 +21,6 @@ from typing import Optional, List, Dict, Any
 
 
 Base = declarative_base()
-
-
-class AccountType(enum.Enum):
-    USER = "USER"
-    ADMIN = "ADMIN"
 
 
 class AdminStatus(enum.Enum):
@@ -48,7 +40,6 @@ class TravelPlanStatus(enum.Enum):
 class UserRole(enum.Enum):
     USER = "USER"
     ADMIN = "ADMIN"
-    MODERATOR = "MODERATOR"
 
 
 class User(Base):
@@ -62,7 +53,6 @@ class User(Base):
     nickname = Column(String)
     profile_image = Column(String)
     preferences = Column(JSONB)
-    account_type = Column(Enum(AccountType), default=AccountType.USER)
     is_active = Column(Boolean, default=True)
     role = Column(Enum(UserRole), default=UserRole.USER)
     last_login = Column(DateTime)
@@ -360,7 +350,7 @@ class UserResponse(BaseModel):
     email: str
     nickname: Optional[str] = None
     profile_image: Optional[str] = None
-    account_type: str
+    role: str
     is_active: bool
     created_at: str
 

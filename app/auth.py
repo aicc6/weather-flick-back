@@ -102,7 +102,7 @@ def get_current_active_user(current_user: User = Depends(get_current_user)):
 
 def get_current_admin_user(current_user: User = Depends(get_current_active_user)):
     """현재 관리자 사용자 조회"""
-    if current_user.role not in [UserRole.ADMIN, UserRole.MODERATOR]:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
