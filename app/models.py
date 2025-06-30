@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, Float, DECIMAL
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Text,
+    Enum,
+    Float,
+    DECIMAL,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -10,11 +20,13 @@ import uuid
 
 Base = declarative_base()
 
+
 # 사용자 역할 열거형
 class UserRole(str, enum.Enum):
     USER = "user"
     ADMIN = "admin"
     MODERATOR = "moderator"
+
 
 # SQLAlchemy 모델
 class User(Base):
@@ -28,17 +40,19 @@ class User(Base):
     region = Column(String(100), nullable=True)
     birth_year = Column(Integer, nullable=True)
     status = Column(String(20), default="active")
-    
+
     # 사용자 선호도 및 설정 (JSONB)
-    preferences = Column(JSONB, nullable=True)  # {"travel_style": [], "interests": [], "budget_range": ""}
+    preferences = Column(
+        JSONB, nullable=True
+    )  # {"travel_style": [], "interests": [], "budget_range": ""}
     notification_settings = Column(JSONB, nullable=True)
-    
+
     # 인증 관련
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
-    
+
     # 활동 통계
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     login_count = Column(Integer, default=0)
@@ -48,7 +62,10 @@ class User(Base):
     auth_provider = Column(String(20), default="email")  # email, google
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
 
 # 사용자 활동 로그 모델
 class UserActivity(Base):
@@ -61,10 +78,12 @@ class UserActivity(Base):
     details = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 # Pydantic 모델 - 사용자 인증
 class UserBase(BaseModel):
     email: EmailStr
     nickname: Optional[str] = None
+
 
 class UserCreate(UserBase):
     password: str
@@ -72,20 +91,26 @@ class UserCreate(UserBase):
     birth_year: Optional[int] = None
     role: Optional[UserRole] = UserRole.USER
 
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+
 class UserPreferences(BaseModel):
-    travel_style: Optional[List[str]] = None  # ["adventure", "relaxation", "culture", "nature"]
-    interests: Optional[List[str]] = None     # ["beach", "mountain", "city", "historic"]
-    budget_range: Optional[str] = None        # "low", "medium", "high", "luxury"
+    travel_style: Optional[List[str]] = (
+        None  # ["adventure", "relaxation", "culture", "nature"]
+    )
+    interests: Optional[List[str]] = None  # ["beach", "mountain", "city", "historic"]
+    budget_range: Optional[str] = None  # "low", "medium", "high", "luxury"
+
 
 class UserNotificationSettings(BaseModel):
     email_notifications: bool = True
     push_notifications: bool = True
     weather_alerts: bool = True
     travel_reminders: bool = True
+
 
 class UserUpdate(BaseModel):
     nickname: Optional[str] = None
@@ -95,6 +120,7 @@ class UserUpdate(BaseModel):
     preferences: Optional[UserPreferences] = None
     notification_settings: Optional[UserNotificationSettings] = None
 
+
 class UserAdminUpdate(BaseModel):
     nickname: Optional[str] = None
     email: Optional[EmailStr] = None
@@ -103,6 +129,7 @@ class UserAdminUpdate(BaseModel):
     role: Optional[UserRole] = None
     status: Optional[str] = None
     region: Optional[str] = None
+
 
 class UserResponse(UserBase):
     id: str  # UUID as string
@@ -123,6 +150,7 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+
 class UserListResponse(BaseModel):
     id: str  # UUID as string
     email: str
@@ -139,31 +167,38 @@ class UserListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str
     expires_in: int
     user_info: UserResponse
 
+
 class TokenData(BaseModel):
     email: Optional[str] = None
     role: Optional[str] = None
+
 
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
 
+
 class PasswordReset(BaseModel):
     email: EmailStr
+
 
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
 
+
 # Pydantic 모델 - 날씨 API
 class WeatherRequest(BaseModel):
     city: str
     country: Optional[str] = None
+
 
 class WeatherResponse(BaseModel):
     city: str
@@ -181,6 +216,7 @@ class WeatherResponse(BaseModel):
     uv_index: float
     last_updated: str
 
+
 class ForecastDay(BaseModel):
     date: str
     max_temp: float
@@ -193,16 +229,19 @@ class ForecastDay(BaseModel):
     chance_of_snow: int
     uv_index: float
 
+
 class ForecastResponse(BaseModel):
     city: str
     country: str
     region: str
     forecast: List[ForecastDay]
 
+
 class FavoriteCity(BaseModel):
     city: str
     country: Optional[str] = None
     added_at: datetime
+
 
 # 관리자 통계 모델
 class AdminStats(BaseModel):
@@ -215,6 +254,7 @@ class AdminStats(BaseModel):
     this_week_logins: int
     this_month_logins: int
 
+
 class UserActivityResponse(BaseModel):
     id: int
     user_id: int
@@ -226,6 +266,7 @@ class UserActivityResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Pydantic 모델 - 지역 정보
 class LocationInfo(BaseModel):
     city: str
@@ -233,6 +274,7 @@ class LocationInfo(BaseModel):
     latitude: float
     longitude: float
     description: Optional[str] = None
+
 
 # Pydantic 모델 - 맛집 정보
 class RestaurantBase(BaseModel):
@@ -247,9 +289,11 @@ class RestaurantBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+
 class RestaurantCreate(RestaurantBase):
     city: str
     region: str
+
 
 class RestaurantResponse(RestaurantBase):
     id: int
@@ -259,6 +303,7 @@ class RestaurantResponse(RestaurantBase):
 
     class Config:
         from_attributes = True
+
 
 # Pydantic 모델 - 교통 정보
 class TransportationBase(BaseModel):
@@ -270,9 +315,11 @@ class TransportationBase(BaseModel):
     fare_info: Optional[str] = None
     contact: Optional[str] = None
 
+
 class TransportationCreate(TransportationBase):
     city: str
     region: str
+
 
 class TransportationResponse(TransportationBase):
     id: int
@@ -282,6 +329,7 @@ class TransportationResponse(TransportationBase):
 
     class Config:
         from_attributes = True
+
 
 # Pydantic 모델 - 숙소 정보
 class AccommodationBase(BaseModel):
@@ -298,9 +346,11 @@ class AccommodationBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
 
+
 class AccommodationCreate(AccommodationBase):
     city: str
     region: str
+
 
 class AccommodationResponse(AccommodationBase):
     id: int
@@ -310,6 +360,7 @@ class AccommodationResponse(AccommodationBase):
 
     class Config:
         from_attributes = True
+
 
 # Pydantic 모델 - 지역 통합 정보
 class CityInfoSchema(BaseModel):
@@ -321,12 +372,14 @@ class CityInfoSchema(BaseModel):
     population: Optional[int] = None
     area: Optional[float] = None
 
+
 class CityInfoResponse(CityInfoSchema):
     id: int
     created_at: datetime
 
     class Config:
         from_attributes = True
+
 
 # Pydantic 모델 - 검색 요청
 class SearchRequest(BaseModel):
@@ -336,6 +389,7 @@ class SearchRequest(BaseModel):
     price_range: Optional[str] = None
     rating_min: Optional[float] = None
 
+
 # Pydantic 모델 - 검색 결과
 class SearchResult(BaseModel):
     restaurants: List[RestaurantResponse] = []
@@ -343,12 +397,14 @@ class SearchResult(BaseModel):
     accommodations: List[AccommodationResponse] = []
     city_info: Optional[CityInfoResponse] = None
 
+
 # Pydantic 모델 - 즐겨찾기
 class FavoritePlaceSchema(BaseModel):
     place_id: int
     place_type: str  # restaurant, transportation, accommodation
     city: str
     added_at: datetime
+
 
 class FavoritePlaceResponse(BaseModel):
     id: int
@@ -361,6 +417,7 @@ class FavoritePlaceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Pydantic 모델 - 리뷰
 class ReviewBase(BaseModel):
     rating: int  # 1-5
@@ -368,8 +425,10 @@ class ReviewBase(BaseModel):
     place_id: int
     place_type: str  # restaurant, transportation, accommodation
 
+
 class ReviewCreate(ReviewBase):
     pass
+
 
 class ReviewResponse(ReviewBase):
     id: int
@@ -380,6 +439,7 @@ class ReviewResponse(ReviewBase):
     class Config:
         from_attributes = True
 
+
 # 맛집 정보 모델
 class Restaurant(Base):
     __tablename__ = "restaurants"
@@ -388,7 +448,9 @@ class Restaurant(Base):
     name = Column(String(200), nullable=False, index=True)
     address = Column(String(500), nullable=False)
     phone = Column(String(50), nullable=True)
-    category = Column(String(50), nullable=False, index=True)  # 한식, 중식, 일식, 양식, 카페, 기타
+    category = Column(
+        String(50), nullable=False, index=True
+    )  # 한식, 중식, 일식, 양식, 카페, 기타
     rating = Column(Float, nullable=True)
     price_range = Column(String(20), nullable=True)  # 저렴, 보통, 고급
     description = Column(Text, nullable=True)
@@ -400,13 +462,16 @@ class Restaurant(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 # 교통 정보 모델
 class Transportation(Base):
     __tablename__ = "transportations"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False, index=True)
-    type = Column(String(50), nullable=False, index=True)  # 지하철, 버스, 택시, 기차, 공항
+    type = Column(
+        String(50), nullable=False, index=True
+    )  # 지하철, 버스, 택시, 기차, 공항
     description = Column(Text, nullable=False)
     route_info = Column(Text, nullable=True)
     operating_hours = Column(String(200), nullable=True)
@@ -417,6 +482,7 @@ class Transportation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 # 숙소 정보 모델
 class Accommodation(Base):
     __tablename__ = "accommodations"
@@ -425,7 +491,9 @@ class Accommodation(Base):
     name = Column(String(200), nullable=False, index=True)
     address = Column(String(500), nullable=False)
     phone = Column(String(50), nullable=True)
-    type = Column(String(50), nullable=False, index=True)  # 호텔, 펜션, 게스트하우스, 모텔, 리조트
+    type = Column(
+        String(50), nullable=False, index=True
+    )  # 호텔, 펜션, 게스트하우스, 모텔, 리조트
     rating = Column(Float, nullable=True)
     price_range = Column(String(20), nullable=True)  # 저렴, 보통, 고급, 럭셔리
     amenities = Column(Text, nullable=True)  # JSON string
@@ -439,6 +507,7 @@ class Accommodation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 # 리뷰 모델
 class Review(Base):
     __tablename__ = "reviews"
@@ -446,11 +515,14 @@ class Review(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
     place_id = Column(Integer, nullable=False, index=True)
-    place_type = Column(String(50), nullable=False)  # restaurant, transportation, accommodation
+    place_type = Column(
+        String(50), nullable=False
+    )  # restaurant, transportation, accommodation
     rating = Column(Integer, nullable=False)  # 1-5
     comment = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 # 지역 정보 모델
 class CityInfo(Base):
@@ -467,6 +539,7 @@ class CityInfo(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 # 즐겨찾기 모델
 class FavoritePlace(Base):
     __tablename__ = "favorite_places"
@@ -474,9 +547,12 @@ class FavoritePlace(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
     place_id = Column(Integer, nullable=False)
-    place_type = Column(String(50), nullable=False)  # restaurant, transportation, accommodation
+    place_type = Column(
+        String(50), nullable=False
+    )  # restaurant, transportation, accommodation
     city = Column(String(100), nullable=False, index=True)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 # 대기질 관련 모델들
 class AirQualityRecord(Base):
@@ -499,6 +575,7 @@ class AirQualityRecord(Base):
     longitude = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class AirQualityFavorite(Base):
     __tablename__ = "air_quality_favorites"
 
@@ -507,17 +584,21 @@ class AirQualityFavorite(Base):
     city = Column(String(100), nullable=False, index=True)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class AirQualityAlert(Base):
     __tablename__ = "air_quality_alerts"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
     city = Column(String(100), nullable=False, index=True)
-    alert_type = Column(String(50), nullable=False)  # daily_report, grade_change, health_advice
+    alert_type = Column(
+        String(50), nullable=False
+    )  # daily_report, grade_change, health_advice
     threshold_grade = Column(String(20), nullable=True)  # 나쁨, 매우나쁨
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 class AirQualityHealthProfile(Base):
     __tablename__ = "air_quality_health_profiles"
@@ -532,6 +613,7 @@ class AirQualityHealthProfile(Base):
     preferred_activities = Column(Text, nullable=True)  # JSON string
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 # Pydantic 모델 - 대기질 관련
 class AirQualityRecordResponse(BaseModel):
@@ -555,6 +637,7 @@ class AirQualityRecordResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AirQualityFavoriteResponse(BaseModel):
     id: int
     user_id: int
@@ -564,10 +647,12 @@ class AirQualityFavoriteResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AirQualityAlertCreate(BaseModel):
     city: str
     alert_type: str
     threshold_grade: Optional[str] = None
+
 
 class AirQualityAlertResponse(BaseModel):
     id: int
@@ -582,6 +667,7 @@ class AirQualityAlertResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AirQualityHealthProfileCreate(BaseModel):
     has_respiratory_condition: bool = False
     has_heart_condition: bool = False
@@ -589,6 +675,7 @@ class AirQualityHealthProfileCreate(BaseModel):
     age_group: Optional[str] = None
     sensitivity_level: str = "normal"
     preferred_activities: Optional[List[str]] = None
+
 
 class AirQualityHealthProfileResponse(BaseModel):
     id: int
@@ -605,10 +692,12 @@ class AirQualityHealthProfileResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AirQualityHistoryResponse(BaseModel):
     city: str
     records: List[AirQualityRecordResponse]
     summary: dict
+
 
 class AirQualityUserStats(BaseModel):
     total_queries: int
@@ -616,6 +705,7 @@ class AirQualityUserStats(BaseModel):
     most_queried_city: Optional[str] = None
     average_aqi: Optional[float] = None
     health_profile: Optional[AirQualityHealthProfileResponse] = None
+
 
 # 여행 계획 관련 모델
 class TravelPlan(Base):
@@ -627,13 +717,18 @@ class TravelPlan(Base):
     description = Column(Text, nullable=True)
     start_date = Column(String, nullable=False)  # Date string (YYYY-MM-DD)
     end_date = Column(String, nullable=False)  # Date string (YYYY-MM-DD)
-    budget = Column(DECIMAL(10,2), nullable=True)
+    budget = Column(DECIMAL(10, 2), nullable=True)
     participants = Column(Integer, default=1)
     transportation = Column(String(50), nullable=True)
-    status = Column(String(20), default="draft")  # draft, confirmed, completed, cancelled
+    status = Column(
+        String(20), default="draft"
+    )  # draft, confirmed, completed, cancelled
     itinerary = Column(JSONB, nullable=True)  # 여행 일정 상세 정보
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
 
 class Destination(Base):
     __tablename__ = "destinations"
@@ -656,7 +751,10 @@ class Destination(Base):
     season_preferences = Column(JSONB, nullable=True)
     popularity_score = Column(DECIMAL(5, 2), default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
 
 class WeatherData(Base):
     __tablename__ = "weather_data"
@@ -673,6 +771,7 @@ class WeatherData(Base):
     uv_index = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 # Pydantic 모델 - 여행 계획
 class TravelPlanCreate(BaseModel):
     title: str
@@ -682,6 +781,7 @@ class TravelPlanCreate(BaseModel):
     budget: Optional[float] = None
     participants: int = 1
     transportation: Optional[str] = None
+
 
 class TravelPlanUpdate(BaseModel):
     title: Optional[str] = None
@@ -693,6 +793,7 @@ class TravelPlanUpdate(BaseModel):
     transportation: Optional[str] = None
     status: Optional[str] = None
     itinerary: Optional[dict] = None
+
 
 class TravelPlanResponse(BaseModel):
     id: str  # UUID as string
@@ -712,6 +813,7 @@ class TravelPlanResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Pydantic 모델 - 여행지
 class DestinationCreate(BaseModel):
     name: str
@@ -726,6 +828,7 @@ class DestinationCreate(BaseModel):
     weather_tags: Optional[List[str]] = None
     activity_tags: Optional[List[str]] = None
     season_preferences: Optional[dict] = None
+
 
 class DestinationResponse(BaseModel):
     id: str  # UUID as string
@@ -751,6 +854,7 @@ class DestinationResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # Pydantic 모델 - 여행지 추천
 class RecommendationRequest(BaseModel):
     travel_dates: List[str]  # ["2024-08-01", "2024-08-03"]
@@ -760,15 +864,18 @@ class RecommendationRequest(BaseModel):
     max_distance: Optional[int] = 500  # km
     budget_range: Optional[str] = None  # "low", "medium", "high"
 
+
 class RecommendationResponse(BaseModel):
     destinations: List[DestinationResponse]
     weather_forecast: Optional[Dict[str, Any]] = None
     total_results: int
     recommendation_score: Optional[float] = None
 
+
 # 구글 OAuth 관련 모델
 class GoogleLoginRequest(BaseModel):
     id_token: str
+
 
 class GoogleLoginResponse(BaseModel):
     access_token: str
@@ -777,25 +884,31 @@ class GoogleLoginResponse(BaseModel):
     user_info: UserResponse
     is_new_user: bool
 
+
 class GoogleAuthUrlResponse(BaseModel):
     auth_url: str
     state: str
+
 
 # 이메일 인증 관련 모델
 class EmailVerificationRequest(BaseModel):
     email: str
     username: Optional[str] = None
 
+
 class EmailVerificationConfirm(BaseModel):
     email: str
     verification_code: str
+
 
 class EmailVerificationResponse(BaseModel):
     message: str
     success: bool
 
+
 class ResendVerificationRequest(BaseModel):
     email: str
+
 
 # 관리자 관련 모델
 class Admin(Base):
@@ -813,6 +926,7 @@ class Admin(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 class Role(Base):
     __tablename__ = "roles"
 
@@ -823,6 +937,7 @@ class Role(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class AdminRole(Base):
     __tablename__ = "admin_roles"
 
@@ -831,6 +946,7 @@ class AdminRole(Base):
     role_id = Column(Integer, nullable=False, index=True)
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
+
 
 class SystemLog(Base):
     __tablename__ = "system_logs"
@@ -842,6 +958,7 @@ class SystemLog(Base):
     context = Column(Text, nullable=True)  # JSON string
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 # Pydantic 모델 - 관리자 시스템
 class AdminCreate(BaseModel):
     email: EmailStr
@@ -849,9 +966,11 @@ class AdminCreate(BaseModel):
     name: str
     phone: Optional[str] = None
 
+
 class AdminLogin(BaseModel):
     email: EmailStr
     password: str
+
 
 class AdminResponse(BaseModel):
     id: int
@@ -866,17 +985,20 @@ class AdminResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AdminToken(BaseModel):
     access_token: str
     token_type: str
     expires_in: int
     admin_info: AdminResponse
 
+
 # Pydantic 모델 - 대시보드 통계
 class DashboardStats(BaseModel):
     realtime_metrics: dict
     daily_stats: dict
     alerts: List[dict] = []
+
 
 class UserAnalytics(BaseModel):
     total_users: int
@@ -887,12 +1009,14 @@ class UserAnalytics(BaseModel):
     user_growth_rate: float
     retention_rate: float
 
+
 class SystemMetrics(BaseModel):
     api_response_time: float
     database_query_time: float
     cache_hit_ratio: float
     error_rate: float
     uptime_percentage: float
+
 
 class ContentStats(BaseModel):
     total_destinations: int
@@ -901,6 +1025,7 @@ class ContentStats(BaseModel):
     completed_travel_plans: int
     total_reviews: int
     average_rating: float
+
 
 # 이메일 인증 모델
 class EmailVerification(Base):
@@ -913,6 +1038,7 @@ class EmailVerification(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 # API 표준 응답 형식
 class StandardResponse(BaseModel):
     success: bool
@@ -921,11 +1047,13 @@ class StandardResponse(BaseModel):
     pagination: Optional[dict] = None
     timestamp: str
 
+
 class PaginationInfo(BaseModel):
     page: int
     limit: int
     total: int
     total_pages: int
+
 
 class ErrorDetail(BaseModel):
     code: str
