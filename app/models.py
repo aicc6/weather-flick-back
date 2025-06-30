@@ -19,6 +19,8 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
 import enum
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
 
 
 Base = declarative_base()
@@ -43,6 +45,12 @@ class TravelPlanStatus(enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class UserRole(enum.Enum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+    MODERATOR = "MODERATOR"
+
+
 class User(Base):
     __tablename__ = "users"
     user_id = Column(
@@ -50,12 +58,22 @@ class User(Base):
     )
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)  # auth.py에서 사용하는 필드명
     nickname = Column(String)
     profile_image = Column(String)
     preferences = Column(JSONB)
     account_type = Column(Enum(AccountType), default=AccountType.USER)
+    is_active = Column(Boolean, default=True)
+    role = Column(Enum(UserRole), default=UserRole.USER)
+    last_login = Column(DateTime)
+    login_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # id 속성을 user_id의 별칭으로 추가
+    @property
+    def id(self):
+        return self.user_id
 
     travel_plans = relationship("TravelPlan", back_populates="user")
     reviews = relationship("Review", back_populates="user")
@@ -197,3 +215,380 @@ class SystemLog(Base):
     message = Column(Text, nullable=False)
     context = Column(JSONB)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, nullable=False, index=True)
+    code = Column(String, nullable=False)
+    is_verified = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class FavoritePlace(Base):
+    __tablename__ = "favorite_places"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    place_name = Column(String, nullable=False)
+    place_type = Column(String, nullable=False)  # restaurant, accommodation, transport
+    address = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    description = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Restaurant(Base):
+    __tablename__ = "restaurants"
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    address = Column(String, nullable=False)
+    phone = Column(String)
+    rating = Column(Float)
+    price_range = Column(String)
+    opening_hours = Column(JSONB)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Transportation(Base):
+    __tablename__ = "transportation"
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # bus, subway, taxi, etc.
+    route = Column(String)
+    schedule = Column(JSONB)
+    fare = Column(String)
+    contact = Column(String)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Accommodation(Base):
+    __tablename__ = "accommodations"
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # hotel, motel, guesthouse, etc.
+    address = Column(String, nullable=False)
+    phone = Column(String)
+    rating = Column(Float)
+    price_range = Column(String)
+    amenities = Column(JSONB)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CityInfo(Base):
+    __tablename__ = "city_info"
+    id = Column(Integer, primary_key=True, index=True)
+    city_name = Column(String, nullable=False, unique=True)
+    region = Column(String, nullable=False)
+    population = Column(Integer)
+    area = Column(Float)
+    description = Column(Text)
+    attractions = Column(JSONB)
+    weather_info = Column(JSONB)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+# Pydantic 모델들
+class WeatherRequest(BaseModel):
+    city: str
+    country: Optional[str] = None
+
+
+class WeatherCondition(BaseModel):
+    temperature: float
+    feels_like: float
+    humidity: int
+    pressure: float
+    condition: str
+    description: str
+    icon: str
+    wind_speed: float
+    wind_direction: int
+    visibility: float
+    uv_index: float
+
+
+class WeatherResponse(BaseModel):
+    city: str
+    country: str
+    current: WeatherCondition
+    timezone: str
+    local_time: str
+
+
+class ForecastDay(BaseModel):
+    date: str
+    temperature_max: float
+    temperature_min: float
+    condition: str
+    description: str
+    icon: str
+    humidity: int
+    wind_speed: float
+    precipitation_chance: float
+
+
+class ForecastResponse(BaseModel):
+    city: str
+    country: str
+    forecast: List[ForecastDay]
+    timezone: str
+
+
+# 인증 관련 Pydantic 모델들
+class TokenData(BaseModel):
+    email: Optional[str] = None
+    role: Optional[str] = None
+
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    nickname: Optional[str] = None
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    email: str
+    nickname: Optional[str] = None
+    profile_image: Optional[str] = None
+    account_type: str
+    is_active: bool
+    created_at: str
+    
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class UserUpdate(BaseModel):
+    nickname: Optional[str] = None
+    profile_image: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class GoogleLoginRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+
+class GoogleLoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+
+class GoogleAuthUrlResponse(BaseModel):
+    auth_url: str
+
+
+class EmailVerificationRequest(BaseModel):
+    email: str
+
+
+class EmailVerificationConfirm(BaseModel):
+    email: str
+    code: str
+
+
+class EmailVerificationResponse(BaseModel):
+    message: str
+    success: bool
+
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+
+# 추천 및 여행 계획 관련 모델들
+class StandardResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict[str, Any]] = None
+
+
+class PaginationInfo(BaseModel):
+    page: int
+    page_size: int
+    total_count: int
+    total_pages: int
+
+
+class DestinationResponse(BaseModel):
+    destination_id: str
+    name: str
+    region: Optional[str] = None
+    category: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    amenities: Optional[Dict[str, Any]] = None
+    image_url: Optional[str] = None
+    rating: Optional[float] = None
+    recommendation_weight: Optional[float] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class RecommendationRequest(BaseModel):
+    destination_types: Optional[List[str]] = None
+    budget_range: Optional[Dict[str, float]] = None
+    travel_dates: Optional[Dict[str, str]] = None
+    preferences: Optional[Dict[str, Any]] = None
+
+
+class RecommendationResponse(BaseModel):
+    destinations: List[DestinationResponse]
+    total_count: int
+    recommendation_score: float
+
+
+class TravelPlanCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: str
+    budget: Optional[float] = None
+    itinerary: Optional[Dict[str, Any]] = None
+
+
+class TravelPlanUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    budget: Optional[float] = None
+    status: Optional[str] = None
+    itinerary: Optional[Dict[str, Any]] = None
+
+
+class TravelPlanResponse(BaseModel):
+    plan_id: str
+    user_id: str
+    title: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: str
+    budget: Optional[float] = None
+    status: str
+    itinerary: Optional[Dict[str, Any]] = None
+    created_at: str
+    
+    class Config:
+        from_attributes = True
+
+
+# 지역 정보 관련 모델들
+class SearchRequest(BaseModel):
+    query: str
+    category: Optional[str] = None
+    location: Optional[str] = None
+    limit: Optional[int] = 10
+
+
+class SearchResult(BaseModel):
+    results: List[Dict[str, Any]]
+    total_count: int
+    category: str
+
+
+class RestaurantResponse(BaseModel):
+    id: str
+    name: str
+    category: str
+    address: str
+    phone: Optional[str] = None
+    rating: Optional[float] = None
+    price_range: Optional[str] = None
+    opening_hours: Optional[Dict[str, Any]] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class AccommodationResponse(BaseModel):
+    id: str
+    name: str
+    type: str  # hotel, motel, guesthouse, etc.
+    address: str
+    phone: Optional[str] = None
+    rating: Optional[float] = None
+    price_range: Optional[str] = None
+    amenities: Optional[List[str]] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class TransportationResponse(BaseModel):
+    id: str
+    name: str
+    type: str  # bus, subway, taxi, etc.
+    route: Optional[str] = None
+    schedule: Optional[Dict[str, Any]] = None
+    fare: Optional[str] = None
+    contact: Optional[str] = None
+
+
+class CityInfoResponse(BaseModel):
+    city_name: str
+    region: str
+    population: Optional[int] = None
+    area: Optional[float] = None
+    description: Optional[str] = None
+    attractions: Optional[List[str]] = None
+    weather_info: Optional[Dict[str, Any]] = None
+
+
+class FavoritePlaceResponse(BaseModel):
+    id: int
+    place_name: str
+    place_type: str
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    description: Optional[str] = None
+    created_at: str
+    
+    class Config:
+        from_attributes = True
+
+
+class ReviewCreate(BaseModel):
+    destination_id: str
+    travel_plan_id: Optional[str] = None
+    rating: int
+    content: Optional[str] = None
+    photos: Optional[List[str]] = None
+
+
+class ReviewResponse(BaseModel):
+    review_id: str
+    user_id: str
+    destination_id: str
+    travel_plan_id: Optional[str] = None
+    rating: int
+    content: Optional[str] = None
+    photos: Optional[List[str]] = None
+    created_at: str
+    
+    class Config:
+        from_attributes = True
+
+
+# 사용자 활동 로그 테이블 (이미 UserActivityLog가 있으므로 별칭으로 사용)
+UserActivity = UserActivityLog
