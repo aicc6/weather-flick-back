@@ -8,6 +8,7 @@ from app.config import settings
 from app.models import EmailVerification
 from app.database import get_db
 
+
 class EmailService:
     """이메일 서비스"""
 
@@ -22,15 +23,17 @@ class EmailService:
             MAIL_SSL_TLS=settings.mail_ssl_tls,
             MAIL_FROM_NAME=settings.mail_from_name,
             USE_CREDENTIALS=True,
-            VALIDATE_CERTS=True
+            VALIDATE_CERTS=True,
         )
         self.fastmail = FastMail(self.conf)
 
     def generate_verification_code(self) -> str:
         """6자리 인증 코드 생성"""
-        return ''.join(random.choices(string.digits, k=6))
+        return "".join(random.choices(string.digits, k=6))
 
-    async def send_verification_email(self, email: str, verification_code: str, username: str = None):
+    async def send_verification_email(
+        self, email: str, verification_code: str, nickname: str = None
+    ):
         """인증 이메일 발송"""
         try:
             # 이메일 템플릿
@@ -57,7 +60,7 @@ class EmailService:
                         <p>이메일 인증</p>
                     </div>
                     <div class="content">
-                        <h2>안녕하세요{f', {username}' if username else ''}!</h2>
+                        <h2>안녕하세요{f", {nickname}" if nickname else ""}!</h2>
                         <p>Weather Flick 회원가입을 위한 이메일 인증 코드입니다.</p>
 
                         <div class="verification-code">
@@ -83,7 +86,7 @@ class EmailService:
                 subject="Weather Flick 이메일 인증",
                 recipients=[email],
                 body=html_content,
-                subtype="html"
+                subtype="html",
             )
 
             await self.fastmail.send_message(message)
@@ -93,7 +96,7 @@ class EmailService:
             print(f"이메일 발송 실패: {e}")
             return False
 
-    async def send_welcome_email(self, email: str, username: str):
+    async def send_welcome_email(self, email: str, nickname: str):
         """환영 이메일 발송"""
         try:
             html_content = f"""
@@ -117,7 +120,7 @@ class EmailService:
                         <p>환영합니다!</p>
                     </div>
                     <div class="content">
-                        <h2>안녕하세요, {username}님!</h2>
+                        <h2>안녕하세요, {nickname}님!</h2>
                         <p>Weather Flick에 가입해주셔서 감사합니다! 🎉</p>
 
                         <p>이제 다음과 같은 서비스를 이용하실 수 있습니다:</p>
@@ -142,7 +145,7 @@ class EmailService:
                 subject="Weather Flick에 오신 것을 환영합니다!",
                 recipients=[email],
                 body=html_content,
-                subtype="html"
+                subtype="html",
             )
 
             await self.fastmail.send_message(message)
@@ -152,6 +155,7 @@ class EmailService:
             print(f"환영 이메일 발송 실패: {e}")
             return False
 
+
 # 이메일 인증 관리 클래스
 class EmailVerificationService:
     """이메일 인증 관리 서비스"""
@@ -159,13 +163,14 @@ class EmailVerificationService:
     def __init__(self):
         self.email_service = EmailService()
 
-    async def create_verification(self, db: Session, email: str, username: str = None) -> Optional[str]:
+    async def create_verification(
+        self, db: Session, email: str, nickname: str = None
+    ) -> Optional[str]:
         """인증 코드 생성 및 이메일 발송"""
         try:
             # 기존 미사용 인증 코드 삭제
             db.query(EmailVerification).filter(
-                EmailVerification.email == email,
-                EmailVerification.is_used == False
+                EmailVerification.email == email, EmailVerification.is_used == False
             ).delete()
 
             # 새 인증 코드 생성
@@ -173,9 +178,7 @@ class EmailVerificationService:
             expires_at = datetime.utcnow() + timedelta(minutes=10)
 
             verification = EmailVerification(
-                email=email,
-                verification_code=verification_code,
-                expires_at=expires_at
+                email=email, verification_code=verification_code, expires_at=expires_at
             )
 
             db.add(verification)
@@ -183,7 +186,7 @@ class EmailVerificationService:
 
             # 이메일 발송
             success = await self.email_service.send_verification_email(
-                email, verification_code, username
+                email, verification_code, nickname
             )
 
             if success:
@@ -201,12 +204,16 @@ class EmailVerificationService:
     def verify_code(self, db: Session, email: str, code: str) -> bool:
         """인증 코드 검증"""
         try:
-            verification = db.query(EmailVerification).filter(
-                EmailVerification.email == email,
-                EmailVerification.verification_code == code,
-                EmailVerification.is_used == False,
-                EmailVerification.expires_at > datetime.utcnow()
-            ).first()
+            verification = (
+                db.query(EmailVerification)
+                .filter(
+                    EmailVerification.email == email,
+                    EmailVerification.verification_code == code,
+                    EmailVerification.is_used == False,
+                    EmailVerification.expires_at > datetime.utcnow(),
+                )
+                .first()
+            )
 
             if verification:
                 # 인증 코드 사용 처리
@@ -223,16 +230,20 @@ class EmailVerificationService:
     def is_email_verified(self, db: Session, email: str) -> bool:
         """이메일이 인증되었는지 확인"""
         try:
-            verification = db.query(EmailVerification).filter(
-                EmailVerification.email == email,
-                EmailVerification.is_used == True
-            ).first()
+            verification = (
+                db.query(EmailVerification)
+                .filter(
+                    EmailVerification.email == email, EmailVerification.is_used == True
+                )
+                .first()
+            )
 
             return verification is not None
 
         except Exception as e:
             print(f"이메일 인증 상태 확인 실패: {e}")
             return False
+
 
 # 서비스 인스턴스
 email_service = EmailService()

@@ -5,15 +5,29 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
 from app.models import (
-    User, UserCreate, UserResponse, Token, UserUpdate,
-    PasswordChange, GoogleLoginRequest,
-    GoogleLoginResponse, GoogleAuthUrlResponse, EmailVerificationRequest,
-    EmailVerificationConfirm, EmailVerificationResponse, ResendVerificationRequest
+    User,
+    UserCreate,
+    UserResponse,
+    Token,
+    UserUpdate,
+    PasswordChange,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
+    GoogleAuthUrlResponse,
+    EmailVerificationRequest,
+    EmailVerificationConfirm,
+    EmailVerificationResponse,
+    ResendVerificationRequest,
 )
 from app.auth import (
-    authenticate_user, create_access_token, get_password_hash,
-    get_current_active_user, update_user_login_info, log_user_activity, check_password_strength,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    authenticate_user,
+    create_access_token,
+    get_password_hash,
+    get_current_active_user,
+    update_user_login_info,
+    log_user_activity,
+    check_password_strength,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from app.services.google_oauth_service import google_oauth_service
 from app.services.email_service import email_verification_service, email_service
@@ -21,10 +35,8 @@ import secrets
 import httpx
 import requests
 
-router = APIRouter(
-    prefix="/auth",
-    tags=["authentication"]
-)
+router = APIRouter(prefix="/auth", tags=["authentication"])
+
 
 @router.post("/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -33,16 +45,14 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
 
     # 사용자명 중복 확인
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
         )
 
     # 비밀번호 강도 검사
@@ -50,14 +60,14 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     if not password_check["is_valid"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Password is too weak: {', '.join(password_check['errors'])}"
+            detail=f"Password is too weak: {', '.join(password_check['errors'])}",
         )
 
     # 이메일 인증 확인
     if not email_verification_service.is_email_verified(db, user.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email verification required. Please verify your email first."
+            detail="Email verification required. Please verify your email first.",
         )
 
     # 새 사용자 생성
@@ -68,7 +78,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         hashed_password=hashed_password,
         role=user.role,
         is_verified=True,  # 이메일 인증 완료
-        email_verified=True
+        email_verified=True,
     )
     db.add(db_user)
     db.commit()
@@ -79,11 +89,12 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
     return db_user
 
+
 @router.post("/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
-    request: Request = None
+    request: Request = None,
 ):
     """로그인"""
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -101,21 +112,22 @@ async def login(
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role.value},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
     )
 
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user_info": user
+        "user_info": user,
     }
+
 
 @router.post("/logout")
 async def logout(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-    request: Request = None
+    request: Request = None,
 ):
     """로그아웃"""
     if request:
@@ -125,33 +137,35 @@ async def logout(
             activity_type="logout",
             description="User logged out",
             ip_address=request.client.host,
-            user_agent=request.headers.get("User-Agent")
+            user_agent=request.headers.get("User-Agent"),
         )
 
     return {"message": "Successfully logged out"}
+
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """현재 사용자 정보 조회"""
     return current_user
 
+
 @router.put("/me", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """사용자 프로필 업데이트"""
     if user_update.username:
         # 사용자명 중복 확인
-        existing_user = db.query(User).filter(
-            User.username == user_update.username,
-            User.id != current_user.id
-        ).first()
+        existing_user = (
+            db.query(User)
+            .filter(User.username == user_update.username, User.id != current_user.id)
+            .first()
+        )
         if existing_user:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already taken"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
             )
         current_user.username = user_update.username
 
@@ -165,19 +179,23 @@ async def update_user_profile(
     db.refresh(current_user)
     return current_user
 
+
 @router.post("/change-password")
 async def change_password(
     password_change: PasswordChange,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """비밀번호 변경"""
     # 현재 비밀번호 확인
     from app.auth import verify_password
-    if not verify_password(password_change.current_password, current_user.hashed_password):
+
+    if not verify_password(
+        password_change.current_password, current_user.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
+            detail="Current password is incorrect",
         )
 
     # 새 비밀번호 강도 검사
@@ -185,7 +203,7 @@ async def change_password(
     if not password_check["is_valid"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Password is too weak: {', '.join(password_check['errors'])}"
+            detail=f"Password is too weak: {', '.join(password_check['errors'])}",
         )
 
     # 비밀번호 변경
@@ -193,6 +211,7 @@ async def change_password(
     db.commit()
 
     return {"message": "Password changed successfully"}
+
 
 # 구글 OAuth 엔드포인트들
 @router.get("/google/auth-url", response_model=GoogleAuthUrlResponse)
@@ -211,11 +230,12 @@ async def get_google_auth_url():
 
     return GoogleAuthUrlResponse(auth_url=auth_url, state=state)
 
+
 @router.post("/google/login", response_model=GoogleLoginResponse)
 async def google_login(
     request: GoogleLoginRequest,
     db: Session = Depends(get_db),
-    http_request: Request = None
+    http_request: Request = None,
 ):
     """구글 ID 토큰으로 로그인"""
     try:
@@ -238,7 +258,7 @@ async def google_login(
             token_type="bearer",
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user_info=user,
-            is_new_user=is_new_user
+            is_new_user=is_new_user,
         )
 
     except HTTPException:
@@ -246,15 +266,13 @@ async def google_login(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Google login failed: {str(e)}"
+            detail=f"Google login failed: {str(e)}",
         )
+
 
 @router.get("/google/callback")
 async def google_callback(
-    code: str,
-    state: str,
-    db: Session = Depends(get_db),
-    request: Request = None
+    code: str, state: str, db: Session = Depends(get_db), request: Request = None
 ):
     """구글 OAuth 콜백 처리"""
     try:
@@ -267,8 +285,8 @@ async def google_callback(
                     "client_secret": google_oauth_service.client_secret,
                     "code": code,
                     "grant_type": "authorization_code",
-                    "redirect_uri": google_oauth_service.redirect_uri
-                }
+                    "redirect_uri": google_oauth_service.redirect_uri,
+                },
             )
 
             if token_response.status_code != 200:
@@ -284,9 +302,7 @@ async def google_callback(
         user_info = await google_oauth_service.get_google_user_info(access_token)
 
         # 사용자 생성 또는 업데이트
-        user = await google_oauth_service.create_or_update_user(
-            db, user_info, request
-        )
+        user = await google_oauth_service.create_or_update_user(db, user_info, request)
 
         # 액세스 토큰 생성
         jwt_token = google_oauth_service.create_access_token_for_user(user)
@@ -300,14 +316,15 @@ async def google_callback(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Google callback failed: {str(e)}"
+            detail=f"Google callback failed: {str(e)}",
         )
+
 
 @router.post("/google/link", response_model=UserResponse)
 async def link_google_account(
     request: GoogleLoginRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """기존 계정에 구글 계정 연결"""
     try:
@@ -315,22 +332,28 @@ async def link_google_account(
         google_data = await google_oauth_service.verify_google_token(request.id_token)
 
         # 이미 다른 사용자가 사용 중인지 확인
-        existing_user = db.query(User).filter(
-            (User.google_id == google_data['google_id']) |
-            (User.email == google_data['email'])
-        ).first()
+        existing_user = (
+            db.query(User)
+            .filter(
+                (User.google_id == google_data["google_id"])
+                | (User.email == google_data["email"])
+            )
+            .first()
+        )
 
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(
                 status_code=400,
-                detail="This Google account is already linked to another user"
+                detail="This Google account is already linked to another user",
             )
 
         # 현재 사용자에 구글 계정 연결
-        current_user.google_id = google_data['google_id']
-        current_user.email_verified = google_data.get('email_verified', False)
-        current_user.is_verified = google_data.get('email_verified', False)
-        current_user.profile_image = google_data.get('picture', current_user.profile_image)
+        current_user.google_id = google_data["google_id"]
+        current_user.email_verified = google_data.get("email_verified", False)
+        current_user.is_verified = google_data.get("email_verified", False)
+        current_user.profile_image = google_data.get(
+            "picture", current_user.profile_image
+        )
 
         db.commit()
         db.refresh(current_user)
@@ -342,14 +365,14 @@ async def link_google_account(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to link Google account: {str(e)}"
+            detail=f"Failed to link Google account: {str(e)}",
         )
+
 
 # 이메일 인증 관련 엔드포인트들
 @router.post("/send-verification", response_model=EmailVerificationResponse)
 async def send_email_verification(
-    request: EmailVerificationRequest,
-    db: Session = Depends(get_db)
+    request: EmailVerificationRequest, db: Session = Depends(get_db)
 ):
     """이메일 인증 코드 발송"""
     try:
@@ -358,23 +381,22 @@ async def send_email_verification(
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email already registered",
             )
 
         # 인증 코드 생성 및 이메일 발송
         verification_code = await email_verification_service.create_verification(
-            db, request.email, request.username
+            db, request.email, request.nickname
         )
 
         if verification_code:
             return EmailVerificationResponse(
-                message="Verification code sent successfully",
-                success=True
+                message="Verification code sent successfully", success=True
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send verification email"
+                detail="Failed to send verification email",
             )
 
     except HTTPException:
@@ -382,13 +404,13 @@ async def send_email_verification(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send verification: {str(e)}"
+            detail=f"Failed to send verification: {str(e)}",
         )
+
 
 @router.post("/verify-email", response_model=EmailVerificationResponse)
 async def verify_email(
-    request: EmailVerificationConfirm,
-    db: Session = Depends(get_db)
+    request: EmailVerificationConfirm, db: Session = Depends(get_db)
 ):
     """이메일 인증 코드 확인"""
     try:
@@ -399,13 +421,12 @@ async def verify_email(
 
         if is_valid:
             return EmailVerificationResponse(
-                message="Email verified successfully",
-                success=True
+                message="Email verified successfully", success=True
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired verification code"
+                detail="Invalid or expired verification code",
             )
 
     except HTTPException:
@@ -413,13 +434,13 @@ async def verify_email(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Verification failed: {str(e)}"
+            detail=f"Verification failed: {str(e)}",
         )
+
 
 @router.post("/resend-verification", response_model=EmailVerificationResponse)
 async def resend_verification(
-    request: ResendVerificationRequest,
-    db: Session = Depends(get_db)
+    request: ResendVerificationRequest, db: Session = Depends(get_db)
 ):
     """인증 코드 재발송"""
     try:
@@ -428,23 +449,22 @@ async def resend_verification(
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email already registered",
             )
 
         # 인증 코드 재발송
         verification_code = await email_verification_service.create_verification(
-            db, request.email
+            db, request.email, request.nickname
         )
 
         if verification_code:
             return EmailVerificationResponse(
-                message="Verification code resent successfully",
-                success=True
+                message="Verification code resent successfully", success=True
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to resend verification email"
+                detail="Failed to resend verification email",
             )
 
     except HTTPException:
@@ -452,8 +472,9 @@ async def resend_verification(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to resend verification: {str(e)}"
+            detail=f"Failed to resend verification: {str(e)}",
         )
+
 
 @router.post("/google", response_model=Token)
 def google_login(data: dict, db: Session = Depends(get_db)):
@@ -465,7 +486,7 @@ def google_login(data: dict, db: Session = Depends(get_db)):
     # 구글에서 사용자 정보 가져오기
     userinfo_response = requests.get(
         "https://www.googleapis.com/oauth2/v3/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"}
+        headers={"Authorization": f"Bearer {access_token}"},
     )
     if not userinfo_response.ok:
         raise HTTPException(status_code=400, detail="Invalid Google token")
@@ -478,10 +499,13 @@ def google_login(data: dict, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         from app.auth import get_password_hash
+
         user = User(
             email=email,
             username=username,
-            hashed_password=get_password_hash(access_token),  # 소셜 로그인은 access_token 등으로 대체
+            hashed_password=get_password_hash(
+                access_token
+            ),  # 소셜 로그인은 access_token 등으로 대체
             is_verified=True,
         )
         db.add(user)
@@ -489,10 +513,11 @@ def google_login(data: dict, db: Session = Depends(get_db)):
         db.refresh(user)
 
     from app.auth import create_access_token
+
     token = create_access_token(data={"sub": user.email, "role": user.role.value})
     return {
         "access_token": token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user_info": user
+        "user_info": user,
     }

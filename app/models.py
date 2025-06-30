@@ -69,7 +69,7 @@ class User(Base):
     login_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+
     # id 속성을 user_id의 별칭으로 추가
     @property
     def id(self):
@@ -362,7 +362,7 @@ class UserResponse(BaseModel):
     account_type: str
     is_active: bool
     created_at: str
-    
+
     class Config:
         from_attributes = True
 
@@ -400,6 +400,7 @@ class GoogleAuthUrlResponse(BaseModel):
 
 class EmailVerificationRequest(BaseModel):
     email: str
+    nickname: str
 
 
 class EmailVerificationConfirm(BaseModel):
@@ -414,6 +415,7 @@ class EmailVerificationResponse(BaseModel):
 
 class ResendVerificationRequest(BaseModel):
     email: str
+    nickname: str
 
 
 # 추천 및 여행 계획 관련 모델들
@@ -441,7 +443,7 @@ class DestinationResponse(BaseModel):
     image_url: Optional[str] = None
     rating: Optional[float] = None
     recommendation_weight: Optional[float] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -489,7 +491,7 @@ class TravelPlanResponse(BaseModel):
     status: str
     itinerary: Optional[Dict[str, Any]] = None
     created_at: str
-    
+
     class Config:
         from_attributes = True
 
@@ -563,7 +565,7 @@ class FavoritePlaceResponse(BaseModel):
     longitude: Optional[float] = None
     description: Optional[str] = None
     created_at: str
-    
+
     class Config:
         from_attributes = True
 
@@ -585,7 +587,7 @@ class ReviewResponse(BaseModel):
     content: Optional[str] = None
     photos: Optional[List[str]] = None
     created_at: str
-    
+
     class Config:
         from_attributes = True
 
