@@ -61,15 +61,21 @@ def authenticate_user(db: Session, email: str, password: str):
         return False
     return user
 
-def log_user_activity(db: Session, user_id: int, activity_type: str, description: str = None,
+def log_user_activity(db: Session, user_id, activity_type: str, description: str = None,
                      ip_address: str = None, user_agent: str = None):
     """사용자 활동 로깅"""
+    details = {}
+    if description:
+        details["description"] = description
+    if ip_address:
+        details["ip_address"] = ip_address
+    if user_agent:
+        details["user_agent"] = user_agent
+    
     activity = UserActivity(
         user_id=user_id,
         activity_type=activity_type,
-        description=description,
-        ip_address=ip_address,
-        user_agent=user_agent
+        details=details
     )
     db.add(activity)
     db.commit()
