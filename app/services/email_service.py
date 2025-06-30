@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from sqlalchemy.orm import Session
@@ -31,7 +31,7 @@ class EmailService:
         return "".join(random.choices(string.digits, k=6))
 
     async def send_verification_email(
-        self, email: str, verification_code: str, nickname: str = None
+        self, email: str, code: str, nickname: str = None
     ):
         """인증 이메일 발송"""
         try:
@@ -63,7 +63,7 @@ class EmailService:
                         <p>Weather Flick 회원가입을 위한 이메일 인증 코드입니다.</p>
 
                         <div class="verification-code">
-                            {verification_code}
+                            {code}
                         </div>
 
                         <p><strong>인증 코드는 10분 후에 만료됩니다.</strong></p>
@@ -169,15 +169,16 @@ class EmailVerificationService:
         try:
             # 기존 미사용 인증 코드 삭제
             db.query(EmailVerification).filter(
-                EmailVerification.email == email, not EmailVerification.is_used
+                EmailVerification.email == email,
+                EmailVerification.is_used == False,  # noqa: E712
             ).delete()
 
             # 새 인증 코드 생성
-            verification_code = self.email_service.generate_verification_code()
-            expires_at = datetime.utcnow() + timedelta(minutes=10)
+            code = self.email_service.generate_verification_code()
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
             verification = EmailVerification(
-                email=email, code=verification_code, expires_at=expires_at
+                email=email, code=code, expires_at=expires_at
             )
 
             db.add(verification)
@@ -185,11 +186,11 @@ class EmailVerificationService:
 
             # 이메일 발송
             success = await self.email_service.send_verification_email(
-                email, verification_code, nickname
+                email, code, nickname
             )
 
             if success:
-                return verification_code
+                return code
             else:
                 # 이메일 발송 실패 시 인증 코드 삭제
                 db.delete(verification)
@@ -207,15 +208,15 @@ class EmailVerificationService:
                 db.query(EmailVerification)
                 .filter(
                     EmailVerification.email == email,
-                    EmailVerification.verification_code == code,
-                    not EmailVerification.is_used,
-                    EmailVerification.expires_at > datetime.utcnow(),
+                    EmailVerification.code == code,
+                    EmailVerification.is_used == False,  # noqa: E712
+                    EmailVerification.expires_at > datetime.now(timezone.utc),
                 )
+                .order_by(EmailVerification.id.desc())
                 .first()
             )
 
             if verification:
-                # 인증 코드 사용 처리
                 verification.is_used = True
                 db.commit()
                 return True
@@ -231,7 +232,10 @@ class EmailVerificationService:
         try:
             verification = (
                 db.query(EmailVerification)
-                .filter(EmailVerification.email == email, EmailVerification.is_used)
+                .filter(
+                    EmailVerification.email == email,
+                    EmailVerification.is_used == True,  # noqa: E712
+                )
                 .first()
             )
 

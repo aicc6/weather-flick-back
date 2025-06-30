@@ -416,7 +416,7 @@ async def verify_email(
     try:
         # 인증 코드 검증
         is_valid = email_verification_service.verify_code(
-            db, request.email, request.verification_code
+            db, request.email, request.code
         )
 
         if is_valid:
