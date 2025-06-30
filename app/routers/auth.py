@@ -49,7 +49,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         )
 
     # 사용자명 중복 확인
-    db_user = db.query(User).filter(User.username == user.username).first()
+    db_user = db.query(User).filter(User.nickname == user.nickname).first()
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
@@ -74,7 +74,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
-        username=user.username,
+        nickname=user.nickname,
         hashed_password=hashed_password,
         role=user.role,
         is_verified=True,  # 이메일 인증 완료
@@ -85,7 +85,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
 
     # 환영 이메일 발송
-    await email_service.send_welcome_email(user.email, user.username)
+    await email_service.send_welcome_email(user.email, user.nickname)
 
     return db_user
 
