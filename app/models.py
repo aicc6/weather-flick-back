@@ -54,6 +54,7 @@ class User(Base):
     profile_image = Column(String)
     preferences = Column(JSONB)
     is_active = Column(Boolean, default=True)
+    is_email_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
     last_login = Column(DateTime)
     login_count = Column(Integer, default=0)
@@ -213,7 +214,6 @@ class EmailVerification(Base):
     email = Column(String, nullable=False, index=True)
     code = Column(String, nullable=False)
     is_used = Column(Boolean, default=False)
-    is_verified = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 

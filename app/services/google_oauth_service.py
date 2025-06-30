@@ -77,8 +77,7 @@ class GoogleOAuthService:
         if user:
             # 기존 사용자 업데이트
             user.google_id = google_id
-            user.email_verified = google_data.get('email_verified', False)
-            user.is_verified = google_data.get('email_verified', False)
+            user.is_email_verified = google_data.get('email_verified', False)
             user.profile_image = google_data.get('picture', user.profile_image)
             user.auth_provider = "google"
 
@@ -96,8 +95,7 @@ class GoogleOAuthService:
                 username=username,
                 google_id=google_id,
                 auth_provider="google",
-                email_verified=google_data.get('email_verified', False),
-                is_verified=google_data.get('email_verified', False),
+                is_email_verified=google_data.get('email_verified', False),
                 profile_image=google_data.get('picture'),
                 is_active=True
             )

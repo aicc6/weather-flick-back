@@ -75,8 +75,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         email=user.email,
         nickname=user.nickname,
         hashed_password=hashed_password,
-        is_verified=True,  # 이메일 인증 완료
-        email_verified=True,
+        is_email_verified=True,
     )
     db.add(db_user)
     db.commit()
@@ -347,8 +346,7 @@ async def link_google_account(
 
         # 현재 사용자에 구글 계정 연결
         current_user.google_id = google_data["google_id"]
-        current_user.email_verified = google_data.get("email_verified", False)
-        current_user.is_verified = google_data.get("email_verified", False)
+        current_user.is_email_verified = google_data.get("email_verified", False)
         current_user.profile_image = google_data.get(
             "picture", current_user.profile_image
         )
@@ -504,7 +502,7 @@ def google_login(data: dict, db: Session = Depends(get_db)):
             hashed_password=get_password_hash(
                 access_token
             ),  # 소셜 로그인은 access_token 등으로 대체
-            is_verified=True,
+            is_email_verified=True,
         )
         db.add(user)
         db.commit()
