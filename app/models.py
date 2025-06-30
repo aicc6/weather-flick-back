@@ -46,7 +46,7 @@ class UserRole(enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = {'extend_existing': True, 'autoload_replace': False}
+    __table_args__ = {"extend_existing": True, "autoload_replace": False}
     user_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
@@ -154,13 +154,38 @@ class WeatherData(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
     destination_id = Column(
-        UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=True
     )
+    # 기상청 격자 좌표
+    grid_x = Column(Integer)  # nx: 예보지점 X 좌표
+    grid_y = Column(Integer)  # ny: 예보지점 Y 좌표
+
+    # 예보 날짜와 시간
     forecast_date = Column(Date, nullable=False)
-    temperature_max = Column(Float)
-    temperature_min = Column(Float)
-    humidity = Column(Float)
-    weather_condition = Column(String)
+    forecast_time = Column(String)  # 예보시간 (HHMM 형식)
+    base_date = Column(Date)  # 발표일자
+    base_time = Column(String)  # 발표시각
+
+    # 기온 정보
+    temperature = Column(Float)  # TMP: 1시간 기온 (℃)
+    temperature_max = Column(Float)  # TMX: 일 최고기온 (℃)
+    temperature_min = Column(Float)  # TMN: 일 최저기온 (℃)
+
+    # 습도 및 강수 정보
+    humidity = Column(Float)  # REH: 습도 (%)
+    precipitation_probability = Column(Float)  # POP: 강수확률 (%)
+    precipitation_type = Column(String)  # PTY: 강수형태 (없음/비/비눈/눈)
+
+    # 하늘 상태
+    sky_condition = Column(String)  # SKY: 하늘상태 (맑음/구름많음/흐림)
+    weather_condition = Column(String)  # 종합 날씨 상태
+
+    # 지역 정보
+    region_name = Column(String)  # 지역명
+
+    # 원본 데이터
+    raw_data = Column(JSONB)  # 원본 API 응답 데이터
+
     created_at = Column(DateTime, server_default=func.now())
 
     destination = relationship("Destination", back_populates="weather_data")
