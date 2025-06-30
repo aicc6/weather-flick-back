@@ -2,7 +2,6 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import Optional
 from app.database import get_db
 from app.models import (
     User,
@@ -76,7 +75,6 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         email=user.email,
         nickname=user.nickname,
         hashed_password=hashed_password,
-        role=user.role,
         is_verified=True,  # 이메일 인증 완료
         email_verified=True,
     )
