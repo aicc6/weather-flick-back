@@ -51,7 +51,7 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)  # OAuth 사용자는 비밀번호가 없을 수 있음
     nickname = Column(String, unique=True, index=True, nullable=False)
     profile_image = Column(String)
     preferences = Column(JSONB)
@@ -61,6 +61,8 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_email_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
+    google_id = Column(String, unique=True, nullable=True)  # 구글 OAuth ID
+    auth_provider = Column(String, default="local")  # 인증 제공자 (local, google 등)
     last_login = Column(DateTime)
     login_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())

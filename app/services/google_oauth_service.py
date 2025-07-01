@@ -57,7 +57,15 @@ class GoogleOAuthService:
                 )
 
                 if response.status_code == 200:
-                    return response.json()
+                    user_data = response.json()
+                    # google_id 필드 추가 (OAuth callback에서 사용)
+                    return {
+                        'google_id': user_data.get('id'),
+                        'email': user_data.get('email'),
+                        'name': user_data.get('name', ''),
+                        'picture': user_data.get('picture', ''),
+                        'email_verified': user_data.get('verified_email', False)
+                    }
                 else:
                     raise HTTPException(status_code=400, detail="Failed to get user info from Google")
 
@@ -88,16 +96,17 @@ class GoogleOAuthService:
 
         else:
             # 새 사용자 생성
-            username = self._generate_username(db, google_data.get('name', ''))
+            nickname = self._generate_username(db, google_data.get('name', ''))
 
             user = User(
                 email=email,
-                username=username,
+                nickname=nickname,
                 google_id=google_id,
                 auth_provider="google",
                 is_email_verified=google_data.get('email_verified', False),
                 profile_image=google_data.get('picture'),
-                is_active=True
+                is_active=True,
+                login_count=0
             )
 
             db.add(user)
@@ -136,7 +145,7 @@ class GoogleOAuthService:
         counter = 1
 
         # 중복 확인
-        while db.query(User).filter(User.username == username).first():
+        while db.query(User).filter(User.nickname == username).first():
             username = f"{base_username}{counter}"
             counter += 1
 
@@ -147,7 +156,7 @@ class GoogleOAuthService:
         token_data = {
             "sub": user.email,
             "role": user.role.value,
-            "user_id": user.id
+            "user_id": str(user.id)
         }
 
         return create_access_token(

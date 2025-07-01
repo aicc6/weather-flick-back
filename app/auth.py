@@ -20,13 +20,16 @@ SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """비밀번호 검증"""
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password: str) -> str:
     """비밀번호 해싱"""
     return pwd_context.hash(password)
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """JWT 액세스 토큰 생성"""
@@ -38,6 +41,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 def verify_token(token: str, credentials_exception):
     """토큰 검증"""
@@ -52,6 +56,7 @@ def verify_token(token: str, credentials_exception):
         raise credentials_exception
     return token_data
 
+
 def authenticate_user(db: Session, email: str, password: str):
     """사용자 인증"""
     user = db.query(User).filter(User.email == email).first()
@@ -61,8 +66,15 @@ def authenticate_user(db: Session, email: str, password: str):
         return False
     return user
 
-def log_user_activity(db: Session, user_id, activity_type: str, description: str = None,
-                     ip_address: str = None, user_agent: str = None):
+
+def log_user_activity(
+    db: Session,
+    user_id,
+    activity_type: str,
+    description: str = None,
+    ip_address: str = None,
+    user_agent: str = None,
+):
     """사용자 활동 로깅"""
     details = {}
     if description:
@@ -71,14 +83,13 @@ def log_user_activity(db: Session, user_id, activity_type: str, description: str
         details["ip_address"] = ip_address
     if user_agent:
         details["user_agent"] = user_agent
-    
+
     activity = UserActivity(
-        user_id=user_id,
-        activity_type=activity_type,
-        details=details
+        user_id=user_id, activity_type=activity_type, details=details
     )
     db.add(activity)
     db.commit()
+
 
 def get_client_ip(request: Request) -> str:
     """클라이언트 IP 주소 가져오기"""
@@ -87,7 +98,8 @@ def get_client_ip(request: Request) -> str:
         return forwarded.split(",")[0]
     return request.client.host
 
-def get_current_user(token = Depends(bearer_scheme), db: Session = Depends(get_db)):
+
+def get_current_user(token=Depends(bearer_scheme), db: Session = Depends(get_db)):
     """현재 사용자 조회"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -100,34 +112,36 @@ def get_current_user(token = Depends(bearer_scheme), db: Session = Depends(get_d
         raise credentials_exception
     return user
 
+
 def get_current_active_user(current_user: User = Depends(get_current_user)):
     """현재 활성 사용자 조회"""
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+
 def get_current_admin_user(current_user: User = Depends(get_current_active_user)):
     """현재 관리자 사용자 조회"""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
     return current_user
+
 
 def get_current_super_admin_user(current_user: User = Depends(get_current_active_user)):
     """현재 슈퍼 관리자 사용자 조회"""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
         )
     return current_user
+
 
 def update_user_login_info(db: Session, user: User, request: Request):
     """사용자 로그인 정보 업데이트"""
     user.last_login = datetime.utcnow()
-    user.login_count += 1
+    user.login_count = (user.login_count or 0) + 1
     db.commit()
 
     # 로그인 활동 로깅
@@ -137,8 +151,9 @@ def update_user_login_info(db: Session, user: User, request: Request):
         activity_type="login",
         description=f"User logged in from {get_client_ip(request)}",
         ip_address=get_client_ip(request),
-        user_agent=request.headers.get("User-Agent")
+        user_agent=request.headers.get("User-Agent"),
     )
+
 
 def check_password_strength(password: str) -> dict:
     """비밀번호 강도 검사"""
@@ -157,5 +172,5 @@ def check_password_strength(password: str) -> dict:
     return {
         "is_valid": len(errors) == 0,
         "errors": errors,
-        "strength": "strong" if len(errors) == 0 else "weak"
+        "strength": "strong" if len(errors) == 0 else "weak",
     }

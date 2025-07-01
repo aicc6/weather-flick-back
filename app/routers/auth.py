@@ -314,7 +314,7 @@ async def google_callback(
         jwt_token = google_oauth_service.create_access_token_for_user(user)
 
         # 프론트엔드로 리다이렉트 (토큰 포함)
-        redirect_url = f"/auth/success?token={jwt_token}&user_id={user.id}"
+        redirect_url = f"/auth/success?token={jwt_token}&user_id={str(user.id)}"
         return {"redirect_url": redirect_url}
 
     except HTTPException:
