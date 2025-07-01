@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
 import uuid
 import json
 
@@ -11,39 +10,13 @@ from app.models import (
     User, StandardResponse, PaginationInfo
 )
 from app.auth import get_current_user
+from app.utils import create_standard_response, convert_uuids_to_strings, create_pagination_info, create_error_response
 
 router = APIRouter(
     prefix="/api/v1/travel-plans",
     tags=["travel-plans"],
     responses={404: {"description": "Not found"}},
 )
-
-def create_standard_response(success: bool, data=None, error=None, pagination=None):
-    """표준 응답 형식 생성"""
-    return {
-        "success": success,
-        "data": data,
-        "error": error,
-        "pagination": pagination,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    }
-
-def convert_uuids_to_strings(obj):
-    """UUID 객체를 문자열로 변환하는 헬퍼 함수"""
-    if hasattr(obj, 'dict'):
-        data = obj.dict()
-    else:
-        data = obj
-    
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if hasattr(value, 'hex'):  # UUID 객체인 경우
-                data[key] = str(value)
-    elif isinstance(data, list):
-        for item in data:
-            convert_uuids_to_strings(item)
-    
-    return data
 
 @router.post("/", response_model=dict)
 async def create_travel_plan(
@@ -80,13 +53,10 @@ async def create_travel_plan(
         
     except Exception as e:
         db.rollback()
-        return create_standard_response(
-            success=False,
-            error={
-                "code": "CREATION_ERROR",
-                "message": "여행 계획 생성에 실패했습니다.",
-                "details": [{"field": "general", "message": str(e)}]
-            }
+        return create_error_response(
+            code="CREATION_ERROR",
+            message="여행 계획 생성에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}]
         )
 
 @router.get("/", response_model=dict)
@@ -117,12 +87,7 @@ async def get_travel_plans(
         response_data = [convert_uuids_to_strings(TravelPlanResponse.from_orm(plan)) for plan in plans]
         
         # 페이지네이션 정보
-        pagination = PaginationInfo(
-            page=page,
-            limit=limit,
-            total=total,
-            total_pages=(total + limit - 1) // limit
-        ).dict()
+        pagination = create_pagination_info(page, limit, total)
         
         return create_standard_response(
             success=True,
@@ -131,13 +96,10 @@ async def get_travel_plans(
         )
         
     except Exception as e:
-        return create_standard_response(
-            success=False,
-            error={
-                "code": "QUERY_ERROR",
-                "message": "여행 계획 조회에 실패했습니다.",
-                "details": [{"field": "general", "message": str(e)}]
-            }
+        return create_error_response(
+            code="QUERY_ERROR",
+            message="여행 계획 조회에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}]
         )
 
 @router.get("/{plan_id}", response_model=dict)
@@ -154,12 +116,9 @@ async def get_travel_plan(
         ).first()
         
         if not plan:
-            return create_standard_response(
-                success=False,
-                error={
-                    "code": "NOT_FOUND",
-                    "message": "여행 계획을 찾을 수 없습니다."
-                }
+            return create_error_response(
+                code="NOT_FOUND",
+                message="여행 계획을 찾을 수 없습니다."
             )
         
         response_data = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
@@ -170,13 +129,10 @@ async def get_travel_plan(
         )
         
     except Exception as e:
-        return create_standard_response(
-            success=False,
-            error={
-                "code": "QUERY_ERROR",
-                "message": "여행 계획 조회에 실패했습니다.",
-                "details": [{"field": "general", "message": str(e)}]
-            }
+        return create_error_response(
+            code="QUERY_ERROR",
+            message="여행 계획 조회에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}]
         )
 
 @router.put("/{plan_id}", response_model=dict)
@@ -194,12 +150,9 @@ async def update_travel_plan(
         ).first()
         
         if not plan:
-            return create_standard_response(
-                success=False,
-                error={
-                    "code": "NOT_FOUND",
-                    "message": "여행 계획을 찾을 수 없습니다."
-                }
+            return create_error_response(
+                code="NOT_FOUND",
+                message="여행 계획을 찾을 수 없습니다."
             )
         
         # 업데이트할 필드들
@@ -224,13 +177,10 @@ async def update_travel_plan(
         
     except Exception as e:
         db.rollback()
-        return create_standard_response(
-            success=False,
-            error={
-                "code": "UPDATE_ERROR",
-                "message": "여행 계획 수정에 실패했습니다.",
-                "details": [{"field": "general", "message": str(e)}]
-            }
+        return create_error_response(
+            code="UPDATE_ERROR",
+            message="여행 계획 수정에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}]
         )
 
 @router.delete("/{plan_id}", response_model=dict)
@@ -247,12 +197,9 @@ async def delete_travel_plan(
         ).first()
         
         if not plan:
-            return create_standard_response(
-                success=False,
-                error={
-                    "code": "NOT_FOUND",
-                    "message": "여행 계획을 찾을 수 없습니다."
-                }
+            return create_error_response(
+                code="NOT_FOUND",
+                message="여행 계획을 찾을 수 없습니다."
             )
         
         db.delete(plan)
@@ -265,11 +212,8 @@ async def delete_travel_plan(
         
     except Exception as e:
         db.rollback()
-        return create_standard_response(
-            success=False,
-            error={
-                "code": "DELETE_ERROR",
-                "message": "여행 계획 삭제에 실패했습니다.",
-                "details": [{"field": "general", "message": str(e)}]
-            }
+        return create_error_response(
+            code="DELETE_ERROR",
+            message="여행 계획 삭제에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}]
         )
