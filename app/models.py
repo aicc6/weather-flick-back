@@ -391,6 +391,8 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    expires_in: int
+    user_info: UserResponse
 
 
 class UserUpdate(BaseModel):
