@@ -6,12 +6,15 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import EmailVerification
+from app.exceptions import EmailServiceError
+from app.logging_config import get_logger
 
 
 class EmailService:
     """이메일 서비스"""
 
     def __init__(self):
+        self.logger = get_logger("email_service")
         self.conf = ConnectionConfig(
             MAIL_USERNAME=settings.mail_username,
             MAIL_PASSWORD=settings.mail_password,
@@ -92,8 +95,12 @@ class EmailService:
             return True
 
         except Exception as e:
-            print(f"이메일 발송 실패: {e}")
-            return False
+            self.logger.error(f"인증 이메일 발송 실패: {email}", extra={"error": str(e)})
+            raise EmailServiceError(
+                message="인증 이메일 발송에 실패했습니다.",
+                code="EMAIL_SEND_FAILED",
+                details=[{"field": "email", "message": f"이메일 전송 실패: {str(e)}"}]
+            )
 
     async def send_welcome_email(self, email: str, nickname: str):
         """환영 이메일 발송"""
@@ -151,8 +158,11 @@ class EmailService:
             return True
 
         except Exception as e:
-            print(f"환영 이메일 발송 실패: {e}")
-            return False
+            self.logger.error(f"환영 이메일 발송 실패: {email}", extra={"error": str(e)})
+            raise EmailServiceError(
+                message="환영 이메일 발송에 실패했습니다.",
+                code="WELCOME_EMAIL_SEND_FAILED"
+            )
 
 
 # 이메일 인증 관리 클래스
@@ -161,6 +171,7 @@ class EmailVerificationService:
 
     def __init__(self):
         self.email_service = EmailService()
+        self.logger = get_logger("email_verification")
 
     async def create_verification(
         self, db: Session, email: str, nickname: str = None
@@ -197,9 +208,17 @@ class EmailVerificationService:
                 db.commit()
                 return None
 
+        except EmailServiceError:
+            # EmailServiceError는 이미 적절한 예외이므로 그대로 전파
+            db.rollback()
+            raise
         except Exception as e:
-            print(f"인증 코드 생성 실패: {e}")
-            return None
+            self.logger.error(f"인증 코드 생성 실패: {email}", extra={"error": str(e)})
+            db.rollback()
+            raise EmailServiceError(
+                message="인증 코드 생성에 실패했습니다.",
+                code="VERIFICATION_CODE_CREATION_FAILED"
+            )
 
     def verify_code(self, db: Session, email: str, code: str) -> bool:
         """인증 코드 검증"""

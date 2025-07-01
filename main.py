@@ -1,12 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import weather, auth, kma_weather, local_info, naver_map, travel_plans, recommendations, destinations, events
+from app.exception_handlers import register_exception_handlers
+from app.logging_config import setup_logging
+
+# 로깅 설정 초기화
+logger = setup_logging()
 
 app = FastAPI(
     title="Weather Flick API",
     description="Weather Flick Backend API with Authentication, Admin Management, Local Information, and Naver Maps",
     version="1.0.0"
 )
+
+# 글로벌 예외 핸들러 등록
+register_exception_handlers(app)
 
 # CORS 미들웨어 설정
 app.add_middleware(
