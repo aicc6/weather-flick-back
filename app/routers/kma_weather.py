@@ -5,13 +5,22 @@ from app.auth import get_current_active_user
 from app.models import User
 from app.utils.kma_utils import (
     CITY_COORDINATES, REGION_CODES, get_supported_cities,
-    is_supported_city, get_city_coordinates, get_region_code
+    is_supported_city, get_city_coordinates, get_region_code,
+    get_supported_provinces, is_supported_province
 )
 
 router = APIRouter(prefix="/kma", tags=["기상청 날씨 API"])
 
+@router.get("/provinces")
+async def get_provinces():
+    """지원되는 도/광역시 목록 조회"""
+    return {
+        "provinces": get_supported_provinces(),
+        "message": "기상청 API에서 지원하는 도/광역시 목록입니다."
+    }
+
 @router.get("/cities")
-async def get_supported_cities():
+async def get_supported_cities_endpoint():
     """지원되는 도시 목록 조회"""
     return {
         "cities": get_supported_cities(),
@@ -149,4 +158,21 @@ async def get_city_coordinates(city: str):
         "city": city,
         "coordinates": get_city_coordinates(city),
         "region_code": get_region_code(city)
+    }
+
+@router.get("/current/by-province/{province_name}")
+async def get_province_weather_kma(
+    province_name: str,
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """특정 도/광역시의 모든 도시 현재 날씨 조회"""
+    if not is_supported_province(province_name):
+        raise HTTPException(status_code=404, detail=f"지원하지 않는 도/광역시입니다: {province_name}")
+
+    weather_data = await kma_weather_service.get_weather_for_province(province_name)
+
+    return {
+        "province": province_name,
+        "source": "기상청",
+        "weather_data": weather_data
     }

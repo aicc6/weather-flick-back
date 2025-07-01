@@ -42,6 +42,22 @@ REGION_CODES = {
     "제주": "11G00201"
 }
 
+# 도/특별시/광역시별 도시 매핑
+PROVINCE_CITIES = {
+    "서울특별시": ["서울"],
+    "부산광역시": ["부산"],
+    "대구광역시": ["대구"],
+    "인천광역시": ["인천"],
+    "광주광역시": ["광주"],
+    "대전광역시": ["대전"],
+    "울산광역시": ["울산"],
+    "세종특별자치시": ["세종"],
+    "경기도": ["수원", "고양", "용인"],
+    "경상남도": ["창원"],
+    "경상북도": ["포항"],
+    "제주특별자치도": ["제주"]
+}
+
 def get_city_coordinates(city: str) -> Optional[Dict[str, int]]:
     """도시의 격자 좌표 조회"""
     return CITY_COORDINATES.get(city)
@@ -57,6 +73,18 @@ def get_supported_cities() -> List[str]:
 def is_supported_city(city: str) -> bool:
     """도시가 지원되는지 확인"""
     return city in CITY_COORDINATES
+
+def get_supported_provinces() -> List[str]:
+    """지원되는 도/광역시 목록 반환"""
+    return list(PROVINCE_CITIES.keys())
+
+def is_supported_province(province: str) -> bool:
+    """도/광역시가 지원되는지 확인"""
+    return province in PROVINCE_CITIES
+
+def get_cities_in_province(province: str) -> Optional[List[str]]:
+    """도/광역시에 속한 도시 목록 반환"""
+    return PROVINCE_CITIES.get(province)
 
 def get_all_city_info() -> Dict[str, Dict]:
     """모든 도시 정보 반환"""

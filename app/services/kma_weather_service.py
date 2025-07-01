@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from app.config import settings
 from app.utils.kma_utils import (
     get_base_time, convert_precipitation_type, convert_wind_direction,
-    format_weather_data, CITY_COORDINATES
+    format_weather_data, CITY_COORDINATES, get_cities_in_province
 )
 
 class KMAWeatherService:
@@ -145,6 +145,38 @@ class KMAWeatherService:
             raise HTTPException(status_code=408, detail="기상청 API 타임아웃")
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
+
+    async def get_weather_for_province(self, province: str) -> List[Dict[str, Any]]:
+        """특정 도/광역시의 모든 도시 현재 날씨 정보 조회"""
+        cities_in_province = get_cities_in_province(province)
+        if not cities_in_province:
+            return []
+
+        tasks = []
+        for city in cities_in_province:
+            coords = CITY_COORDINATES.get(city)
+            if coords:
+                task = self.get_current_weather(coords["nx"], coords["ny"])
+                tasks.append(task)
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        weather_data = []
+        # Filter out cities that might not have been found in CITY_COORDINATES
+        cities_with_coords = [city for city in cities_in_province if city in CITY_COORDINATES]
+        for i, result in enumerate(results):
+            city = cities_with_coords[i]
+            if isinstance(result, Exception):
+                weather_data.append({
+                    "city": city,
+                    "error": str(result)
+                })
+            else:
+                data = result.copy()
+                data["city"] = city
+                weather_data.append(data)
+
+        return weather_data
 
     async def get_all_cities_current_weather(self) -> List[Dict[str, Any]]:
         """모든 지원 도시의 현재 날씨 정보 조회"""
