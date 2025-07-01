@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -11,7 +11,7 @@ router = APIRouter(
 
 @router.get("/{area_code}", response_model=List[Dict[str, Any]])
 async def get_events_by_area(
-    area_code: str = Query(..., description="TourAPI 지역 코드 (예: 1=서울, 31=경기도)"),
+    area_code: str = Path(..., description="TourAPI 지역 코드 (예: 1=서울, 31=경기도)"),
 ):
     """
     특정 지역의 현재 진행중인 축제/이벤트 목록을 조회합니다.

@@ -172,6 +172,15 @@ async def update_user_profile(
     if user_update.preferences is not None:
         current_user.preferences = user_update.preferences
 
+    if user_update.preferred_region is not None:
+        current_user.preferred_region = user_update.preferred_region
+
+    if user_update.preferred_theme is not None:
+        current_user.preferred_theme = user_update.preferred_theme
+
+    if user_update.bio is not None:
+        current_user.bio = user_update.bio
+
     db.commit()
     db.refresh(current_user)
     return current_user
