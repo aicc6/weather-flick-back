@@ -396,7 +396,7 @@ class Token(BaseModel):
 class UserUpdate(BaseModel):
     nickname: Optional[str] = None
     profile_image: Optional[str] = None
-    preferences: Optional[Dict[str, Any]] = None
+    preferences: Optional[List[str]] = None
 
 
 class PasswordChange(BaseModel):

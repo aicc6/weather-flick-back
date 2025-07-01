@@ -172,6 +172,9 @@ async def update_user_profile(
     if user_update.profile_image is not None:
         current_user.profile_image = user_update.profile_image
 
+    if user_update.preferences is not None:
+        current_user.preferences = user_update.preferences
+
     db.commit()
     db.refresh(current_user)
     return current_user

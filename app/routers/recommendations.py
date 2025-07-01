@@ -92,17 +92,12 @@ async def get_weather_based_recommendations(
         )
 
     try:
-        # 날씨 기반 추천 여행지 목록 가져오기
-        recommended_destinations = await recommendation_service.get_weather_based_recommendations(
-            db=db, province=request.province, city=request.city
+        # 날씨 및 개인화 기반 추천 여행지 목록 가져오기
+        scored_destinations = await recommendation_service.get_weather_based_recommendations(
+            db=db, province=request.province, city=request.city, user=current_user
         )
 
-        # 추천 점수 계산 및 정렬 (옵션)
-        scored_destinations = [
-            (dest, calculate_recommendation_score(dest, None, None, None))
-            for dest in recommended_destinations
-        ]
-        scored_destinations.sort(key=lambda x: x[1], reverse=True)
+        # scored_destinations는 이제 (destination, score) 튜플의 리스트입니다.
 
         top_destinations = [dest for dest, score in scored_destinations]
 
