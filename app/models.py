@@ -52,7 +52,7 @@ class User(Base):
     )
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    nickname = Column(String)
+    nickname = Column(String, unique=True, index=True, nullable=False)
     profile_image = Column(String)
     preferences = Column(JSONB)
     is_active = Column(Boolean, default=True)
