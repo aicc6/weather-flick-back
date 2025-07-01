@@ -21,7 +21,7 @@ async def get_events_by_area(
     try:
         # 항상 현재 날짜를 기준으로 진행중인 이벤트를 검색
         today_str = datetime.now().strftime('%Y%m%d')
-        festivals = await get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
+        festivals = get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
         return festivals
     except Exception as e:
         # 실제 구현에서는 더 상세한 오류 처리가 필요합니다.
