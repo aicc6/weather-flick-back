@@ -114,9 +114,11 @@ class Destination(Base):
     destination_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
-    name = Column(String, nullable=False)
-    region = Column(String)
+    name = Column(String, nullable=False, index=True)
+    province = Column(String, nullable=False, index=True) # 도/광역시
+    region = Column(String, index=True) # 시/군/구
     category = Column(String)
+    is_indoor = Column(Boolean, default=False) # 실내/실외 여부
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
     amenities = Column(JSONB)
@@ -450,11 +452,25 @@ class PaginationInfo(BaseModel):
     total_pages: int
 
 
+class DestinationCreate(BaseModel):
+    name: str
+    province: str
+    region: Optional[str] = None
+    category: Optional[str] = None
+    is_indoor: Optional[bool] = False
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    amenities: Optional[Dict[str, Any]] = None
+    image_url: Optional[str] = None
+
+
 class DestinationResponse(BaseModel):
     destination_id: uuid.UUID
     name: str
+    province: str
     region: Optional[str] = None
     category: Optional[str] = None
+    is_indoor: Optional[bool] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     amenities: Optional[Dict[str, Any]] = None
