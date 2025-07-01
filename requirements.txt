@@ -10,3 +10,4 @@ httpx
 python-multipart
 psycopg2-binary
 gunicorn
+pydantic-settings
