@@ -12,6 +12,7 @@ class DestinationService:
             region=destination.region,
             category=destination.category,
             is_indoor=destination.is_indoor,
+            tags=destination.tags,
             latitude=destination.latitude,
             longitude=destination.longitude,
             amenities=destination.amenities,

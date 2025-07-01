@@ -119,6 +119,7 @@ class Destination(Base):
     region = Column(String, index=True) # 시/군/구
     category = Column(String)
     is_indoor = Column(Boolean, default=False) # 실내/실외 여부
+    tags = Column(JSONB) # 여행지 특성 태그
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
     amenities = Column(JSONB)
@@ -458,6 +459,7 @@ class DestinationCreate(BaseModel):
     region: Optional[str] = None
     category: Optional[str] = None
     is_indoor: Optional[bool] = False
+    tags: Optional[List[str]] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     amenities: Optional[Dict[str, Any]] = None
@@ -471,6 +473,7 @@ class DestinationResponse(BaseModel):
     region: Optional[str] = None
     category: Optional[str] = None
     is_indoor: Optional[bool] = None
+    tags: Optional[List[str]] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     amenities: Optional[Dict[str, Any]] = None
