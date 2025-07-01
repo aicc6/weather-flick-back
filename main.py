@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import weather, auth, kma_weather, local_info, naver_map, air_quality, travel_plans, recommendations
+from app.routers import weather, auth, kma_weather, local_info, naver_map, travel_plans, recommendations
 
 app = FastAPI(
     title="Weather Flick API",
-    description="Weather Flick Backend API with Authentication, Admin Management, Local Information, Naver Maps, and Air Quality",
+    description="Weather Flick Backend API with Authentication, Admin Management, Local Information, and Naver Maps",
     version="1.0.0"
 )
 
@@ -23,7 +23,6 @@ app.include_router(weather.router)
 app.include_router(kma_weather.router)
 app.include_router(local_info.router)
 app.include_router(naver_map.router)
-app.include_router(air_quality.router)
 app.include_router(travel_plans.router)
 app.include_router(recommendations.router)
 
