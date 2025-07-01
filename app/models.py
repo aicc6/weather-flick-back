@@ -55,6 +55,9 @@ class User(Base):
     nickname = Column(String, unique=True, index=True, nullable=False)
     profile_image = Column(String)
     preferences = Column(JSONB)
+    preferred_region = Column(String)  # 선호 지역
+    preferred_theme = Column(String)   # 선호 테마
+    bio = Column(Text)                 # 자기소개
     is_active = Column(Boolean, default=True)
     is_email_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
@@ -380,6 +383,9 @@ class UserResponse(BaseModel):
     email: str
     nickname: Optional[str] = None
     profile_image: Optional[str] = None
+    preferred_region: Optional[str] = None
+    preferred_theme: Optional[str] = None
+    bio: Optional[str] = None
     role: str
     is_active: bool
     created_at: datetime
@@ -399,6 +405,9 @@ class UserUpdate(BaseModel):
     nickname: Optional[str] = None
     profile_image: Optional[str] = None
     preferences: Optional[List[str]] = None
+    preferred_region: Optional[str] = None
+    preferred_theme: Optional[str] = None
+    bio: Optional[str] = None
 
 
 class PasswordChange(BaseModel):

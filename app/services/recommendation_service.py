@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models import User
-from app.services.destination_service import get_destinations_by_tags
+from app.services.destination_service import destination_service
 from app.services.tour_api_service import get_festivals_from_tour_api
 from app.utils.kma_utils import get_area_code_for_city
 
@@ -53,7 +53,7 @@ async def get_weather_based_recommendations(
                 print(f"Error fetching festival data: {e}")
 
     # 3. 태그에 맞는 여행지 조회
-    destinations = get_destinations_by_tags(db, recommended_tags)
+    destinations = destination_service.get_destinations_by_tags(db, recommended_tags)
 
     # 4. 개인화 점수 계산
     user_preferences = set(user.preferences.get("tags", [])) if user.preferences else set()

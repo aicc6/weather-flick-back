@@ -35,4 +35,11 @@ class DestinationService:
         """모든 여행지 목록 조회"""
         return db.query(Destination).offset(skip).limit(limit).all()
 
+    def get_destinations_by_tags(self, db: Session, tags: List[str], skip: int = 0, limit: int = 100) -> List[Destination]:
+        """태그로 여행지 목록 조회"""
+        query = db.query(Destination)
+        for tag in tags:
+            query = query.filter(Destination.tags.contains([tag]))
+        return query.offset(skip).limit(limit).all()
+
 destination_service = DestinationService()
