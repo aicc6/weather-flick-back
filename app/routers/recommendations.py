@@ -11,7 +11,7 @@ from app.models import (
     User, StandardResponse
 )
 from app.auth import get_current_user
-from app.services.recommendation_service import recommendation_service
+from app.services import recommendation_service
 
 router = APIRouter(
     prefix="/api/v1/recommendations",
@@ -75,41 +75,25 @@ def calculate_recommendation_score(destination, weather_data, user_preferences, 
         score *= destination.recommendation_weight
     return score
 
-@router.post("/weather-based", response_model=RecommendationResponse)
-async def get_weather_based_recommendations(
+@router.post("/weather-based", response_model=List[RecommendationResponse])
+async def get_recommendations_based_on_weather(
     request: RecommendationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
-    사용자의 위치와 현재 날씨를 기반으로 여행지를 추천합니다.
-    - 요청에는 `province`와 `city`가 포함되어야 합니다.
+    현재 날씨와 사용자 선호도에 기반한 여행지를 추천합니다.
+    - **weather_status**: 현재 날씨 상태 (예: "맑음", "비")
+    - **city**: 현재 도시 (예: "서울", "수원")
     """
-    if not request.province or not request.city:
-        raise HTTPException(
-            status_code=400,
-            detail="요청에 'province'와 'city'를 포함해야 합니다."
-        )
-
     try:
-        # 날씨 및 개인화 기반 추천 여행지 목록 가져오기
-        scored_destinations = await recommendation_service.get_weather_based_recommendations(
-            db=db, province=request.province, city=request.city, user=current_user
+        recommendations = await recommendation_service.get_weather_based_recommendations(
+            db=db,
+            weather_status=request.weather_status,
+            city=request.city,
+            user=current_user
         )
-
-        # scored_destinations는 이제 (destination, score) 튜플의 리스트입니다.
-
-        top_destinations = [dest for dest, score in scored_destinations]
-
-        # 응답 모델에 맞게 변환
-        dest_responses = [DestinationResponse.from_orm(dest) for dest in top_destinations]
-
-        return RecommendationResponse(
-            destinations=dest_responses,
-            total_count=len(dest_responses),
-            recommendation_score=scored_destinations[0][1] if scored_destinations else 0
-        )
-
+        return recommendations
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

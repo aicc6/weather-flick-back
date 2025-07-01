@@ -1,83 +1,86 @@
-from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from app.services.kma_weather_service import kma_weather_service
-from app.models import Destination, User
-from sqlalchemy import or_
+from sqlalchemy.orm import Session
+from datetime import datetime
 
-class RecommendationService:
-    # 날씨 상태와 관련 태그 매핑
-    WEATHER_TO_TAGS_MAPPING = {
-        "맑음": ["#야외", "#산책", "#공원", "#자연"],
-        "구름많음": ["#산책", "#경치", "#나들이"],
-        "흐림": ["#실내", "#카페", "#박물관", "#쇼핑"],
-        "비": ["#실내", "#박물관", "#미술관", "#아쿠아리움", "#카페"],
-        "비/눈": ["#실내", "#카페", "#쇼핑"],
-        "눈": ["#실내", "#겨울경치", "#스파", "#카페"],
-        "소나기": ["#실내", "#급방문", "#카페"]
-    }
+from app.models import User
+from app.services.destination_service import get_destinations_by_tags
+from app.services.tour_api_service import get_festivals_from_tour_api
+from app.utils.kma_utils import get_area_code_for_city
 
-    def calculate_personalization_score(self, destination: Destination, user: User) -> float:
-        """개인화 점수 계산"""
-        score = 0.0
-        if user.preferences and destination.tags:
-            user_prefs = set(user.preferences)
-            dest_tags = set(destination.tags)
-            common_tags = user_prefs.intersection(dest_tags)
-            # 일치하는 태그 하나당 1.0점 추가
-            score += len(common_tags) * 1.0
-        return score
+# 날씨 상태와 관련 태그 매핑
+weather_to_tags_map = {
+    "맑음": ["#야외", "#활동적인", "#공원", "#산책", "#자연"],
+    "구름많음": ["#실내", "#문화", "#전시", "#카페", "#쇼핑"],
+    "흐림": ["#실내", "#문화", "#전시", "#카페", "#쇼핑"],
+    "비": ["#실내", "#아늑한", "#전시", "#박물관", "#카페"],
+    "비/눈": ["#실내", "#아늑한", "#전시", "#박물관", "#카페"],
+    "눈": ["#실내", "#겨울", "#아늑한", "#전시", "#카페"],
+    "소나기": ["#실내", "#급할때", "#쇼핑", "#카페"],
+}
 
-    async def get_weather_based_recommendations(
-        self, db: Session, province: str, city: str, user: User
-    ) -> List[tuple[Destination, float]]:
-        """
-        날씨 및 개인 선호도 기반 여행지 추천 로직
-        1. 현재 날씨 정보를 가져온다.
-        2. 날씨에 맞는 태그를 결정한다.
-        3. 해당 지역과 태그에 맞는 여행지를 DB에서 조회한다.
-        """
-        try:
-            # 1. 현재 날씨 정보 가져오기 (kma_weather_service 사용)
-            coords = kma_weather_service.get_city_coordinates(city)
-            if not coords:
-                # 기본적으로는 city로 검색하지만, province 전체로 확장 검색도 가능
-                return []
 
-            weather_data = await kma_weather_service.get_current_weather(coords["nx"], coords["ny"])
-            weather_condition = weather_data.get("sky_condition", "맑음") # SKY 값 기준
+async def get_weather_based_recommendations(
+    db: Session, weather_status: str, city: str, user: User
+) -> List[Dict[str, Any]]:
+    """
+    날씨, 도시, 사용자 선호도를 기반으로 여행지를 추천합니다.
+    '맑은 날'에는 현재 진행중인 축제 정보를 추가로 추천합니다.
+    """
+    # 1. 날씨 상태에 따라 추천 태그 목록 생성
+    recommended_tags = weather_to_tags_map.get(weather_status, [])
+    if not recommended_tags:
+        return []
 
-            # 2. 날씨에 맞는 추천 태그 결정
-            relevant_tags = self.WEATHER_TO_TAGS_MAPPING.get(weather_condition, [])
+    # 2. 날씨가 "맑음"일 경우, 현재 진행중인 축제/이벤트 정보 추가
+    events_recommendations = []
+    if weather_status == "맑음":
+        area_code = get_area_code_for_city(city)
+        if area_code:
+            today_str = datetime.now().strftime('%Y%m%d')
+            try:
+                festivals = await get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
+                for festival in festivals:
+                    events_recommendations.append({
+                        "id": festival.get("contentid"),
+                        "name": f"[축제] {festival.get('title')}",
+                        "description": festival.get("addr1"),
+                        "province": city,
+                        "tags": ["#축제", "#이벤트", "#야외"],
+                        "is_indoor": False,
+                        "recommendation_score": 100,
+                    })
+            except Exception as e:
+                print(f"Error fetching festival data: {e}")
 
-            # 3. DB에서 조건에 맞는 여행지 조회
-            if not relevant_tags:
-                # 추천 태그가 없으면 해당 지역의 모든 여행지 반환
-                return db.query(Destination).filter(Destination.province == province).all()
+    # 3. 태그에 맞는 여행지 조회
+    destinations = get_destinations_by_tags(db, recommended_tags)
 
-            # 태그 중 하나라도 포함되면 추천
-            tag_filters = [Destination.tags.contains([tag]) for tag in relevant_tags]
+    # 4. 개인화 점수 계산
+    user_preferences = set(user.preferences.get("tags", [])) if user.preferences else set()
+    recommended_destinations = []
+    for dest in destinations:
+        dest_tags = set(dest.tags)
 
-            weather_recommendations = db.query(Destination).filter(
-                Destination.province == province,
-                or_(*tag_filters)
-            ).all()
+        weather_score = len(set(recommended_tags).intersection(dest_tags))
+        personalization_score = len(user_preferences.intersection(dest_tags)) * 2
+        total_score = weather_score + personalization_score
 
-            # 개인화 점수 반영하여 최종 추천 목록 생성
-            final_recommendations = []
-            for dest in weather_recommendations:
-                # 기본 점수(평점) + 개인화 점수
-                personal_score = self.calculate_personalization_score(dest, user)
-                final_score = (dest.rating or 3.0) + personal_score
-                final_recommendations.append((dest, final_score))
+        if total_score > 0:
+            recommended_destinations.append({
+                "id": dest.id,
+                "name": dest.name,
+                "description": dest.description,
+                "province": dest.province,
+                "tags": dest.tags,
+                "is_indoor": dest.is_indoor,
+                "recommendation_score": total_score,
+            })
 
-            # 최종 점수 기준으로 내림차순 정렬
-            final_recommendations.sort(key=lambda x: x[1], reverse=True)
+    # 5. 최종 추천 목록 생성 및 정렬
+    final_recommendations = sorted(
+        events_recommendations + recommended_destinations,
+        key=lambda x: x["recommendation_score"],
+        reverse=True
+    )
 
-            return final_recommendations
-
-        except Exception as e:
-            # 오류 처리 (예: 로깅)
-            print(f"Error in get_weather_based_recommendations: {e}")
-            return []
-
-recommendation_service = RecommendationService()
+    return final_recommendations

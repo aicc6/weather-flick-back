@@ -58,6 +58,31 @@ PROVINCE_CITIES = {
     "제주특별자치도": ["제주"]
 }
 
+KMA_AREA_CODE_MAP = {
+    # ... (기존 매핑 정보)
+}
+
+# 도시 이름을 TourAPI 지역 코드로 변환하는 맵
+CITY_TO_TOURAPI_AREA_CODE = {
+    "서울": "1",
+    "인천": "2",
+    "대전": "3",
+    "대구": "4",
+    "광주": "5",
+    "부산": "6",
+    "울산": "7",
+    "세종": "8",
+    "경기도": "31",
+    "강원도": "32",
+    "충청북도": "33",
+    "충청남도": "34",
+    "경상북도": "35",
+    "경상남도": "36",
+    "전라북도": "37",
+    "전라남도": "38",
+    "제주도": "39",
+}
+
 def get_city_coordinates(city: str) -> Optional[Dict[str, int]]:
     """도시의 격자 좌표 조회"""
     return CITY_COORDINATES.get(city)
@@ -201,3 +226,16 @@ def format_weather_data(data: Dict) -> Dict:
         data["rainfall"] = round(float(data["rainfall"]), 1)
 
     return data
+
+def get_area_code_for_city(city_name: str) -> str | None:
+    """
+    KMA 도시 이름(예: '서울', '수원')을 TourAPI 지역 코드(예: '1', '31')로 변환합니다.
+    """
+    if city_name in CITY_TO_TOURAPI_AREA_CODE:
+        return CITY_TO_TOURAPI_AREA_CODE[city_name]
+
+    for province, cities in PROVINCE_CITIES.items():
+        if city_name in cities:
+            return CITY_TO_TOURAPI_AREA_CODE.get(province)
+
+    return None
