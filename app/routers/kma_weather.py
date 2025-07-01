@@ -18,6 +18,17 @@ async def get_supported_cities():
         "message": "기상청 API에서 지원하는 주요 도시 목록입니다."
     }
 
+@router.get("/current/all-cities")
+async def get_all_cities_current_weather_kma(
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """모든 주요 도시의 현재 날씨 조회"""
+    weather_data = await kma_weather_service.get_all_cities_current_weather()
+    return {
+        "source": "기상청",
+        "weather_data": weather_data
+    }
+
 @router.get("/current/{city}")
 async def get_current_weather_kma(
     city: str,

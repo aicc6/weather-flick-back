@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import xml.etree.ElementTree as ET
 from typing import Optional, Dict, Any, List
@@ -6,7 +7,7 @@ from datetime import datetime, timedelta
 from app.config import settings
 from app.utils.kma_utils import (
     get_base_time, convert_precipitation_type, convert_wind_direction,
-    format_weather_data
+    format_weather_data, CITY_COORDINATES
 )
 
 class KMAWeatherService:
@@ -144,6 +145,32 @@ class KMAWeatherService:
             raise HTTPException(status_code=408, detail="기상청 API 타임아웃")
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
+
+    async def get_all_cities_current_weather(self) -> List[Dict[str, Any]]:
+        """모든 지원 도시의 현재 날씨 정보 조회"""
+        tasks = []
+        for city, coords in CITY_COORDINATES.items():
+            task = self.get_current_weather(coords["nx"], coords["ny"])
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        weather_data = []
+        cities = list(CITY_COORDINATES.keys())
+        for i, result in enumerate(results):
+            city = cities[i]
+            if isinstance(result, Exception):
+                weather_data.append({
+                    "city": city,
+                    "error": str(result)
+                })
+            else:
+                # get_current_weather가 도시 이름을 반환하지 않으므로 추가
+                data = result.copy()
+                data["city"] = city
+                weather_data.append(data)
+
+        return weather_data
 
     def _parse_current_weather_kma(self, data: Dict[str, Any], nx: int, ny: int) -> Dict[str, Any]:
         """기상청 현재날씨 데이터 파싱"""
