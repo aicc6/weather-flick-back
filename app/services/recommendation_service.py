@@ -38,7 +38,7 @@ async def get_weather_based_recommendations(
         if area_code:
             today_str = datetime.now().strftime('%Y%m%d')
             try:
-                festivals = get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
+                festivals = await get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
                 for festival in festivals:
                     events_recommendations.append({
                         "id": festival.get("contentid"),

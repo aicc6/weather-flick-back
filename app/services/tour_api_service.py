@@ -1,7 +1,7 @@
 """
 TourAPI 연동을 위한 서비스 모듈
 """
-import requests
+import httpx
 import os
 from typing import List, Dict, Any
 from urllib.parse import unquote
@@ -34,9 +34,9 @@ def get_mock_festivals() -> List[Dict[str, Any]]:
     return mock_response.get("response", {}).get("body", {}).get("items", {}).get("item", [])
 
 
-def get_festivals_from_tour_api(area_code: str, event_start_date: str) -> List[Dict[str, Any]]:
+async def get_festivals_from_tour_api(area_code: str, event_start_date: str) -> List[Dict[str, Any]]:
     """
-    지정된 지역 코드와 시작일 기준으로 축제 정보를 가져옵니다.
+    (비동기) 지정된 지역 코드와 시작일 기준으로 축제 정보를 가져옵니다.
     먼저 실제 TourAPI 호출을 시도하고, 모든 종류의 예외 발생 시 목 데이터를 안전하게 반환합니다.
     """
     service_key_encoded = os.getenv("TOUR_API_KEY")
@@ -58,12 +58,10 @@ def get_festivals_from_tour_api(area_code: str, event_start_date: str) -> List[D
             "eventStartDate": event_start_date
         }
 
-        # SSL 경고를 비활성화하고, 인증서 검증 없이 요청
-        requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
-
-        print(f"Requesting REAL festival data from TourAPI for areaCode: {area_code}")
-        response = requests.get(base_url, params=params, timeout=15, verify=False)
-        response.raise_for_status()
+        async with httpx.AsyncClient() as client:
+            print(f"Requesting REAL festival data from TourAPI for areaCode: {area_code}")
+            response = await client.get(base_url, params=params, timeout=15.0)
+            response.raise_for_status()
 
         data = response.json()
         items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
