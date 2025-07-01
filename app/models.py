@@ -372,7 +372,7 @@ class TokenData(BaseModel):
 class UserCreate(BaseModel):
     email: str
     password: str
-    nickname: Optional[str] = None
+    nickname: str
 
 
 class UserResponse(BaseModel):
