@@ -153,21 +153,18 @@ async def update_user_profile(
     db: Session = Depends(get_db),
 ):
     """사용자 프로필 업데이트"""
-    if user_update.username:
+    if user_update.nickname:
         # 사용자명 중복 확인
         existing_user = (
             db.query(User)
-            .filter(User.username == user_update.username, User.id != current_user.id)
+            .filter(User.nickname == user_update.nickname, User.id != current_user.id)
             .first()
         )
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
             )
-        current_user.username = user_update.username
-
-    if user_update.bio is not None:
-        current_user.bio = user_update.bio
+        current_user.nickname = user_update.nickname
 
     if user_update.profile_image is not None:
         current_user.profile_image = user_update.profile_image
@@ -496,7 +493,11 @@ def google_login(data: dict, db: Session = Depends(get_db)):
 
     # 이미 가입된 사용자면 로그인, 아니면 회원가입
     existing_user_check = db.query(User.email).filter(User.email == email).first()
-    user = db.query(User).filter(User.email == email).first() if existing_user_check else None
+    user = (
+        db.query(User).filter(User.email == email).first()
+        if existing_user_check
+        else None
+    )
     if not user:
         from app.auth import get_password_hash
 
