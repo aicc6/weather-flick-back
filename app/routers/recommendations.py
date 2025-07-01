@@ -13,7 +13,7 @@ from app.services import recommendation_service
 from app.utils import create_standard_response, convert_uuids_to_strings, create_pagination_info, create_error_response
 
 router = APIRouter(
-    prefix="/api/v1/recommendations",
+    prefix="/recommendations",
     tags=["recommendations"],
     responses={404: {"description": "Not found"}},
 )

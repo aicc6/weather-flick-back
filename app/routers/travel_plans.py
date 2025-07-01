@@ -13,7 +13,7 @@ from app.auth import get_current_user
 from app.utils import create_standard_response, convert_uuids_to_strings, create_pagination_info, create_error_response
 
 router = APIRouter(
-    prefix="/api/v1/travel-plans",
+    prefix="/travel-plans",
     tags=["travel-plans"],
     responses={404: {"description": "Not found"}},
 )
