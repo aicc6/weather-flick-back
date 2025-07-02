@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     DECIMAL,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
@@ -155,6 +156,10 @@ class TravelPlan(Base):
     user = relationship("User", back_populates="travel_plans")
     reviews = relationship("Review", back_populates="travel_plan")
 
+# 성능 개선을 위한 복합 인덱스
+Index('idx_travel_plan_user_status', TravelPlan.user_id, TravelPlan.status)
+Index('idx_travel_plan_dates', TravelPlan.start_date, TravelPlan.end_date)
+
 
 class WeatherData(Base):
     __tablename__ = "weather_data"
@@ -198,6 +203,10 @@ class WeatherData(Base):
 
     destination = relationship("Destination", back_populates="weather_data")
 
+# WeatherData 성능 최적화 인덱스
+Index('idx_weather_forecast_location', WeatherData.forecast_date, WeatherData.grid_x, WeatherData.grid_y)
+Index('idx_weather_destination_date', WeatherData.destination_id, WeatherData.forecast_date)
+
 
 class Review(Base):
     __tablename__ = "reviews"
@@ -219,6 +228,10 @@ class Review(Base):
     user = relationship("User", back_populates="reviews")
     destination = relationship("Destination", back_populates="reviews")
     travel_plan = relationship("TravelPlan", back_populates="reviews")
+
+# Review 성능 최적화 인덱스
+Index('idx_review_destination_date', Review.destination_id, Review.created_at)
+Index('idx_review_user_rating', Review.user_id, Review.rating)
 
 
 class UserActivityLog(Base):

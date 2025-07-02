@@ -9,9 +9,12 @@ SQLALCHEMY_DATABASE_URL = settings.database_url
 # 엔진 생성
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,  # 연결 상태 확인
-    pool_recycle=300,    # 5분마다 연결 재생성
-    echo=settings.debug  # 디버그 모드에서 SQL 로그 출력
+    pool_size=20,           # 기본 연결 수 증가
+    max_overflow=30,        # 추가 연결 수 설정
+    pool_timeout=30,        # 연결 대기 시간
+    pool_pre_ping=True,     # 연결 상태 확인
+    pool_recycle=3600,      # 1시간마다 연결 재생성
+    echo=settings.debug     # 디버그 모드에서 SQL 로그 출력
 )
 
 # SQLAlchemy 메타데이터 캐시 강제 새로고침
@@ -35,5 +38,20 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+# 트랜잭션 관리 컨텍스트 매니저
+from contextlib import contextmanager
+
+@contextmanager
+def db_transaction(db: Session):
+    """트랜잭션 관리를 위한 컨텍스트 매니저"""
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

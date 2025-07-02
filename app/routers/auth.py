@@ -54,19 +54,20 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     try:
         logger.info(f"회원가입 시도: {user.email}")
         
-        # 이메일 중복 확인
-        db_user = db.query(User.email).filter(User.email == user.email).first()
-        if db_user:
-            logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
-            raise ValidationError(
-                message="이미 등록된 이메일입니다.",
-                code="EMAIL_ALREADY_EXISTS",
-                details=[{"field": "email", "message": "이미 사용 중인 이메일입니다."}]
-            )
-
-        # 사용자명 중복 확인
-        db_user = db.query(User.nickname).filter(User.nickname == user.nickname).first()
-        if db_user:
+        # 이메일 및 닉네임 중복 확인을 단일 쿼리로 최적화
+        existing_user = db.query(User).filter(
+            (User.email == user.email) | (User.nickname == user.nickname)
+        ).first()
+        
+        if existing_user:
+            if existing_user.email == user.email:
+                logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
+                raise ValidationError(
+                    message="이미 등록된 이메일입니다.",
+                    code="EMAIL_ALREADY_EXISTS",
+                    details=[{"field": "email", "message": "이미 사용 중인 이메일입니다."}]
+                )
+            elif existing_user.nickname == user.nickname:
             logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
             raise ValidationError(
                 message="이미 등록된 닉네임입니다.",
