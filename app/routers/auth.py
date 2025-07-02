@@ -68,12 +68,12 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
                     details=[{"field": "email", "message": "이미 사용 중인 이메일입니다."}]
                 )
             elif existing_user.nickname == user.nickname:
-            logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
-            raise ValidationError(
-                message="이미 등록된 닉네임입니다.",
-                code="NICKNAME_ALREADY_EXISTS",
-                details=[{"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}]
-            )
+                logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
+                raise ValidationError(
+                    message="이미 등록된 닉네임입니다.",
+                    code="NICKNAME_ALREADY_EXISTS",
+                    details=[{"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}]
+                )
 
         # 비밀번호 강도 검사
         password_check = check_password_strength(user.password)
