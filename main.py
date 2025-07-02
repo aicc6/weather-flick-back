@@ -37,16 +37,16 @@ app.add_middleware(
 )
 
 # 라우터 포함 - 모든 라우터에 /api prefix 추가
-app.include_router(auth.router)
-app.include_router(weather.router)
-app.include_router(kma_weather.router)
-app.include_router(local_info.router)
-app.include_router(naver_map.router)
-app.include_router(travel_plans.router)
-app.include_router(recommendations.router)
-app.include_router(destinations.router)
-app.include_router(events.router)
-app.include_router(config.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(weather.router, prefix="/api")
+app.include_router(kma_weather.router, prefix="/api")
+app.include_router(local_info.router, prefix="/api")
+app.include_router(naver_map.router, prefix="/api")
+app.include_router(travel_plans.router, prefix="/api")
+app.include_router(recommendations.router, prefix="/api")
+app.include_router(destinations.router, prefix="/api")
+app.include_router(events.router, prefix="/api")
+app.include_router(config.router, prefix="/api")
 
 
 @app.get("/")
