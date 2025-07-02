@@ -5,6 +5,7 @@ import httpx
 import os
 from typing import List, Dict, Any
 from urllib.parse import unquote
+from app.config import settings
 
 def get_mock_festivals() -> List[Dict[str, Any]]:
     """
@@ -39,9 +40,9 @@ async def get_festivals_from_tour_api(area_code: str, event_start_date: str) -> 
     (비동기) 지정된 지역 코드와 시작일 기준으로 축제 정보를 가져옵니다.
     먼저 실제 TourAPI 호출을 시도하고, 모든 종류의 예외 발생 시 목 데이터를 안전하게 반환합니다.
     """
-    service_key_encoded = os.getenv("TOUR_API_KEY")
+    service_key_encoded = settings.korea_tourism_api_key
     if not service_key_encoded:
-        print("--- 경고: TourAPI 인증키가 없습니다. 목 데이터를 사용합니다. ---")
+        print("--- 경고: TourAPI 인증키(korea_tourism_api_key)가 없습니다. 목 데이터를 사용합니다. ---")
         return get_mock_festivals()
 
     try:
