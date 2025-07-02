@@ -10,3 +10,10 @@ httpx
 python-multipart
 psycopg2-binary
 gunicorn
+pydantic-settings
+fastapi-mail
+google-auth
+google-auth-oauthlib
+python-dotenv
+python-json-logger
+

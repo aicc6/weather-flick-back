@@ -3,6 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.exceptions import (
+    AuthenticationError, 
+    ValidationError, 
+    NotFoundError, 
+    EmailServiceError,
+    DatabaseError
+)
+from app.logging_config import get_logger
 from app.models import (
     User,
     UserCreate,
@@ -36,55 +44,88 @@ import requests
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
+# 로거 설정
+logger = get_logger("auth")
+
 
 @router.post("/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     """회원가입 (이메일 인증 필요)"""
-    # 이메일 중복 확인
-    db_user = db.query(User.email).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
+    try:
+        logger.info(f"회원가입 시도: {user.email}")
+        
+        # 이메일 중복 확인
+        db_user = db.query(User.email).filter(User.email == user.email).first()
+        if db_user:
+            logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
+            raise ValidationError(
+                message="이미 등록된 이메일입니다.",
+                code="EMAIL_ALREADY_EXISTS",
+                details=[{"field": "email", "message": "이미 사용 중인 이메일입니다."}]
+            )
+
+        # 사용자명 중복 확인
+        db_user = db.query(User.nickname).filter(User.nickname == user.nickname).first()
+        if db_user:
+            logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
+            raise ValidationError(
+                message="이미 등록된 닉네임입니다.",
+                code="NICKNAME_ALREADY_EXISTS",
+                details=[{"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}]
+            )
+
+        # 비밀번호 강도 검사
+        password_check = check_password_strength(user.password)
+        if not password_check["is_valid"]:
+            logger.warning(f"약한 비밀번호로 회원가입 시도: {user.email}")
+            raise ValidationError(
+                message="비밀번호가 보안 요구사항을 충족하지 않습니다.",
+                code="WEAK_PASSWORD",
+                details=[{"field": "password", "message": f"비밀번호 오류: {', '.join(password_check['errors'])}"}]
+            )
+
+        # 이메일 인증 확인
+        if not email_verification_service.is_email_verified(db, user.email):
+            logger.warning(f"이메일 미인증 상태로 회원가입 시도: {user.email}")
+            raise ValidationError(
+                message="이메일 인증이 필요합니다.",
+                code="EMAIL_NOT_VERIFIED",
+                details=[{"field": "email", "message": "먼저 이메일 인증을 완료해주세요."}]
+            )
+
+        # 새 사용자 생성
+        hashed_password = get_password_hash(user.password)
+        db_user = User(
+            email=user.email,
+            nickname=user.nickname,
+            hashed_password=hashed_password,
+            is_email_verified=True,
         )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
 
-    # 사용자명 중복 확인
-    db_user = db.query(User.nickname).filter(User.nickname == user.nickname).first()
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
+        logger.info(f"회원가입 완료: {user.email}")
+
+        # 환영 이메일 발송 (에러가 발생해도 회원가입은 완료됨)
+        try:
+            await email_service.send_welcome_email(user.email, user.nickname)
+            logger.info(f"환영 이메일 발송 완료: {user.email}")
+        except Exception as e:
+            logger.warning(f"환영 이메일 발송 실패 (회원가입은 완료됨): {user.email}, 오류: {str(e)}")
+
+        return db_user
+        
+    except ValidationError:
+        # ValidationError는 그대로 전파
+        raise
+    except Exception as e:
+        logger.error(f"회원가입 중 예상치 못한 오류 발생: {user.email}, 오류: {str(e)}")
+        db.rollback()
+        raise DatabaseError(
+            message="회원가입 처리 중 오류가 발생했습니다.",
+            code="REGISTRATION_FAILED"
         )
-
-    # 비밀번호 강도 검사
-    password_check = check_password_strength(user.password)
-    if not password_check["is_valid"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Password is too weak: {', '.join(password_check['errors'])}",
-        )
-
-    # 이메일 인증 확인
-    if not email_verification_service.is_email_verified(db, user.email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email verification required. Please verify your email first.",
-        )
-
-    # 새 사용자 생성
-    hashed_password = get_password_hash(user.password)
-    db_user = User(
-        email=user.email,
-        nickname=user.nickname,
-        hashed_password=hashed_password,
-        is_email_verified=True,
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-
-    # 환영 이메일 발송
-    await email_service.send_welcome_email(user.email, user.nickname)
-
-    return db_user
 
 
 @router.post("/login", response_model=Token)
@@ -314,7 +355,7 @@ async def google_callback(
         jwt_token = google_oauth_service.create_access_token_for_user(user)
 
         # 프론트엔드로 리다이렉트 (토큰 포함)
-        redirect_url = f"/auth/success?token={jwt_token}&user_id={user.id}"
+        redirect_url = f"/auth/success?token={jwt_token}&user_id={str(user.id)}"
         return {"redirect_url": redirect_url}
 
     except HTTPException:
