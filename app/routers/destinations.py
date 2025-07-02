@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.services.destination_service import destination_service
 from app.models import DestinationCreate, DestinationResponse
+import httpx
+import os
 
 router = APIRouter(
     prefix="/destinations",
     tags=["destinations"]
 )
+
+GOOGLE_API_KEY = os.getenv("GCP_API_KEY")
 
 @router.post("/", response_model=DestinationResponse)
 def create_destination(
@@ -36,3 +40,15 @@ def read_destinations_by_province(
     if not destinations:
         raise HTTPException(status_code=404, detail="해당 지역의 여행지를 찾을 수 없습니다.")
     return destinations
+
+@router.get("/search")
+async def search_destination(query: str = Query(...)):
+    url = (
+        f"https://maps.googleapis.com/maps/api/place/autocomplete/json"
+        f"?input={query}&key={GOOGLE_API_KEY}&language=ko"
+    )
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+        data = resp.json()
+    suggestions = [item["description"] for item in data.get("predictions", [])]
+    return suggestions

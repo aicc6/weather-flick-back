@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     korea_tourism_api_key: str = ""
     korea_tourism_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
 
+    # 구글 GCP API 키 (Geocoding 등)
+    gcp_api_key: str = ""
+
     @property
     def database_url(self) -> str:
         """데이터베이스 URL 생성 - PostgreSQL이 설정되지 않으면 SQLite 사용"""
