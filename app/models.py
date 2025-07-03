@@ -438,11 +438,17 @@ class GoogleLoginRequest(BaseModel):
 class GoogleLoginResponse(BaseModel):
     access_token: str
     token_type: str
-    user: UserResponse
+    expires_in: int
+    user_info: UserResponse
+    is_new_user: bool
 
 
 class GoogleAuthUrlResponse(BaseModel):
     auth_url: str
+    state: str
+
+class GoogleAuthCodeRequest(BaseModel):
+    auth_code: str
 
 
 class EmailVerificationRequest(BaseModel):

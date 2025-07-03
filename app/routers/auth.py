@@ -1,6 +1,7 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.exceptions import (
@@ -21,6 +22,7 @@ from app.models import (
     GoogleLoginRequest,
     GoogleLoginResponse,
     GoogleAuthUrlResponse,
+    GoogleAuthCodeRequest,
     EmailVerificationRequest,
     EmailVerificationConfirm,
     EmailVerificationResponse,
@@ -41,11 +43,57 @@ from app.services.email_service import email_verification_service, email_service
 import secrets
 import httpx
 import requests
+from typing import Dict
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 # 로거 설정
 logger = get_logger("auth")
+
+# 임시 인증 코드 저장소 (프로덕션에서는 Redis 사용 권장)
+temp_auth_store: Dict[str, Dict] = {}
+
+def store_temp_auth(code: str, data: Dict, ttl_minutes: int = 10):
+    """임시 인증 데이터 저장"""
+    expire_time = datetime.now() + timedelta(minutes=ttl_minutes)
+    temp_auth_store[code] = {
+        "data": data,
+        "expire_time": expire_time
+    }
+
+def get_temp_auth(code: str) -> Dict:
+    """임시 인증 데이터 조회 및 삭제"""
+    logger.info(f"Looking for temp auth code: {code[:10]}...")
+    logger.info(f"Available codes: {[k[:10] + '...' for k in temp_auth_store.keys()]}")
+    
+    if code not in temp_auth_store:
+        logger.warning(f"Temp auth code not found: {code[:10]}...")
+        return None
+    
+    stored = temp_auth_store[code]
+    
+    # 만료 확인
+    if datetime.now() > stored["expire_time"]:
+        logger.warning(f"Temp auth code expired: {code[:10]}...")
+        del temp_auth_store[code]
+        return None
+    
+    # 사용 후 삭제 (일회성)
+    data = stored["data"]
+    del temp_auth_store[code]
+    logger.info(f"Temp auth code used successfully: {code[:10]}...")
+    return data
+
+def cleanup_expired_auth():
+    """만료된 임시 인증 데이터 정리"""
+    now = datetime.now()
+    expired_codes = [
+        code for code, stored in temp_auth_store.items()
+        if now > stored["expire_time"]
+    ]
+    for code in expired_codes:
+        del temp_auth_store[code]
 
 
 @router.post("/register", response_model=UserResponse)
@@ -320,51 +368,134 @@ async def google_login(
 
 @router.get("/google/callback")
 async def google_callback(
-    code: str, state: str, db: Session = Depends(get_db), request: Request = None
+    code: str, state: str, request: Request = None
 ):
-    """구글 OAuth 콜백 처리"""
+    """구글 OAuth 콜백 처리 - 임시 코드 생성"""
     try:
-        # 액세스 토큰 교환
+        logger.info(f"Google OAuth callback received - code: {code[:10]}..., state: {state}")
+        
+        # 만료된 임시 코드 정리
+        cleanup_expired_auth()
+        
+        # 임시 인증 코드 생성
+        temp_code = secrets.token_urlsafe(32)
+        
+        # 구글 인증 데이터를 임시 저장 (5분 TTL)
+        store_temp_auth(temp_code, {
+            "google_code": code,
+            "state": state,
+            "ip_address": request.client.host if request else None,
+            "user_agent": request.headers.get("User-Agent") if request else None
+        })
+        
+        logger.info(f"Temp auth code stored: {temp_code[:10]}... (expires in 10min)")
+        logger.info(f"Current temp_auth_store size: {len(temp_auth_store)}")
+        
+        # 프론트엔드로 임시 코드와 함께 리다이렉트 (토큰 없이)
+        from app.config import settings
+        frontend_url = f"{settings.frontend_url}/auth/google/callback?auth_code={temp_code}"
+        logger.info(f"Google OAuth callback - redirecting with temp code: {temp_code[:10]}...")
+        return RedirectResponse(url=frontend_url, status_code=302)
+
+    except Exception as e:
+        logger.error(f"Google callback failed: {str(e)}")
+        # 에러 시에도 프론트엔드로 리다이렉트
+        from app.config import settings
+        error_url = f"{settings.frontend_url}/auth/google/callback?error=oauth_failed"
+        return RedirectResponse(url=error_url, status_code=302)
+
+
+@router.post("/google/exchange", response_model=GoogleLoginResponse)
+async def exchange_google_auth_code(
+    request_data: GoogleAuthCodeRequest,
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    """임시 인증 코드를 JWT 토큰으로 교환"""
+    try:
+        auth_code = request_data.auth_code
+        logger.info(f"Exchange request received - auth_code: {auth_code[:10]}...")
+        
+        if not auth_code:
+            logger.error("No auth_code provided in request")
+            raise HTTPException(status_code=400, detail="auth_code is required")
+
+        # 임시 인증 데이터 조회
+        temp_data = get_temp_auth(auth_code)
+        if not temp_data:
+            logger.error(f"Invalid or expired auth code: {auth_code[:10]}...")
+            logger.info(f"Current temp_auth_store keys: {list(temp_auth_store.keys())}")
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid or expired auth code"
+            )
+        
+        logger.info(f"Temp auth data found for code: {auth_code[:10]}...")
+
+        google_code = temp_data["google_code"]
+        state = temp_data["state"]
+
+        logger.info(f"Processing Google auth exchange for code: {google_code[:10]}...")
+
+        # 구글 액세스 토큰 교환
         async with httpx.AsyncClient() as client:
+            token_data = {
+                "client_id": google_oauth_service.client_id,
+                "client_secret": google_oauth_service.client_secret,
+                "code": google_code,
+                "grant_type": "authorization_code",
+                "redirect_uri": google_oauth_service.redirect_uri,
+            }
+            
             token_response = await client.post(
                 "https://oauth2.googleapis.com/token",
-                data={
-                    "client_id": google_oauth_service.client_id,
-                    "client_secret": google_oauth_service.client_secret,
-                    "code": code,
-                    "grant_type": "authorization_code",
-                    "redirect_uri": google_oauth_service.redirect_uri,
-                },
+                data=token_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
 
             if token_response.status_code != 200:
-                raise HTTPException(status_code=400, detail="Failed to exchange token")
+                logger.error(f"Token exchange failed - Status: {token_response.status_code}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Failed to exchange Google authorization code"
+                )
 
-            token_data = token_response.json()
-            access_token = token_data.get("access_token")
+            token_response_data = token_response.json()
+            access_token = token_response_data.get("access_token")
 
             if not access_token:
-                raise HTTPException(status_code=400, detail="No access token received")
+                raise HTTPException(status_code=400, detail="No access token received from Google")
 
         # 사용자 정보 조회
         user_info = await google_oauth_service.get_google_user_info(access_token)
+        logger.info(f"User info retrieved: {user_info.get('email')}")
 
         # 사용자 생성 또는 업데이트
         user = await google_oauth_service.create_or_update_user(db, user_info, request)
 
-        # 액세스 토큰 생성
+        # JWT 토큰 생성
         jwt_token = google_oauth_service.create_access_token_for_user(user)
 
-        # 프론트엔드로 리다이렉트 (토큰 포함)
-        redirect_url = f"/auth/success?token={jwt_token}&user_id={str(user.id)}"
-        return {"redirect_url": redirect_url}
+        # 새 사용자 여부 확인
+        is_new_user = user.created_at == user.updated_at
+
+        logger.info(f"Google OAuth exchange successful for user: {user.email}")
+
+        return GoogleLoginResponse(
+            access_token=jwt_token,
+            token_type="bearer",
+            expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            user_info=user,
+            is_new_user=is_new_user,
+        )
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Google auth exchange failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Google callback failed: {str(e)}",
+            detail=f"Google auth exchange failed: {str(e)}",
         )
 
 

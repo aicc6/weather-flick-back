@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    frontend_url: str = "http://localhost:5173"
 
     # 공공데이터포털 API 설정
     public_data_api_key: str = ""
