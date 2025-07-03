@@ -12,6 +12,7 @@ from app.routers import (
     events,
     config,
     location,
+    plan,
 )
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
@@ -49,6 +50,7 @@ app.include_router(destinations.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(location.router, prefix="/api")
+app.include_router(plan.router, prefix="/api")
 
 
 @app.get("/")
