@@ -1,91 +1,124 @@
+"""Application configuration settings."""
+
 import os
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from dotenv import load_dotenv
+from pydantic import validator
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
+
 class Settings(BaseSettings):
+    """Application settings configuration."""
+    
     # 기본 설정
     app_name: str = "Weather Flick API"
     app_version: str = "1.0.0"
     debug: bool = False
+    environment: str = "development"
 
     # 서버 설정
     host: str = "0.0.0.0"
     port: int = 8000
 
     # CORS 설정
-    cors_origins: list = ["*"]
+    cors_origins: list[str] = ["*"]
 
     # JWT 설정
-    secret_key: str = "your-secret-key-here"
+    secret_key: str = os.getenv("JWT_SECRET_KEY", "")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    refresh_token_expire_minutes: int = 10080  # 7 days
 
     # 데이터베이스 설정
-    database_host: Optional[str] = None
-    database_port: Optional[int] = None
-    database_user: Optional[str] = None
-    database_password: Optional[str] = None
-    database_name: Optional[str] = None
+    database_url: str = os.getenv("DATABASE_URL", "")
+    database_host: Optional[str] = os.getenv("DATABASE_HOST")
+    database_port: Optional[int] = int(os.getenv("DATABASE_PORT", "5432"))
+    database_user: Optional[str] = os.getenv("DATABASE_USER")
+    database_password: Optional[str] = os.getenv("DATABASE_PASSWORD")
+    database_name: Optional[str] = os.getenv("DATABASE_NAME")
 
     # 이메일 설정
-    mail_username: str = ""
-    mail_password: str = ""
-    mail_from: str = "noreply@weatherflick.com"
-    mail_port: int = 587
-    mail_server: str = "smtp.gmail.com"
-    mail_starttls: bool = True
-    mail_ssl_tls: bool = False
-    mail_from_name: str = "Weather Flick"
+    mail_username: str = os.getenv("MAIL_USERNAME", "")
+    mail_password: str = os.getenv("MAIL_PASSWORD", "")
+    mail_from: str = os.getenv("MAIL_FROM", "noreply@weatherflick.com")
+    mail_port: int = int(os.getenv("MAIL_PORT", "587"))
+    mail_server: str = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    mail_starttls: bool = os.getenv("MAIL_STARTTLS", "true").lower() == "true"
+    mail_ssl_tls: bool = os.getenv("MAIL_SSL_TLS", "false").lower() == "true"
+    mail_from_name: str = os.getenv("MAIL_FROM_NAME", "Weather Flick")
 
-    # WeatherAPI 설정
-    weather_api_key: str = ""
+    # Redis 설정
+    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+    # 외부 API 설정
+    weather_api_key: str = os.getenv("WEATHER_API_KEY", "")
     weather_api_url: str = "http://api.weatherapi.com/v1"
-
-    # 기상청 API 설정
-    kma_api_key: str = ""
-
-    # 카카오 API 설정
-    kakao_api_key: str = ""
+    
+    kma_api_key: str = os.getenv("KMA_API_KEY", "")
+    kma_forecast_url: str = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0"
+    
+    kakao_api_key: str = os.getenv("KAKAO_API_KEY", "")
     kakao_api_url: str = "https://dapi.kakao.com/v2/local"
-
-    # 네이버 API 설정
-    naver_client_id: str = ""
-    naver_client_secret: str = ""
+    
+    naver_client_id: str = os.getenv("NAVER_CLIENT_ID", "")
+    naver_client_secret: str = os.getenv("NAVER_CLIENT_SECRET", "")
     naver_api_url: str = "https://openapi.naver.com/v1"
-
-    # 구글 API 설정
-    google_api_key: str = ""
+    
+    google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
     google_places_url: str = "https://maps.googleapis.com/maps/api/place"
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
-    frontend_url: str = "http://localhost:5173"
-
-    # 공공데이터포털 API 설정
-    public_data_api_key: str = ""
-    public_data_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
-
-    # 한국관광공사 API 설정
-    korea_tourism_api_key: str = ""
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
+    
+    korea_tourism_api_key: str = os.getenv("KOREA_TOURISM_API_KEY", "")
     korea_tourism_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
+    
+    # 프론트엔드 설정
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-    # 구글 GCP API 키 (Geocoding 등)
-    gcp_api_key: str = ""
+    @validator("secret_key")
+    def secret_key_must_be_set(cls, v: str) -> str:
+        """Validate that secret key is set."""
+        if not v:
+            raise ValueError("JWT_SECRET_KEY must be set")
+        return v
+
+    @validator("database_url")
+    def database_url_must_be_set(cls, v: str) -> str:
+        """Validate that database URL is set."""
+        if not v:
+            raise ValueError("DATABASE_URL must be set")
+        return v
 
     @property
-    def database_url(self) -> str:
-        """데이터베이스 URL 생성 - PostgreSQL이 설정되지 않으면 SQLite 사용"""
-        if all([self.database_host, self.database_user, self.database_password, self.database_name]):
-            return f"postgresql://{self.database_user}:{self.database_password}@{self.database_host}:{self.database_port or 5432}/{self.database_name}"
-        else:
-            # SQLite 사용 (개발 환경)
-            return "sqlite:///./weather_flick.db"
+    def is_production(self) -> bool:
+        """Check if running in production environment."""
+        return self.environment.lower() == "production"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Get CORS origins as list."""
+        if self.is_production:
+            return [self.frontend_url]
+        return self.cors_origins
 
     class Config:
+        """Pydantic config."""
+        
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
+
+# 설정 인스턴스 생성
 settings = Settings()
+
+# 필수 환경 변수 검증
+if not settings.secret_key:
+    raise ValueError("JWT_SECRET_KEY environment variable is required")
+
+if not settings.database_url:
+    raise ValueError("DATABASE_URL environment variable is required")

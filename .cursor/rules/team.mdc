@@ -1,68 +1,638 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: Weather Flick Backend Development Rules
+globs: ["**/*.py", "**/*.md", "**/*.yml", "**/*.yaml", "**/*.toml"]
+alwaysApply: true
 ---
 
-  You are an expert in Python, FastAPI, and scalable API development.
+# Weather Flick Backend Team Rules
 
-  Key Principles
-  - Write concise, technical responses with accurate Python examples.
-  - Use functional, declarative programming; avoid classes where possible.
-  - Prefer iteration and modularization over code duplication.
-  - Use descriptive variable names with auxiliary verbs (e.g., is_active, has_permission).
-  - Use lowercase with underscores for directories and files (e.g., routers/user_routes.py).
-  - Favor named exports for routes and utility functions.
-  - Use the Receive an Object, Return an Object (RORO) pattern.
+당신은 Weather Flick 백엔드 개발의 전문가입니다. FastAPI, Python, PostgreSQL, 그리고 확장 가능한 API 개발에 능숙합니다.
 
-  Python/FastAPI
-  - Use def for pure functions and async def for asynchronous operations.
-  - Use type hints for all function signatures. Prefer Pydantic models over raw dictionaries for input validation.
-  - File structure: exported router, sub-routes, utilities, static content, types (models, schemas).
-  - Avoid unnecessary curly braces in conditional statements.
-  - For single-line statements in conditionals, omit curly braces.
-  - Use concise, one-line syntax for simple conditional statements (e.g., if condition: do_something()).
+## 🎯 프로젝트 컨텍스트
 
-  Error Handling and Validation
-  - Prioritize error handling and edge cases:
-    - Handle errors and edge cases at the beginning of functions.
-    - Use early returns for error conditions to avoid deeply nested if statements.
-    - Place the happy path last in the function for improved readability.
-    - Avoid unnecessary else statements; use the if-return pattern instead.
-    - Use guard clauses to handle preconditions and invalid states early.
-    - Implement proper error logging and user-friendly error messages.
-    - Use custom error types or error factories for consistent error handling.
+### 역할 및 책임
+- **사용자 API 서버**: FastAPI 기반 RESTful API 서비스 (포트: 8000)
+- **인증 시스템**: JWT + Google OAuth + 이메일 인증
+- **데이터 연동**: 기상청(KMA), 한국관광공사(KTO) API 통합
+- **추천 엔진**: 사용자 맞춤 여행지 추천 시스템
+- **13개 라우터**: auth, destinations, events, kma_weather, local_info, location, naver_map, plan, recommendations, travel_plans, weather, config
 
-  Dependencies
-  - FastAPI
-  - Pydantic v2
-  - Async database libraries like asyncpg or aiomysql
-  - SQLAlchemy 2.0 (if using ORM features)
+### 기술 스택
+- **Framework**: FastAPI 0.111.0
+- **Language**: Python 3.11+
+- **Database**: PostgreSQL + SQLAlchemy + Alembic
+- **Validation**: Pydantic 2.7.1
+- **Code Quality**: Ruff + Black + MyPy + pre-commit hooks
 
-  FastAPI-Specific Guidelines
-  - Use functional components (plain functions) and Pydantic models for input validation and response schemas.
-  - Use declarative route definitions with clear return type annotations.
-  - Use def for synchronous operations and async def for asynchronous ones.
-  - Minimize @app.on_event("startup") and @app.on_event("shutdown"); prefer lifespan context managers for managing startup and shutdown events.
-  - Use middleware for logging, error monitoring, and performance optimization.
-  - Optimize for performance using async functions for I/O-bound tasks, caching strategies, and lazy loading.
-  - Use HTTPException for expected errors and model them as specific HTTP responses.
-  - Use middleware for handling unexpected errors, logging, and error monitoring.
-  - Use Pydantic's BaseModel for consistent input/output validation and response schemas.
+## 📁 필수 프로젝트 구조
 
-  Performance Optimization
-  - Minimize blocking I/O operations; use asynchronous operations for all database calls and external API requests.
-  - Implement caching for static and frequently accessed data using tools like Redis or in-memory stores.
-  - Optimize data serialization and deserialization with Pydantic.
-  - Use lazy loading techniques for large datasets and substantial API responses.
+```
+app/
+├── routers/           # API 엔드포인트 (13개 라우터)
+│   ├── auth.py        # 인증 및 사용자 관리
+│   ├── destinations.py # 여행지 정보
+│   ├── recommendations.py # 개인화 추천
+│   └── ...
+├── services/          # 비즈니스 로직 (9개 서비스)
+│   ├── recommendation_service.py
+│   ├── weather_service.py
+│   └── ...
+├── models.py          # SQLAlchemy 모델들
+├── database.py        # DB 연결 및 세션 관리
+├── config.py          # 설정 및 환경변수
+├── auth.py           # 인증 및 권한 관리
+└── utils/            # 유틸리티 함수들
+```
 
-  Key Conventions
-  1. Rely on FastAPI’s dependency injection system for managing state and shared resources.
-  2. Prioritize API performance metrics (response time, latency, throughput).
-  3. Limit blocking operations in routes:
-     - Favor asynchronous and non-blocking flows.
-     - Use dedicated async functions for database and external API operations.
-     - Structure routes and dependencies clearly to optimize readability and maintainability.
+## 🛠️ 핵심 개발 원칙
 
-  Refer to FastAPI documentation for Data Models, Path Operations, and Middleware for best practices.
+### 1. 코딩 스타일 (Ruff + Black + MyPy 준수)
+- **함수/변수명**: snake_case (get_user_recommendations)
+- **클래스명**: PascalCase (RecommendationService)
+- **상수명**: UPPER_SNAKE_CASE (API_BASE_URL)
+- **파일명**: snake_case (recommendation_service.py)
+- **타입 힌트**: 모든 함수에 필수
+- **라인 길이**: 88자 제한 (Black 기본값)
 
+### 2. FastAPI 라우터 패턴 (필수 준수)
+
+```python
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from app.database import get_db
+from app.auth import get_current_user
+from app.services.recommendation_service import RecommendationService
+
+router = APIRouter(prefix="/recommendations", tags=["recommendations"])
+
+@router.get("/", response_model=List[RecommendationResponse])
+async def get_recommendations(
+    user_preferences: Optional[str] = None,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> List[RecommendationResponse]:
+    """
+    사용자 맞춤 여행지 추천 목록을 반환합니다.
+    
+    Args:
+        user_preferences: 사용자 선호도 필터
+        limit: 반환할 추천 개수 (기본값: 10)
+        db: 데이터베이스 세션
+        current_user: 현재 로그인된 사용자
+    
+    Returns:
+        List[RecommendationResponse]: 추천 여행지 목록
+    
+    Raises:
+        HTTPException: 추천 생성 실패 시
+    """
+    try:
+        service = RecommendationService(db)
+        recommendations = await service.get_personalized_recommendations(
+            user_id=current_user.id,
+            preferences=user_preferences,
+            limit=limit
+        )
+        return recommendations
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"추천 생성 중 오류가 발생했습니다: {str(e)}"
+        )
+```
+
+### 3. Pydantic 스키마 패턴 (필수)
+
+```python
+from pydantic import BaseModel, Field, validator, ConfigDict
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
+
+class TravelPreferenceEnum(str, Enum):
+    NATURE = "nature"
+    CULTURE = "culture"
+    FOOD = "food"
+    ACTIVITY = "activity"
+
+class RecommendationRequest(BaseModel):
+    """추천 요청 스키마"""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    
+    destination_type: TravelPreferenceEnum
+    travel_dates: List[datetime] = Field(..., min_length=2, max_length=2)
+    budget_range: Optional[int] = Field(None, ge=0, le=10000000)
+    group_size: int = Field(..., ge=1, le=20)
+    
+    @validator('travel_dates')
+    def validate_travel_dates(cls, v):
+        if len(v) != 2:
+            raise ValueError('여행 시작일과 종료일을 모두 제공해야 합니다')
+        if v[0] >= v[1]:
+            raise ValueError('시작일은 종료일보다 빨라야 합니다')
+        return v
+
+class RecommendationResponse(BaseModel):
+    """추천 응답 스키마"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    destination_name: str
+    description: str
+    weather_score: float = Field(..., ge=0.0, le=10.0)
+    recommendation_reason: str
+    estimated_cost: Optional[int] = None
+    created_at: datetime
+```
+
+### 4. 서비스 클래스 패턴 (필수)
+
+```python
+from sqlalchemy.orm import Session
+from sqlalchemy import select, and_
+from typing import List, Optional
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class RecommendationService:
+    """여행지 추천 서비스"""
+    
+    def __init__(self, db: Session):
+        self.db = db
+    
+    async def get_personalized_recommendations(
+        self,
+        user_id: int,
+        preferences: Optional[str] = None,
+        limit: int = 10
+    ) -> List[dict]:
+        """
+        사용자 맞춤 추천 생성
+        
+        Args:
+            user_id: 사용자 ID
+            preferences: 선호도 필터
+            limit: 추천 개수 제한
+        
+        Returns:
+            List[dict]: 추천 결과 목록
+        
+        Raises:
+            ValueError: 잘못된 입력 값
+            Exception: 서비스 처리 오류
+        """
+        try:
+            # 입력 검증 (Early Return)
+            if user_id <= 0:
+                raise ValueError("유효하지 않은 사용자 ID입니다")
+            
+            if limit <= 0 or limit > 100:
+                raise ValueError("limit는 1-100 사이의 값이어야 합니다")
+            
+            # 사용자 정보 조회
+            user = self.db.get(User, user_id)
+            if not user:
+                raise ValueError(f"사용자를 찾을 수 없습니다: {user_id}")
+            
+            # 비즈니스 로직 실행
+            recommendations = await self._generate_recommendations(
+                user, preferences, limit
+            )
+            
+            logger.info(f"생성된 추천 수: {len(recommendations)} (사용자: {user_id})")
+            return recommendations
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"추천 생성 실패: {e}, 사용자: {user_id}")
+            raise
+```
+
+## 🔧 코드 품질 규칙
+
+### 1. 필수 품질 검사 명령어 (커밋 전 실행)
+
+```bash
+# 린팅 및 자동 수정
+ruff check --fix .
+
+# 코드 포맷팅
+black .
+
+# 타입 체킹
+mypy app/
+
+# 전체 품질 검사
+pre-commit run --all-files
+
+# 테스트 실행
+pytest --cov=app
+```
+
+### 2. 에러 처리 패턴 (Early Return)
+
+```python
+# ✅ 올바른 패턴 - Early Return
+async def process_user_data(user_id: int, data: dict) -> dict:
+    # 입력 검증 - Early Return
+    if not user_id:
+        raise ValueError("사용자 ID가 필요합니다")
+    
+    if not data:
+        raise ValueError("처리할 데이터가 없습니다")
+    
+    # 사용자 존재 확인 - Early Return
+    user = await get_user(user_id)
+    if not user:
+        raise ValueError("사용자를 찾을 수 없습니다")
+    
+    if not user.is_active:
+        raise ValueError("비활성 사용자입니다")
+    
+    # Happy Path - 메인 로직
+    processed_data = await process_data(data)
+    return {
+        "user_id": user_id,
+        "processed": processed_data,
+        "timestamp": datetime.now()
+    }
+
+# ❌ 잘못된 패턴 - 깊은 중첩
+async def process_user_data_bad(user_id: int, data: dict) -> dict:
+    if user_id:
+        if data:
+            user = await get_user(user_id)
+            if user:
+                if user.is_active:
+                    # 너무 깊은 중첩
+                    processed_data = await process_data(data)
+                    return processed_data
+                else:
+                    raise ValueError("비활성 사용자")
+            else:
+                raise ValueError("사용자 없음")
+        else:
+            raise ValueError("데이터 없음")
+    else:
+        raise ValueError("ID 없음")
+```
+
+### 3. 비동기 처리 패턴
+
+```python
+# ✅ 올바른 비동기 패턴
+async def fetch_weather_and_attractions(region: str) -> dict:
+    """날씨와 관광지 정보를 병렬로 가져오기"""
+    async with asyncio.TaskGroup() as tg:
+        weather_task = tg.create_task(fetch_weather_data(region))
+        attractions_task = tg.create_task(fetch_attractions_data(region))
+    
+    return {
+        "weather": weather_task.result(),
+        "attractions": attractions_task.result()
+    }
+
+# ✅ 데이터베이스 비동기 처리
+async def get_user_with_plans(user_id: int, db: AsyncSession) -> Optional[User]:
+    """사용자와 여행 계획을 함께 조회"""
+    stmt = select(User).options(
+        selectinload(User.travel_plans)
+    ).where(User.id == user_id)
+    
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+```
+
+## 🚨 보안 및 환경설정 규칙
+
+### 1. 환경변수 관리 (필수)
+
+```python
+# config.py - 올바른 설정 패턴
+from pydantic import BaseSettings, validator, Field
+from functools import lru_cache
+
+class Settings(BaseSettings):
+    # 필수 환경변수
+    database_url: str = Field(..., env="DATABASE_URL")
+    secret_key: str = Field(..., env="JWT_SECRET_KEY")
+    kto_api_key: str = Field(..., env="KTO_API_KEY")
+    kma_api_key: str = Field(..., env="KMA_API_KEY")
+    
+    @validator("secret_key")
+    def secret_key_must_be_set(cls, v: str) -> str:
+        if not v or len(v) < 32:
+            raise ValueError("JWT_SECRET_KEY는 32자 이상이어야 합니다")
+        return v
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+# ✅ 올바른 사용법
+settings = get_settings()
+api_key = settings.kto_api_key
+
+# ❌ 잘못된 사용법 - 하드코딩 금지
+API_KEY = "actual-api-key-here"  # 절대 금지!
+```
+
+### 2. SQL 인젝션 방지 (필수)
+
+```python
+# ✅ SQLAlchemy ORM 사용
+async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+# ❌ 원시 SQL 문자열 조합 금지
+async def get_user_by_email_bad(email: str, db: AsyncSession):
+    query = f"SELECT * FROM users WHERE email = '{email}'"  # 위험!
+    result = await db.execute(text(query))
+```
+
+### 3. 인증 의존성 (모든 보호된 엔드포인트에 필수)
+
+```python
+# 모든 보호된 엔드포인트에 인증 확인
+@router.get("/user-data")
+async def get_user_data(
+    current_user: User = Depends(get_current_user)  # 필수!
+):
+    return {"user_id": current_user.id, "email": current_user.email}
+
+# 관리자 권한 필요한 경우
+@router.delete("/admin/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user)  # 관리자 권한 확인
+):
+    # 관리자만 접근 가능한 로직
+    pass
+```
+
+## 📝 문서화 및 로깅 규칙
+
+### 1. 함수 문서화 (필수)
+
+```python
+def calculate_weather_score(
+    temperature: float,
+    humidity: float,
+    precipitation: float
+) -> float:
+    """
+    날씨 조건을 기반으로 여행 적합도 점수를 계산합니다.
+    
+    Args:
+        temperature: 기온 (섭씨, -50.0 ~ 50.0)
+        humidity: 습도 (%, 0.0 ~ 100.0)
+        precipitation: 강수량 (mm, 0.0 ~ 1000.0)
+    
+    Returns:
+        float: 0.0-10.0 범위의 여행 적합도 점수
+    
+    Raises:
+        ValueError: 입력값이 유효 범위를 벗어난 경우
+    
+    Example:
+        >>> calculate_weather_score(22.5, 60, 0)
+        8.5
+        >>> calculate_weather_score(35.0, 90, 50)
+        3.2
+    """
+```
+
+### 2. 로깅 패턴
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def process_recommendation(user_id: int) -> dict:
+    logger.info(f"추천 처리 시작 - 사용자: {user_id}")
+    
+    try:
+        result = await generate_recommendations(user_id)
+        logger.info(f"추천 처리 완료 - 사용자: {user_id}, 결과 수: {len(result)}")
+        return result
+    except Exception as e:
+        logger.error(f"추천 처리 실패 - 사용자: {user_id}, 오류: {e}")
+        raise
+```
+
+## 🧪 테스트 작성 규칙
+
+### 1. 테스트 구조
+
+```python
+# tests/test_recommendation_service.py
+import pytest
+from unittest.mock import Mock, AsyncMock
+from httpx import AsyncClient
+
+class TestRecommendationService:
+    @pytest.fixture
+    def mock_db(self):
+        return Mock(spec=AsyncSession)
+    
+    @pytest.fixture
+    def service(self, mock_db):
+        return RecommendationService(mock_db)
+    
+    async def test_get_recommendations_success(self, service, mock_db):
+        """정상적인 추천 생성 테스트"""
+        # Given
+        user_id = 1
+        mock_db.get.return_value = User(id=user_id, email="test@example.com")
+        
+        # When
+        result = await service.get_personalized_recommendations(user_id)
+        
+        # Then
+        assert len(result) > 0
+        assert result[0]["user_id"] == user_id
+    
+    async def test_get_recommendations_user_not_found(self, service, mock_db):
+        """사용자 없음 예외 테스트"""
+        # Given
+        mock_db.get.return_value = None
+        
+        # When & Then
+        with pytest.raises(ValueError, match="사용자를 찾을 수 없습니다"):
+            await service.get_personalized_recommendations(999)
+```
+
+## 🔄 데이터베이스 규칙
+
+### 1. 모델 정의 패턴
+
+```python
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, ForeignKey
+from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.sql import func
+
+Base = declarative_base()
+
+class TimestampMixin:
+    """타임스탬프 필드 믹스인"""
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class User(Base, TimestampMixin):
+    """사용자 모델"""
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    nickname = Column(String(50), unique=True, index=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # 관계 설정
+    travel_plans = relationship("TravelPlan", back_populates="user")
+    
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, email='{self.email}')>"
+```
+
+### 2. Alembic 마이그레이션
+
+```python
+# migration 파일 예시
+def upgrade() -> None:
+    """업그레이드 작업"""
+    op.add_column('users', sa.Column('profile_image_url', sa.String(500), nullable=True))
+    op.create_index('idx_users_email', 'users', ['email'])
+
+def downgrade() -> None:
+    """다운그레이드 작업"""
+    op.drop_index('idx_users_email', 'users')
+    op.drop_column('users', 'profile_image_url')
+```
+
+## 🚀 성능 최적화 규칙
+
+### 1. 데이터베이스 쿼리 최적화
+
+```python
+# ✅ Eager Loading으로 N+1 쿼리 방지
+async def get_users_with_plans(db: AsyncSession) -> List[User]:
+    stmt = select(User).options(
+        selectinload(User.travel_plans)
+    ).where(User.is_active == True)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+# ✅ 인덱스 활용
+async def get_attractions_by_region(region: str, db: AsyncSession) -> List[TouristAttraction]:
+    stmt = select(TouristAttraction).where(
+        TouristAttraction.region == region,  # region 필드에 인덱스 필요
+        TouristAttraction.is_active == True
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+```
+
+### 2. 캐싱 활용
+
+```python
+from functools import lru_cache
+import redis
+
+# 메모리 캐싱
+@lru_cache(maxsize=100)
+def get_weather_calculation_result(temp: float, humidity: float) -> float:
+    # 계산 집약적인 작업
+    return complex_weather_calculation(temp, humidity)
+
+# Redis 캐싱
+async def get_cached_attractions(region: str) -> List[dict]:
+    cache_key = f"attractions:{region}"
+    cached = await redis_client.get(cache_key)
+    
+    if cached:
+        return json.loads(cached)
+    
+    # 캐시 미스 시 DB에서 조회
+    attractions = await fetch_attractions_from_db(region)
+    await redis_client.setex(cache_key, 3600, json.dumps(attractions))  # 1시간 캐시
+    return attractions
+```
+
+## 📊 모니터링 및 알람
+
+### 1. 성능 메트릭
+
+```python
+import time
+from functools import wraps
+
+def monitor_performance(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        start_time = time.time()
+        try:
+            result = await func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            logger.info(f"{func.__name__} 실행시간: {execution_time:.2f}초")
+            return result
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"{func.__name__} 실행실패: {e}, 소요시간: {execution_time:.2f}초")
+            raise
+    return wrapper
+
+@monitor_performance
+async def complex_recommendation_logic(user_id: int) -> dict:
+    # 복잡한 추천 로직
+    pass
+```
+
+## 🔧 개발 워크플로우
+
+### 1. 커밋 전 체크리스트
+
+```bash
+# 1. 코드 품질 검사
+ruff check --fix .
+black .
+mypy app/
+
+# 2. 테스트 실행
+pytest --cov=app --cov-min=80
+
+# 3. 전체 품질 검사
+pre-commit run --all-files
+
+# 4. 환경변수 확인
+python check_env.py
+```
+
+### 2. API 개발 순서
+
+1. **스키마 정의** (Pydantic 모델)
+2. **데이터베이스 모델** 업데이트 (필요시)
+3. **마이그레이션** 생성 및 적용
+4. **서비스 로직** 구현
+5. **라우터** 구현
+6. **테스트** 작성
+7. **문서화** 업데이트
+
+이 규칙들을 엄격히 준수하여 Weather Flick 백엔드의 일관성, 보안성, 성능을 보장하세요.

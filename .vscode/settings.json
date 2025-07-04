@@ -1,3 +1,74 @@
 {
+  // Python 설정
+  "python.defaultInterpreterPath": "./venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  
+  // 포맷터 설정
+  "python.formatting.provider": "black",
+  "python.formatting.blackArgs": ["--line-length=88"],
+  
+  // Linter 설정
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "python.linting.mypyEnabled": true,
+  "python.linting.banditEnabled": true,
+  
+  // Import 정렬
+  "python.sortImports.args": ["--profile", "black"],
+  
+  // 저장 시 자동 포맷팅
   "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": true,
+    "source.fixAll": true
+  },
+  
+  // 타입 체킹
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.autoImportCompletions": true,
+  
+  // 파일 연관
+  "files.associations": {
+    ".env": "dotenv",
+    ".env.example": "dotenv",
+    "*.toml": "toml"
+  },
+  
+  // 제외할 파일들
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.coverage": true,
+    "**/htmlcov": true,
+    "**/.ruff_cache": true
+  },
+  
+  // 워크스페이스 설정
+  "editor.rulers": [88],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.trimAutoWhitespace": true,
+  
+  // 터미널 설정
+  "terminal.integrated.env.osx": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "terminal.integrated.env.linux": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "terminal.integrated.env.windows": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  
+  // 추천 확장 프로그램
+  "extensions.recommendations": [
+    "ms-python.python",
+    "ms-python.black-formatter",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "ms-python.isort",
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml"
+  ]
 }
