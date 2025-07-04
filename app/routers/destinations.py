@@ -4,12 +4,12 @@ from typing import List
 from app.database import get_db
 from app.services.destination_service import destination_service
 from app.models import DestinationCreate, DestinationResponse
+from app.config import settings
 import httpx
-import os
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
-GOOGLE_API_KEY = os.getenv("GCP_API_KEY")
+GOOGLE_API_KEY = settings.google_api_key
 
 
 @router.post("/", response_model=DestinationResponse)

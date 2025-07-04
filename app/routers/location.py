@@ -4,7 +4,7 @@ from app.config import settings
 
 router = APIRouter(prefix="/location", tags=["location"])
 
-GOOGLE_API_KEY = settings.gcp_api_key
+GOOGLE_API_KEY = settings.google_api_key
 
 @router.get("/reverse-geocode")
 async def reverse_geocode(lat: float = Query(...), lng: float = Query(...)):
