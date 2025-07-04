@@ -1,11 +1,12 @@
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
-from app.database import get_db
-from app.services.destination_service import destination_service
-from app.models import DestinationCreate, DestinationResponse
+
 from app.config import settings
-import httpx
+from app.database import get_db
+from app.models import DestinationCreate, DestinationResponse
+from app.services.destination_service import destination_service
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -18,7 +19,7 @@ def create_destination(destination: DestinationCreate, db: Session = Depends(get
     return destination_service.create_destination(db=db, destination=destination)
 
 
-@router.get("/", response_model=List[DestinationResponse])
+@router.get("/", response_model=list[DestinationResponse])
 def read_all_destinations(
     skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 ):
@@ -44,7 +45,7 @@ async def search_destination(query: str = Query(...)):
     return suggestions
 
 
-@router.get("/{province}", response_model=List[DestinationResponse])
+@router.get("/{province}", response_model=list[DestinationResponse])
 def read_destinations_by_province(
     province: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 ):

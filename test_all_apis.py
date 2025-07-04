@@ -1,17 +1,18 @@
 import asyncio
 import os
 import sys
-from typing import Coroutine
+from collections.abc import Coroutine
+
 import httpx
 
 # 프로젝트 루트를 경로에 추가하여 app 모듈을 찾을 수 있도록 함
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.services.weather_service import WeatherService
+from app.config import settings
+from app.services import tour_api_service
 from app.services.kma_weather_service import KMAWeatherService
 from app.services.local_info_service import LocalInfoService
-from app.services import tour_api_service
-from app.config import settings
+from app.services.weather_service import WeatherService
 from app.utils.kma_utils import CITY_COORDINATES
 
 # --- 테스트 설정 ---

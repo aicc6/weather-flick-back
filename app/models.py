@@ -1,27 +1,26 @@
+import enum
 import uuid
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
 from sqlalchemy import (
+    DECIMAL,
+    Boolean,
     Column,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
     Integer,
     String,
-    Float,
     Text,
-    Boolean,
-    DateTime,
-    Date,
-    Enum,
-    ForeignKey,
-    DECIMAL,
-    Index,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
-import enum
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-import uuid
-
 
 Base = declarative_base()
 
@@ -52,13 +51,15 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=True)  # OAuth 사용자는 비밀번호가 없을 수 있음
+    hashed_password = Column(
+        String, nullable=True
+    )  # OAuth 사용자는 비밀번호가 없을 수 있음
     nickname = Column(String, unique=True, index=True, nullable=False)
     profile_image = Column(String)
     preferences = Column(JSONB)
     preferred_region = Column(String)  # 선호 지역
-    preferred_theme = Column(String)   # 선호 테마
-    bio = Column(Text)                 # 자기소개
+    preferred_theme = Column(String)  # 선호 테마
+    bio = Column(Text)  # 자기소개
     is_active = Column(Boolean, default=True)
     is_email_verified = Column(Boolean, default=False)
     role = Column(Enum(UserRole), default=UserRole.USER)
@@ -121,11 +122,11 @@ class Destination(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
     name = Column(String, nullable=False, index=True)
-    province = Column(String, nullable=False, index=True) # 도/광역시
-    region = Column(String, index=True) # 시/군/구
+    province = Column(String, nullable=False, index=True)  # 도/광역시
+    region = Column(String, index=True)  # 시/군/구
     category = Column(String)
-    is_indoor = Column(Boolean, default=False) # 실내/실외 여부
-    tags = Column(JSONB) # 여행지 특성 태그
+    is_indoor = Column(Boolean, default=False)  # 실내/실외 여부
+    tags = Column(JSONB)  # 여행지 특성 태그
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
     amenities = Column(JSONB)
@@ -156,9 +157,10 @@ class TravelPlan(Base):
     user = relationship("User", back_populates="travel_plans")
     reviews = relationship("Review", back_populates="travel_plan")
 
+
 # 성능 개선을 위한 복합 인덱스
-Index('idx_travel_plan_user_status', TravelPlan.user_id, TravelPlan.status)
-Index('idx_travel_plan_dates', TravelPlan.start_date, TravelPlan.end_date)
+Index("idx_travel_plan_user_status", TravelPlan.user_id, TravelPlan.status)
+Index("idx_travel_plan_dates", TravelPlan.start_date, TravelPlan.end_date)
 
 
 class WeatherData(Base):
@@ -203,9 +205,19 @@ class WeatherData(Base):
 
     destination = relationship("Destination", back_populates="weather_data")
 
+
 # WeatherData 성능 최적화 인덱스
-Index('idx_weather_forecast_location', WeatherData.forecast_date, WeatherData.grid_x, WeatherData.grid_y)
-Index('idx_weather_destination_date', WeatherData.destination_id, WeatherData.forecast_date)
+Index(
+    "idx_weather_forecast_location",
+    WeatherData.forecast_date,
+    WeatherData.grid_x,
+    WeatherData.grid_y,
+)
+Index(
+    "idx_weather_destination_date",
+    WeatherData.destination_id,
+    WeatherData.forecast_date,
+)
 
 
 class Review(Base):
@@ -229,9 +241,10 @@ class Review(Base):
     destination = relationship("Destination", back_populates="reviews")
     travel_plan = relationship("TravelPlan", back_populates="reviews")
 
+
 # Review 성능 최적화 인덱스
-Index('idx_review_destination_date', Review.destination_id, Review.created_at)
-Index('idx_review_user_rating', Review.user_id, Review.rating)
+Index("idx_review_destination_date", Review.destination_id, Review.created_at)
+Index("idx_review_user_rating", Review.user_id, Review.rating)
 
 
 class UserActivityLog(Base):
@@ -337,7 +350,7 @@ class CityInfo(Base):
 # Pydantic 모델들
 class WeatherRequest(BaseModel):
     city: str
-    country: Optional[str] = None
+    country: str | None = None
 
 
 class WeatherCondition(BaseModel):
@@ -377,14 +390,14 @@ class ForecastDay(BaseModel):
 class ForecastResponse(BaseModel):
     city: str
     country: str
-    forecast: List[ForecastDay]
+    forecast: list[ForecastDay]
     timezone: str
 
 
 # 인증 관련 Pydantic 모델들
 class TokenData(BaseModel):
-    email: Optional[str] = None
-    role: Optional[str] = None
+    email: str | None = None
+    role: str | None = None
 
 
 class UserCreate(BaseModel):
@@ -396,11 +409,11 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     user_id: uuid.UUID
     email: str
-    nickname: Optional[str] = None
-    profile_image: Optional[str] = None
-    preferred_region: Optional[str] = None
-    preferred_theme: Optional[str] = None
-    bio: Optional[str] = None
+    nickname: str | None = None
+    profile_image: str | None = None
+    preferred_region: str | None = None
+    preferred_theme: str | None = None
+    bio: str | None = None
     role: str
     is_active: bool
     created_at: datetime
@@ -417,12 +430,12 @@ class Token(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    nickname: Optional[str] = None
-    profile_image: Optional[str] = None
-    preferences: Optional[List[str]] = None
-    preferred_region: Optional[str] = None
-    preferred_theme: Optional[str] = None
-    bio: Optional[str] = None
+    nickname: str | None = None
+    profile_image: str | None = None
+    preferences: list[str | None] = None
+    preferred_region: str | None = None
+    preferred_theme: str | None = None
+    bio: str | None = None
 
 
 class PasswordChange(BaseModel):
@@ -446,6 +459,7 @@ class GoogleLoginResponse(BaseModel):
 class GoogleAuthUrlResponse(BaseModel):
     auth_url: str
     state: str
+
 
 class GoogleAuthCodeRequest(BaseModel):
     auth_code: str
@@ -475,7 +489,7 @@ class ResendVerificationRequest(BaseModel):
 class StandardResponse(BaseModel):
     success: bool
     message: str
-    data: Optional[Dict[str, Any]] = None
+    data: dict[str, Any | None] = None
 
 
 class PaginationInfo(BaseModel):
@@ -488,77 +502,77 @@ class PaginationInfo(BaseModel):
 class DestinationCreate(BaseModel):
     name: str
     province: str
-    region: Optional[str] = None
-    category: Optional[str] = None
-    is_indoor: Optional[bool] = False
-    tags: Optional[List[str]] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    amenities: Optional[Dict[str, Any]] = None
-    image_url: Optional[str] = None
+    region: str | None = None
+    category: str | None = None
+    is_indoor: bool | None = False
+    tags: list[str | None] = None
+    latitude: float | None = None
+    longitude: float | None = None
+    amenities: dict[str, Any | None] = None
+    image_url: str | None = None
 
 
 class DestinationResponse(BaseModel):
     destination_id: uuid.UUID
     name: str
     province: str
-    region: Optional[str] = None
-    category: Optional[str] = None
-    is_indoor: Optional[bool] = None
-    tags: Optional[List[str]] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    amenities: Optional[Dict[str, Any]] = None
-    image_url: Optional[str] = None
-    rating: Optional[float] = None
-    recommendation_weight: Optional[float] = None
+    region: str | None = None
+    category: str | None = None
+    is_indoor: bool | None = None
+    tags: list[str | None] = None
+    latitude: float | None = None
+    longitude: float | None = None
+    amenities: dict[str, Any | None] = None
+    image_url: str | None = None
+    rating: float | None = None
+    recommendation_weight: float | None = None
 
     class Config:
         from_attributes = True
 
 
 class RecommendationRequest(BaseModel):
-    destination_types: Optional[List[str]] = None
-    budget_range: Optional[Dict[str, float]] = None
-    travel_dates: Optional[Dict[str, str]] = None
-    preferences: Optional[Dict[str, Any]] = None
+    destination_types: list[str | None] = None
+    budget_range: dict[str, float | None] = None
+    travel_dates: dict[str, str | None] = None
+    preferences: dict[str, Any | None] = None
 
 
 class RecommendationResponse(BaseModel):
-    destinations: List[DestinationResponse]
+    destinations: list[DestinationResponse]
     total_count: int
     recommendation_score: float
 
 
 class TravelPlanCreate(BaseModel):
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     start_date: str
     end_date: str
-    budget: Optional[float] = None
-    itinerary: Optional[Dict[str, Any]] = None
+    budget: float | None = None
+    itinerary: dict[str, Any | None] = None
 
 
 class TravelPlanUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    budget: Optional[float] = None
-    status: Optional[str] = None
-    itinerary: Optional[Dict[str, Any]] = None
+    title: str | None = None
+    description: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    budget: float | None = None
+    status: str | None = None
+    itinerary: dict[str, Any | None] = None
 
 
 class TravelPlanResponse(BaseModel):
     plan_id: uuid.UUID
     user_id: uuid.UUID
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     start_date: str
     end_date: str
-    budget: Optional[float] = None
+    budget: float | None = None
     status: str
-    itinerary: Optional[Dict[str, Any]] = None
+    itinerary: dict[str, Any | None] = None
     created_at: datetime
 
     class Config:
@@ -568,13 +582,13 @@ class TravelPlanResponse(BaseModel):
 # 지역 정보 관련 모델들
 class SearchRequest(BaseModel):
     query: str
-    category: Optional[str] = None
-    location: Optional[str] = None
-    limit: Optional[int] = 10
+    category: str | None = None
+    location: str | None = None
+    limit: int | None = 10
 
 
 class SearchResult(BaseModel):
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     total_count: int
     category: str
 
@@ -584,12 +598,12 @@ class RestaurantResponse(BaseModel):
     name: str
     category: str
     address: str
-    phone: Optional[str] = None
-    rating: Optional[float] = None
-    price_range: Optional[str] = None
-    opening_hours: Optional[Dict[str, Any]] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    phone: str | None = None
+    rating: float | None = None
+    price_range: str | None = None
+    opening_hours: dict[str, Any | None] = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class AccommodationResponse(BaseModel):
@@ -597,42 +611,42 @@ class AccommodationResponse(BaseModel):
     name: str
     type: str  # hotel, motel, guesthouse, etc.
     address: str
-    phone: Optional[str] = None
-    rating: Optional[float] = None
-    price_range: Optional[str] = None
-    amenities: Optional[List[str]] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    phone: str | None = None
+    rating: float | None = None
+    price_range: str | None = None
+    amenities: list[str | None] = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class TransportationResponse(BaseModel):
     id: str
     name: str
     type: str  # bus, subway, taxi, etc.
-    route: Optional[str] = None
-    schedule: Optional[Dict[str, Any]] = None
-    fare: Optional[str] = None
-    contact: Optional[str] = None
+    route: str | None = None
+    schedule: dict[str, Any | None] = None
+    fare: str | None = None
+    contact: str | None = None
 
 
 class CityInfoResponse(BaseModel):
     city_name: str
     region: str
-    population: Optional[int] = None
-    area: Optional[float] = None
-    description: Optional[str] = None
-    attractions: Optional[List[str]] = None
-    weather_info: Optional[Dict[str, Any]] = None
+    population: int | None = None
+    area: float | None = None
+    description: str | None = None
+    attractions: list[str | None] = None
+    weather_info: dict[str, Any | None] = None
 
 
 class FavoritePlaceResponse(BaseModel):
     id: int
     place_name: str
     place_type: str
-    address: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    description: Optional[str] = None
+    address: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    description: str | None = None
     created_at: datetime
 
     class Config:
@@ -641,20 +655,20 @@ class FavoritePlaceResponse(BaseModel):
 
 class ReviewCreate(BaseModel):
     destination_id: uuid.UUID
-    travel_plan_id: Optional[uuid.UUID] = None
+    travel_plan_id: uuid.UUID | None = None
     rating: int
-    content: Optional[str] = None
-    photos: Optional[List[str]] = None
+    content: str | None = None
+    photos: list[str | None] = None
 
 
 class ReviewResponse(BaseModel):
     review_id: uuid.UUID
     user_id: uuid.UUID
     destination_id: uuid.UUID
-    travel_plan_id: Optional[uuid.UUID] = None
+    travel_plan_id: uuid.UUID | None = None
     rating: int
-    content: Optional[str] = None
-    photos: Optional[List[str]] = None
+    content: str | None = None
+    photos: list[str | None] = None
     created_at: datetime
 
     class Config:

@@ -1,7 +1,6 @@
 """Application configuration settings."""
 
 import os
-from typing import Optional
 
 from dotenv import load_dotenv
 from pydantic import validator
@@ -12,7 +11,7 @@ load_dotenv()
 
 class Settings(BaseSettings):
     """Application settings configuration."""
-    
+
     # 기본 설정
     app_name: str = "Weather Flick API"
     app_version: str = "1.0.0"
@@ -34,11 +33,11 @@ class Settings(BaseSettings):
 
     # 데이터베이스 설정
     database_url: str = os.getenv("DATABASE_URL", "")
-    database_host: Optional[str] = os.getenv("DATABASE_HOST")
-    database_port: Optional[int] = int(os.getenv("DATABASE_PORT", "5432"))
-    database_user: Optional[str] = os.getenv("DATABASE_USER")
-    database_password: Optional[str] = os.getenv("DATABASE_PASSWORD")
-    database_name: Optional[str] = os.getenv("DATABASE_NAME")
+    database_host: str | None = os.getenv("DATABASE_HOST")
+    database_port: int | None = int(os.getenv("DATABASE_PORT", "5432"))
+    database_user: str | None = os.getenv("DATABASE_USER")
+    database_password: str | None = os.getenv("DATABASE_PASSWORD")
+    database_name: str | None = os.getenv("DATABASE_NAME")
 
     # 이메일 설정
     mail_username: str = os.getenv("MAIL_USERNAME", "")
@@ -56,26 +55,30 @@ class Settings(BaseSettings):
     # 외부 API 설정
     weather_api_key: str = os.getenv("WEATHER_API_KEY", "")
     weather_api_url: str = "http://api.weatherapi.com/v1"
-    
+
     kma_api_key: str = os.getenv("KMA_API_KEY", "")
     kma_forecast_url: str = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0"
-    
+
     kakao_api_key: str = os.getenv("KAKAO_API_KEY", "")
     kakao_api_url: str = "https://dapi.kakao.com/v2/local"
-    
+
     naver_client_id: str = os.getenv("NAVER_CLIENT_ID", "")
     naver_client_secret: str = os.getenv("NAVER_CLIENT_SECRET", "")
     naver_api_url: str = "https://openapi.naver.com/v1"
-    
+
     google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
     google_places_url: str = "https://maps.googleapis.com/maps/api/place"
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
-    
+    google_redirect_uri: str = os.getenv(
+        "GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback"
+    )
+
     korea_tourism_api_key: str = os.getenv("KOREA_TOURISM_API_KEY", "")
-    korea_tourism_api_url: str = "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
-    
+    korea_tourism_api_url: str = (
+        "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
+    )
+
     # 프론트엔드 설정
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -107,7 +110,7 @@ class Settings(BaseSettings):
 
     class Config:
         """Pydantic config."""
-        
+
         env_file = ".env"
         case_sensitive = False
         extra = "ignore"

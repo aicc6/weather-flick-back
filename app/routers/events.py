@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Path
-from typing import List, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Path
 
 from app.services.tour_api_service import get_festivals_from_tour_api
 
@@ -9,7 +10,8 @@ router = APIRouter(
     tags=["events"],
 )
 
-@router.get("/{area_code}", response_model=List[Dict[str, Any]])
+
+@router.get("/{area_code}", response_model=list[dict[str, Any]])
 async def get_events_by_area(
     area_code: str = Path(..., description="TourAPI 지역 코드 (예: 1=서울, 31=경기도)"),
 ):
@@ -20,9 +22,13 @@ async def get_events_by_area(
     """
     try:
         # 항상 현재 날짜를 기준으로 진행중인 이벤트를 검색
-        today_str = datetime.now().strftime('%Y%m%d')
-        festivals = await get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
+        today_str = datetime.now().strftime("%Y%m%d")
+        festivals = await get_festivals_from_tour_api(
+            area_code=area_code, event_start_date=today_str
+        )
         return festivals
     except Exception as e:
         # 실제 구현에서는 더 상세한 오류 처리가 필요합니다.
-        raise HTTPException(status_code=500, detail=f"이벤트 정보를 가져오는 중 오류 발생: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"이벤트 정보를 가져오는 중 오류 발생: {str(e)}"
+        )

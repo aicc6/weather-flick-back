@@ -1,13 +1,15 @@
-import httpx
-from typing import Optional, Dict, Any
-from fastapi import HTTPException
-from google.oauth2 import id_token
-from google.auth.transport import requests
-from app.config import settings
-from app.models import User, UserRole
-from sqlalchemy.orm import Session
-from app.auth import get_password_hash, create_access_token, log_user_activity
 from datetime import timedelta
+from typing import Any
+
+import httpx
+from fastapi import HTTPException
+from google.auth.transport import requests
+from google.oauth2 import id_token
+from sqlalchemy.orm import Session
+
+from app.auth import create_access_token, log_user_activity
+from app.config import settings
+from app.models import User
 
 
 class GoogleOAuthService:
@@ -18,7 +20,7 @@ class GoogleOAuthService:
         self.client_secret = settings.google_client_secret
         self.redirect_uri = settings.google_redirect_uri
 
-    async def verify_google_token(self, token: str) -> Dict[str, Any]:
+    async def verify_google_token(self, token: str) -> dict[str, Any]:
         """구글 ID 토큰 검증"""
         try:
             # 구글 ID 토큰 검증
@@ -51,7 +53,7 @@ class GoogleOAuthService:
                 status_code=500, detail=f"Token verification failed: {str(e)}"
             )
 
-    async def get_google_user_info(self, access_token: str) -> Dict[str, Any]:
+    async def get_google_user_info(self, access_token: str) -> dict[str, Any]:
         """구글 액세스 토큰으로 사용자 정보 조회"""
         try:
             async with httpx.AsyncClient() as client:
@@ -81,7 +83,7 @@ class GoogleOAuthService:
             )
 
     async def create_or_update_user(
-        self, db: Session, google_data: Dict[str, Any], request=None
+        self, db: Session, google_data: dict[str, Any], request=None
     ) -> User:
         """구글 사용자 정보로 사용자 생성 또는 업데이트"""
         google_id = google_data["google_id"]
@@ -139,7 +141,7 @@ class GoogleOAuthService:
                 db=db,
                 user_id=user.id,
                 activity_type="google_login",
-                description=f"User logged in via Google OAuth",
+                description="User logged in via Google OAuth",
                 ip_address=request.client.host if request else None,
                 user_agent=request.headers.get("User-Agent") if request else None,
             )

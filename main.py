@@ -1,21 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import (
-    weather,
-    auth,
-    kma_weather,
-    local_info,
-    naver_map,
-    travel_plans,
-    recommendations,
-    destinations,
-    events,
-    config,
-    location,
-    plan,
-)
+
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
+from app.routers import (
+    auth,
+    config,
+    destinations,
+    events,
+    kma_weather,
+    local_info,
+    location,
+    naver_map,
+    plan,
+    recommendations,
+    travel_plans,
+    weather,
+)
 
 # 로깅 설정 초기화
 logger = setup_logging()

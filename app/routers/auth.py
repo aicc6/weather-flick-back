@@ -1,50 +1,46 @@
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordRequestForm
+import secrets
+from datetime import datetime, timedelta
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+
+from app.auth import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    authenticate_user,
+    check_password_strength,
+    create_access_token,
+    get_current_active_user,
+    get_password_hash,
+    log_user_activity,
+    update_user_login_info,
+)
 from app.database import get_db
 from app.exceptions import (
-    AuthenticationError, 
-    ValidationError, 
-    NotFoundError, 
-    EmailServiceError,
-    DatabaseError
+    DatabaseError,
+    ValidationError,
 )
 from app.logging_config import get_logger
 from app.models import (
+    EmailVerificationConfirm,
+    EmailVerificationRequest,
+    EmailVerificationResponse,
+    GoogleAuthCodeRequest,
+    GoogleAuthUrlResponse,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
+    PasswordChange,
+    ResendVerificationRequest,
+    Token,
     User,
     UserCreate,
     UserResponse,
-    Token,
     UserUpdate,
-    PasswordChange,
-    GoogleLoginRequest,
-    GoogleLoginResponse,
-    GoogleAuthUrlResponse,
-    GoogleAuthCodeRequest,
-    EmailVerificationRequest,
-    EmailVerificationConfirm,
-    EmailVerificationResponse,
-    ResendVerificationRequest,
 )
-from app.auth import (
-    authenticate_user,
-    create_access_token,
-    get_password_hash,
-    get_current_active_user,
-    update_user_login_info,
-    log_user_activity,
-    check_password_strength,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-)
+from app.services.email_service import email_service, email_verification_service
 from app.services.google_oauth_service import google_oauth_service
-from app.services.email_service import email_verification_service, email_service
-import secrets
-import httpx
-import requests
-from typing import Dict
-from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -52,45 +48,44 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = get_logger("auth")
 
 # 임시 인증 코드 저장소 (프로덕션에서는 Redis 사용 권장)
-temp_auth_store: Dict[str, Dict] = {}
+temp_auth_store: dict[str, dict] = {}
 
-def store_temp_auth(code: str, data: Dict, ttl_minutes: int = 10):
+
+def store_temp_auth(code: str, data: dict, ttl_minutes: int = 10):
     """임시 인증 데이터 저장"""
     expire_time = datetime.now() + timedelta(minutes=ttl_minutes)
-    temp_auth_store[code] = {
-        "data": data,
-        "expire_time": expire_time
-    }
+    temp_auth_store[code] = {"data": data, "expire_time": expire_time}
 
-def get_temp_auth(code: str) -> Dict:
+
+def get_temp_auth(code: str) -> dict:
     """임시 인증 데이터 조회 및 삭제"""
     logger.info(f"Looking for temp auth code: {code[:10]}...")
     logger.info(f"Available codes: {[k[:10] + '...' for k in temp_auth_store.keys()]}")
-    
+
     if code not in temp_auth_store:
         logger.warning(f"Temp auth code not found: {code[:10]}...")
         return None
-    
+
     stored = temp_auth_store[code]
-    
+
     # 만료 확인
     if datetime.now() > stored["expire_time"]:
         logger.warning(f"Temp auth code expired: {code[:10]}...")
         del temp_auth_store[code]
         return None
-    
+
     # 사용 후 삭제 (일회성)
     data = stored["data"]
     del temp_auth_store[code]
     logger.info(f"Temp auth code used successfully: {code[:10]}...")
     return data
 
+
 def cleanup_expired_auth():
     """만료된 임시 인증 데이터 정리"""
     now = datetime.now()
     expired_codes = [
-        code for code, stored in temp_auth_store.items()
-        if now > stored["expire_time"]
+        code for code, stored in temp_auth_store.items() if now > stored["expire_time"]
     ]
     for code in expired_codes:
         del temp_auth_store[code]
@@ -101,26 +96,32 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     """회원가입 (이메일 인증 필요)"""
     try:
         logger.info(f"회원가입 시도: {user.email}")
-        
+
         # 이메일 및 닉네임 중복 확인을 단일 쿼리로 최적화
-        existing_user = db.query(User).filter(
-            (User.email == user.email) | (User.nickname == user.nickname)
-        ).first()
-        
+        existing_user = (
+            db.query(User)
+            .filter((User.email == user.email) | (User.nickname == user.nickname))
+            .first()
+        )
+
         if existing_user:
             if existing_user.email == user.email:
                 logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
                 raise ValidationError(
                     message="이미 등록된 이메일입니다.",
                     code="EMAIL_ALREADY_EXISTS",
-                    details=[{"field": "email", "message": "이미 사용 중인 이메일입니다."}]
+                    details=[
+                        {"field": "email", "message": "이미 사용 중인 이메일입니다."}
+                    ],
                 )
             elif existing_user.nickname == user.nickname:
                 logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
                 raise ValidationError(
                     message="이미 등록된 닉네임입니다.",
                     code="NICKNAME_ALREADY_EXISTS",
-                    details=[{"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}]
+                    details=[
+                        {"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}
+                    ],
                 )
 
         # 비밀번호 강도 검사
@@ -130,7 +131,12 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             raise ValidationError(
                 message="비밀번호가 보안 요구사항을 충족하지 않습니다.",
                 code="WEAK_PASSWORD",
-                details=[{"field": "password", "message": f"비밀번호 오류: {', '.join(password_check['errors'])}"}]
+                details=[
+                    {
+                        "field": "password",
+                        "message": f"비밀번호 오류: {', '.join(password_check['errors'])}",
+                    }
+                ],
             )
 
         # 이메일 인증 확인
@@ -139,7 +145,9 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             raise ValidationError(
                 message="이메일 인증이 필요합니다.",
                 code="EMAIL_NOT_VERIFIED",
-                details=[{"field": "email", "message": "먼저 이메일 인증을 완료해주세요."}]
+                details=[
+                    {"field": "email", "message": "먼저 이메일 인증을 완료해주세요."}
+                ],
             )
 
         # 새 사용자 생성
@@ -161,10 +169,12 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             await email_service.send_welcome_email(user.email, user.nickname)
             logger.info(f"환영 이메일 발송 완료: {user.email}")
         except Exception as e:
-            logger.warning(f"환영 이메일 발송 실패 (회원가입은 완료됨): {user.email}, 오류: {str(e)}")
+            logger.warning(
+                f"환영 이메일 발송 실패 (회원가입은 완료됨): {user.email}, 오류: {str(e)}"
+            )
 
         return db_user
-        
+
     except ValidationError:
         # ValidationError는 그대로 전파
         raise
@@ -172,8 +182,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         logger.error(f"회원가입 중 예상치 못한 오류 발생: {user.email}, 오류: {str(e)}")
         db.rollback()
         raise DatabaseError(
-            message="회원가입 처리 중 오류가 발생했습니다.",
-            code="REGISTRATION_FAILED"
+            message="회원가입 처리 중 오류가 발생했습니다.", code="REGISTRATION_FAILED"
         )
 
 
@@ -367,40 +376,49 @@ async def google_login(
 
 
 @router.get("/google/callback")
-async def google_callback(
-    code: str, state: str, request: Request = None
-):
+async def google_callback(code: str, state: str, request: Request = None):
     """구글 OAuth 콜백 처리 - 임시 코드 생성"""
     try:
-        logger.info(f"Google OAuth callback received - code: {code[:10]}..., state: {state}")
-        
+        logger.info(
+            f"Google OAuth callback received - code: {code[:10]}..., state: {state}"
+        )
+
         # 만료된 임시 코드 정리
         cleanup_expired_auth()
-        
+
         # 임시 인증 코드 생성
         temp_code = secrets.token_urlsafe(32)
-        
+
         # 구글 인증 데이터를 임시 저장 (5분 TTL)
-        store_temp_auth(temp_code, {
-            "google_code": code,
-            "state": state,
-            "ip_address": request.client.host if request else None,
-            "user_agent": request.headers.get("User-Agent") if request else None
-        })
-        
+        store_temp_auth(
+            temp_code,
+            {
+                "google_code": code,
+                "state": state,
+                "ip_address": request.client.host if request else None,
+                "user_agent": request.headers.get("User-Agent") if request else None,
+            },
+        )
+
         logger.info(f"Temp auth code stored: {temp_code[:10]}... (expires in 10min)")
         logger.info(f"Current temp_auth_store size: {len(temp_auth_store)}")
-        
+
         # 프론트엔드로 임시 코드와 함께 리다이렉트 (토큰 없이)
         from app.config import settings
-        frontend_url = f"{settings.frontend_url}/auth/google/callback?auth_code={temp_code}"
-        logger.info(f"Google OAuth callback - redirecting with temp code: {temp_code[:10]}...")
+
+        frontend_url = (
+            f"{settings.frontend_url}/auth/google/callback?auth_code={temp_code}"
+        )
+        logger.info(
+            f"Google OAuth callback - redirecting with temp code: {temp_code[:10]}..."
+        )
         return RedirectResponse(url=frontend_url, status_code=302)
 
     except Exception as e:
         logger.error(f"Google callback failed: {str(e)}")
         # 에러 시에도 프론트엔드로 리다이렉트
         from app.config import settings
+
         error_url = f"{settings.frontend_url}/auth/google/callback?error=oauth_failed"
         return RedirectResponse(url=error_url, status_code=302)
 
@@ -415,7 +433,7 @@ async def exchange_google_auth_code(
     try:
         auth_code = request_data.auth_code
         logger.info(f"Exchange request received - auth_code: {auth_code[:10]}...")
-        
+
         if not auth_code:
             logger.error("No auth_code provided in request")
             raise HTTPException(status_code=400, detail="auth_code is required")
@@ -425,15 +443,12 @@ async def exchange_google_auth_code(
         if not temp_data:
             logger.error(f"Invalid or expired auth code: {auth_code[:10]}...")
             logger.info(f"Current temp_auth_store keys: {list(temp_auth_store.keys())}")
-            raise HTTPException(
-                status_code=400, 
-                detail="Invalid or expired auth code"
-            )
-        
+            raise HTTPException(status_code=400, detail="Invalid or expired auth code")
+
         logger.info(f"Temp auth data found for code: {auth_code[:10]}...")
 
         google_code = temp_data["google_code"]
-        state = temp_data["state"]
+        # state = temp_data["state"]  # 현재 사용하지 않음
 
         logger.info(f"Processing Google auth exchange for code: {google_code[:10]}...")
 
@@ -446,25 +461,29 @@ async def exchange_google_auth_code(
                 "grant_type": "authorization_code",
                 "redirect_uri": google_oauth_service.redirect_uri,
             }
-            
+
             token_response = await client.post(
                 "https://oauth2.googleapis.com/token",
                 data=token_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"}
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
 
             if token_response.status_code != 200:
-                logger.error(f"Token exchange failed - Status: {token_response.status_code}")
+                logger.error(
+                    f"Token exchange failed - Status: {token_response.status_code}"
+                )
                 raise HTTPException(
-                    status_code=400, 
-                    detail="Failed to exchange Google authorization code"
+                    status_code=400,
+                    detail="Failed to exchange Google authorization code",
                 )
 
             token_response_data = token_response.json()
             access_token = token_response_data.get("access_token")
 
             if not access_token:
-                raise HTTPException(status_code=400, detail="No access token received from Google")
+                raise HTTPException(
+                    status_code=400, detail="No access token received from Google"
+                )
 
         # 사용자 정보 조회
         user_info = await google_oauth_service.get_google_user_info(access_token)
@@ -652,55 +671,3 @@ async def resend_verification(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to resend verification: {str(e)}",
         )
-
-
-@router.post("/google", response_model=Token)
-def google_login(data: dict, db: Session = Depends(get_db)):
-    """구글 소셜 로그인/회원가입"""
-    access_token = data.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=400, detail="No access token provided")
-
-    # 구글에서 사용자 정보 가져오기
-    userinfo_response = requests.get(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if not userinfo_response.ok:
-        raise HTTPException(status_code=400, detail="Invalid Google token")
-
-    userinfo = userinfo_response.json()
-    email = userinfo["email"]
-    username = userinfo.get("name", email.split("@")[0])
-
-    # 이미 가입된 사용자면 로그인, 아니면 회원가입
-    existing_user_check = db.query(User.email).filter(User.email == email).first()
-    user = (
-        db.query(User).filter(User.email == email).first()
-        if existing_user_check
-        else None
-    )
-    if not user:
-        from app.auth import get_password_hash
-
-        user = User(
-            email=email,
-            username=username,
-            hashed_password=get_password_hash(
-                access_token
-            ),  # 소셜 로그인은 access_token 등으로 대체
-            is_email_verified=True,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    from app.auth import create_access_token
-
-    token = create_access_token(data={"sub": user.email, "role": user.role.value})
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user_info": user,
-    }

@@ -1,13 +1,14 @@
 import random
 import string
-from datetime import datetime, timedelta, timezone
-from typing import Optional
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from datetime import UTC, datetime, timedelta
+
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from sqlalchemy.orm import Session
+
 from app.config import settings
-from app.models import EmailVerification
 from app.exceptions import EmailServiceError
 from app.logging_config import get_logger
+from app.models import EmailVerification
 
 
 class EmailService:
@@ -95,11 +96,13 @@ class EmailService:
             return True
 
         except Exception as e:
-            self.logger.error(f"인증 이메일 발송 실패: {email}", extra={"error": str(e)})
+            self.logger.error(
+                f"인증 이메일 발송 실패: {email}", extra={"error": str(e)}
+            )
             raise EmailServiceError(
                 message="인증 이메일 발송에 실패했습니다.",
                 code="EMAIL_SEND_FAILED",
-                details=[{"field": "email", "message": f"이메일 전송 실패: {str(e)}"}]
+                details=[{"field": "email", "message": f"이메일 전송 실패: {str(e)}"}],
             )
 
     async def send_welcome_email(self, email: str, nickname: str):
@@ -158,10 +161,12 @@ class EmailService:
             return True
 
         except Exception as e:
-            self.logger.error(f"환영 이메일 발송 실패: {email}", extra={"error": str(e)})
+            self.logger.error(
+                f"환영 이메일 발송 실패: {email}", extra={"error": str(e)}
+            )
             raise EmailServiceError(
                 message="환영 이메일 발송에 실패했습니다.",
-                code="WELCOME_EMAIL_SEND_FAILED"
+                code="WELCOME_EMAIL_SEND_FAILED",
             )
 
 
@@ -175,7 +180,7 @@ class EmailVerificationService:
 
     async def create_verification(
         self, db: Session, email: str, nickname: str = None
-    ) -> Optional[str]:
+    ) -> str | None:
         """인증 코드 생성 및 이메일 발송"""
         try:
             # 기존 미사용 인증 코드 삭제
@@ -186,7 +191,7 @@ class EmailVerificationService:
 
             # 새 인증 코드 생성
             code = self.email_service.generate_verification_code()
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+            expires_at = datetime.now(UTC) + timedelta(minutes=10)
 
             verification = EmailVerification(
                 email=email, code=code, expires_at=expires_at
@@ -217,7 +222,7 @@ class EmailVerificationService:
             db.rollback()
             raise EmailServiceError(
                 message="인증 코드 생성에 실패했습니다.",
-                code="VERIFICATION_CODE_CREATION_FAILED"
+                code="VERIFICATION_CODE_CREATION_FAILED",
             )
 
     def verify_code(self, db: Session, email: str, code: str) -> bool:
@@ -229,7 +234,7 @@ class EmailVerificationService:
                     EmailVerification.email == email,
                     EmailVerification.code == code,
                     EmailVerification.is_used == False,  # noqa: E712
-                    EmailVerification.expires_at > datetime.now(timezone.utc),
+                    EmailVerification.expires_at > datetime.now(UTC),
                 )
                 .order_by(EmailVerification.id.desc())
                 .first()

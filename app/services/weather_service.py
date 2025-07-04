@@ -1,14 +1,19 @@
+from typing import Any
+
 import httpx
-from typing import Optional, Dict, Any
 from fastapi import HTTPException
+
 from app.config import settings
+
 
 class WeatherService:
     def __init__(self):
         self.api_key = settings.weather_api_key
         self.base_url = settings.weather_api_url
 
-    async def get_current_weather(self, city: str, country: Optional[str] = None) -> Dict[str, Any]:
+    async def get_current_weather(
+        self, city: str, country: str | None = None
+    ) -> dict[str, Any]:
         """현재 날씨 정보 조회"""
         try:
             # 도시명과 국가코드를 결합
@@ -20,9 +25,9 @@ class WeatherService:
                     params={
                         "key": self.api_key,
                         "q": location,
-                        "aqi": "no"  # 대기질 정보 제외
+                        "aqi": "no",  # 대기질 정보 제외
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -40,7 +45,9 @@ class WeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="Weather API unavailable")
 
-    async def get_forecast(self, city: str, days: int = 3, country: Optional[str] = None) -> Dict[str, Any]:
+    async def get_forecast(
+        self, city: str, days: int = 3, country: str | None = None
+    ) -> dict[str, Any]:
         """날씨 예보 조회"""
         try:
             location = f"{city},{country}" if country else city
@@ -52,9 +59,9 @@ class WeatherService:
                         "key": self.api_key,
                         "q": location,
                         "days": min(days, 14),  # 최대 14일
-                        "aqi": "no"
+                        "aqi": "no",
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -68,7 +75,7 @@ class WeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="Weather API unavailable")
 
-    def _parse_current_weather(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_current_weather(self, data: dict[str, Any]) -> dict[str, Any]:
         """현재 날씨 데이터 파싱"""
         location = data.get("location", {})
         current = data.get("current", {})
@@ -87,10 +94,10 @@ class WeatherService:
             "pressure": current.get("pressure_mb", 0),
             "visibility": current.get("vis_km", 0),
             "uv_index": current.get("uv", 0),
-            "last_updated": current.get("last_updated", "")
+            "last_updated": current.get("last_updated", ""),
         }
 
-    def _parse_forecast(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_forecast(self, data: dict[str, Any]) -> dict[str, Any]:
         """예보 데이터 파싱"""
         location = data.get("location", {})
         forecast = data.get("forecast", {})
@@ -98,25 +105,28 @@ class WeatherService:
         forecast_days = []
         for day in forecast.get("forecastday", []):
             day_data = day.get("day", {})
-            forecast_days.append({
-                "date": day.get("date", ""),
-                "max_temp": day_data.get("maxtemp_c", 0),
-                "min_temp": day_data.get("mintemp_c", 0),
-                "avg_temp": day_data.get("avgtemp_c", 0),
-                "description": day_data.get("condition", {}).get("text", ""),
-                "icon": day_data.get("condition", {}).get("icon", ""),
-                "humidity": day_data.get("avghumidity", 0),
-                "chance_of_rain": day_data.get("daily_chance_of_rain", 0),
-                "chance_of_snow": day_data.get("daily_chance_of_snow", 0),
-                "uv_index": day_data.get("uv", 0)
-            })
+            forecast_days.append(
+                {
+                    "date": day.get("date", ""),
+                    "max_temp": day_data.get("maxtemp_c", 0),
+                    "min_temp": day_data.get("mintemp_c", 0),
+                    "avg_temp": day_data.get("avgtemp_c", 0),
+                    "description": day_data.get("condition", {}).get("text", ""),
+                    "icon": day_data.get("condition", {}).get("icon", ""),
+                    "humidity": day_data.get("avghumidity", 0),
+                    "chance_of_rain": day_data.get("daily_chance_of_rain", 0),
+                    "chance_of_snow": day_data.get("daily_chance_of_snow", 0),
+                    "uv_index": day_data.get("uv", 0),
+                }
+            )
 
         return {
             "city": location.get("name", ""),
             "country": location.get("country", ""),
             "region": location.get("region", ""),
-            "forecast": forecast_days
+            "forecast": forecast_days,
         }
+
 
 # 서비스 인스턴스
 weather_service = WeatherService()

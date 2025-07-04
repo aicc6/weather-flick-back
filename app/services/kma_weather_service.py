@@ -1,14 +1,20 @@
 import asyncio
-import httpx
-import xml.etree.ElementTree as ET
-from typing import Optional, Dict, Any, List
-from fastapi import HTTPException
 from datetime import datetime, timedelta
+from typing import Any
+
+import httpx
+from fastapi import HTTPException
+
 from app.config import settings
 from app.utils.kma_utils import (
-    get_base_time, convert_precipitation_type, convert_wind_direction,
-    format_weather_data, CITY_COORDINATES, get_cities_in_province
+    CITY_COORDINATES,
+    convert_precipitation_type,
+    convert_wind_direction,
+    format_weather_data,
+    get_base_time,
+    get_cities_in_province,
 )
+
 
 class KMAWeatherService:
     """기상청 공공데이터포털 API 서비스"""
@@ -17,7 +23,7 @@ class KMAWeatherService:
         self.api_key = settings.kma_api_key
         self.base_url = "http://apis.data.go.kr/1360000"
 
-    async def get_current_weather(self, nx: int, ny: int) -> Dict[str, Any]:
+    async def get_current_weather(self, nx: int, ny: int) -> dict[str, Any]:
         """현재 날씨 정보 조회 (기상청)"""
         try:
             # 현재 시간 기준으로 조회
@@ -34,9 +40,9 @@ class KMAWeatherService:
                         "base_date": base_date,
                         "base_time": base_time,
                         "nx": nx,
-                        "ny": ny
+                        "ny": ny,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -50,7 +56,7 @@ class KMAWeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
 
-    async def get_short_forecast(self, nx: int, ny: int) -> Dict[str, Any]:
+    async def get_short_forecast(self, nx: int, ny: int) -> dict[str, Any]:
         """단기예보 조회 (3일)"""
         try:
             base_date, base_time = get_base_time()
@@ -66,9 +72,9 @@ class KMAWeatherService:
                         "base_date": base_date,
                         "base_time": base_time,
                         "nx": nx,
-                        "ny": ny
+                        "ny": ny,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -82,7 +88,7 @@ class KMAWeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
 
-    async def get_mid_forecast(self, regId: str) -> Dict[str, Any]:
+    async def get_mid_forecast(self, regId: str) -> dict[str, Any]:
         """중기예보 조회 (3~10일)"""
         try:
             now = datetime.now()
@@ -97,9 +103,9 @@ class KMAWeatherService:
                         "numOfRows": "10",
                         "dataType": "JSON",
                         "tmFc": tmFc,
-                        "regId": regId
+                        "regId": regId,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -113,7 +119,7 @@ class KMAWeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
 
-    async def get_weather_warning(self, area: str) -> Dict[str, Any]:
+    async def get_weather_warning(self, area: str) -> dict[str, Any]:
         """기상특보 조회"""
         try:
             now = datetime.now()
@@ -130,9 +136,9 @@ class KMAWeatherService:
                         "dataType": "JSON",
                         "fromTmFc": fromTmFc,
                         "toTmFc": toTmFc,
-                        "area": area
+                        "area": area,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -146,7 +152,7 @@ class KMAWeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
 
-    async def get_weather_for_province(self, province: str) -> List[Dict[str, Any]]:
+    async def get_weather_for_province(self, province: str) -> list[dict[str, Any]]:
         """특정 도/광역시의 모든 도시 현재 날씨 정보 조회"""
         cities_in_province = get_cities_in_province(province)
         if not cities_in_province:
@@ -163,14 +169,13 @@ class KMAWeatherService:
 
         weather_data = []
         # Filter out cities that might not have been found in CITY_COORDINATES
-        cities_with_coords = [city for city in cities_in_province if city in CITY_COORDINATES]
+        cities_with_coords = [
+            city for city in cities_in_province if city in CITY_COORDINATES
+        ]
         for i, result in enumerate(results):
             city = cities_with_coords[i]
             if isinstance(result, Exception):
-                weather_data.append({
-                    "city": city,
-                    "error": str(result)
-                })
+                weather_data.append({"city": city, "error": str(result)})
             else:
                 data = result.copy()
                 data["city"] = city
@@ -178,7 +183,7 @@ class KMAWeatherService:
 
         return weather_data
 
-    async def get_all_cities_current_weather(self) -> List[Dict[str, Any]]:
+    async def get_all_cities_current_weather(self) -> list[dict[str, Any]]:
         """모든 지원 도시의 현재 날씨 정보 조회"""
         tasks = []
         for city, coords in CITY_COORDINATES.items():
@@ -192,10 +197,7 @@ class KMAWeatherService:
         for i, result in enumerate(results):
             city = cities[i]
             if isinstance(result, Exception):
-                weather_data.append({
-                    "city": city,
-                    "error": str(result)
-                })
+                weather_data.append({"city": city, "error": str(result)})
             else:
                 # get_current_weather가 도시 이름을 반환하지 않으므로 추가
                 data = result.copy()
@@ -204,9 +206,13 @@ class KMAWeatherService:
 
         return weather_data
 
-    def _parse_current_weather_kma(self, data: Dict[str, Any], nx: int, ny: int) -> Dict[str, Any]:
+    def _parse_current_weather_kma(
+        self, data: dict[str, Any], nx: int, ny: int
+    ) -> dict[str, Any]:
         """기상청 현재날씨 데이터 파싱"""
-        items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        items = (
+            data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        )
 
         weather_data = {
             "nx": nx,
@@ -218,7 +224,7 @@ class KMAWeatherService:
             "wind_direction": "",
             "pressure": 0,
             "visibility": 0,
-            "cloud_cover": 0
+            "cloud_cover": 0,
         }
 
         for item in items:
@@ -242,9 +248,13 @@ class KMAWeatherService:
 
         return format_weather_data(weather_data)
 
-    def _parse_short_forecast_kma(self, data: Dict[str, Any], nx: int, ny: int) -> Dict[str, Any]:
+    def _parse_short_forecast_kma(
+        self, data: dict[str, Any], nx: int, ny: int
+    ) -> dict[str, Any]:
         """기상청 단기예보 데이터 파싱"""
-        items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        items = (
+            data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        )
 
         # 날짜별로 데이터 그룹화
         forecast_by_date = {}
@@ -273,7 +283,7 @@ class KMAWeatherService:
                 "avg_temp": 0,
                 "rainfall_probability": 0,
                 "weather_description": "",
-                "wind_speed": 0
+                "wind_speed": 0,
             }
 
             temp_count = 0
@@ -288,62 +298,69 @@ class KMAWeatherService:
                     temp_count += 1
 
                 if "POP" in categories:  # 강수확률
-                    daily_data["rainfall_probability"] = max(daily_data["rainfall_probability"], int(categories["POP"]))
+                    daily_data["rainfall_probability"] = max(
+                        daily_data["rainfall_probability"], int(categories["POP"])
+                    )
 
                 if "WSD" in categories:  # 풍속
-                    daily_data["wind_speed"] = max(daily_data["wind_speed"], float(categories["WSD"]))
+                    daily_data["wind_speed"] = max(
+                        daily_data["wind_speed"], float(categories["WSD"])
+                    )
 
             if temp_count > 0:
                 daily_data["avg_temp"] = total_temp / temp_count
 
             daily_forecast.append(daily_data)
 
-        return {
-            "nx": nx,
-            "ny": ny,
-            "forecast": daily_forecast
-        }
+        return {"nx": nx, "ny": ny, "forecast": daily_forecast}
 
-    def _parse_mid_forecast_kma(self, data: Dict[str, Any], regId: str) -> Dict[str, Any]:
+    def _parse_mid_forecast_kma(
+        self, data: dict[str, Any], regId: str
+    ) -> dict[str, Any]:
         """기상청 중기예보 데이터 파싱"""
-        items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        items = (
+            data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        )
 
-        forecast_data = {
-            "regId": regId,
-            "forecast": []
-        }
+        forecast_data = {"regId": regId, "forecast": []}
 
         for item in items:
             if item.get("rnSt") and item.get("rnSt") != "":  # 강수확률이 있는 경우
-                forecast_data["forecast"].append({
-                    "date": item.get("tmFc", "")[:8],  # YYYYMMDD
-                    "weather": item.get("wfSv", ""),
-                    "rainfall_probability": int(item.get("rnSt", "0")),
-                    "max_temp": int(item.get("taMax", "0")),
-                    "min_temp": int(item.get("taMin", "0"))
-                })
+                forecast_data["forecast"].append(
+                    {
+                        "date": item.get("tmFc", "")[:8],  # YYYYMMDD
+                        "weather": item.get("wfSv", ""),
+                        "rainfall_probability": int(item.get("rnSt", "0")),
+                        "max_temp": int(item.get("taMax", "0")),
+                        "min_temp": int(item.get("taMin", "0")),
+                    }
+                )
 
         return forecast_data
 
-    def _parse_weather_warning_kma(self, data: Dict[str, Any], area: str) -> Dict[str, Any]:
+    def _parse_weather_warning_kma(
+        self, data: dict[str, Any], area: str
+    ) -> dict[str, Any]:
         """기상특보 데이터 파싱"""
-        items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        items = (
+            data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+        )
 
         warnings = []
         for item in items:
-            warnings.append({
-                "area": item.get("area", ""),
-                "warning_type": item.get("warningType", ""),
-                "warning_level": item.get("warningLevel", ""),
-                "warning_message": item.get("warningMessage", ""),
-                "issue_time": item.get("issueTime", ""),
-                "cancel_time": item.get("cancelTime", "")
-            })
+            warnings.append(
+                {
+                    "area": item.get("area", ""),
+                    "warning_type": item.get("warningType", ""),
+                    "warning_level": item.get("warningLevel", ""),
+                    "warning_message": item.get("warningMessage", ""),
+                    "issue_time": item.get("issueTime", ""),
+                    "cancel_time": item.get("cancelTime", ""),
+                }
+            )
 
-        return {
-            "area": area,
-            "warnings": warnings
-        }
+        return {"area": area, "warnings": warnings}
+
 
 # 서비스 인스턴스
 kma_weather_service = KMAWeatherService()

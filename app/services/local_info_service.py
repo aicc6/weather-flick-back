@@ -1,75 +1,100 @@
+
 import httpx
-import json
-from typing import List, Dict, Optional, Any
-from sqlalchemy.orm import Session
-from app.models import Restaurant, Transportation, Accommodation, CityInfo, FavoritePlace, Review
+
 from app.config import settings
+
 
 class LocalInfoService:
     def __init__(self):
-        self.kakao_api_key = getattr(settings, 'kakao_api_key', None)
-        self.naver_client_id = getattr(settings, 'naver_client_id', None)
-        self.naver_client_secret = getattr(settings, 'naver_client_secret', None)
-        self.google_api_key = getattr(settings, 'google_api_key', None)
-        self.public_data_api_key = getattr(settings, 'public_data_api_key', None)
-        self.korea_tourism_api_key = getattr(settings, 'korea_tourism_api_key', None)
+        self.kakao_api_key = getattr(settings, "kakao_api_key", None)
+        self.naver_client_id = getattr(settings, "naver_client_id", None)
+        self.naver_client_secret = getattr(settings, "naver_client_secret", None)
+        self.google_api_key = getattr(settings, "google_api_key", None)
+        self.public_data_api_key = getattr(settings, "public_data_api_key", None)
+        self.korea_tourism_api_key = getattr(settings, "korea_tourism_api_key", None)
 
-    async def search_restaurants(self, city: str, region: str = None, category: str = None,
-                               keyword: str = None, limit: int = 20) -> List[Dict]:
+    async def search_restaurants(
+        self,
+        city: str,
+        region: str = None,
+        category: str = None,
+        keyword: str = None,
+        limit: int = 20,
+    ) -> list[dict]:
         """맛집 검색 (카카오 API 또는 한국관광공사 API 사용)"""
         results = []
 
         # 카카오 API로 맛집 검색
         if self.kakao_api_key:
-            kakao_results = await self._search_kakao_restaurants(city, category, keyword, limit)
+            kakao_results = await self._search_kakao_restaurants(
+                city, category, keyword, limit
+            )
             results.extend(kakao_results)
 
         # 한국관광공사 API로 맛집 검색
         if self.korea_tourism_api_key:
-            tourism_results = await self._search_korea_tourism_restaurants(city, keyword, limit)
+            tourism_results = await self._search_korea_tourism_restaurants(
+                city, keyword, limit
+            )
             results.extend(tourism_results)
 
         # 내장 데이터로 보완
         if not results:
-            results = await self._search_local_restaurants(city, region, category, keyword, limit)
+            results = await self._search_local_restaurants(
+                city, region, category, keyword, limit
+            )
 
         # 중복 제거 및 정렬
         unique_results = self._remove_duplicates(results)
         return unique_results[:limit]
 
-    async def search_transportation(self, city: str, region: str = None,
-                                  transport_type: str = None, limit: int = 20) -> List[Dict]:
+    async def search_transportation(
+        self, city: str, region: str = None, transport_type: str = None, limit: int = 20
+    ) -> list[dict]:
         """교통 정보 검색 (공공데이터포털 API 사용)"""
         results = []
 
         # 공공데이터포털 API로 교통 정보 검색
         if self.public_data_api_key:
-            public_results = await self._search_public_transportation(city, transport_type, limit)
+            public_results = await self._search_public_transportation(
+                city, transport_type, limit
+            )
             results.extend(public_results)
 
         # 내장 데이터로 보완
         if not results:
-            results = await self._search_local_transportation(city, region, transport_type, limit)
+            results = await self._search_local_transportation(
+                city, region, transport_type, limit
+            )
 
         return results[:limit]
 
-    async def search_accommodations(self, city: str, region: str = None,
-                                  accommodation_type: str = None, limit: int = 20) -> List[Dict]:
+    async def search_accommodations(
+        self,
+        city: str,
+        region: str = None,
+        accommodation_type: str = None,
+        limit: int = 20,
+    ) -> list[dict]:
         """숙소 정보 검색 (한국관광공사 API 사용)"""
         results = []
 
         # 한국관광공사 API로 숙소 검색
         if self.korea_tourism_api_key:
-            tourism_results = await self._search_korea_tourism_accommodations(city, accommodation_type, limit)
+            tourism_results = await self._search_korea_tourism_accommodations(
+                city, accommodation_type, limit
+            )
             results.extend(tourism_results)
 
         # 내장 데이터로 보완
         if not results:
-            results = await self._search_local_accommodations(city, region, accommodation_type, limit)
+            results = await self._search_local_accommodations(
+                city, region, accommodation_type, limit
+            )
 
         return results[:limit]
 
-    async def get_city_info(self, city: str) -> Optional[Dict]:
+    async def get_city_info(self, city: str) -> dict | None:
         """도시 정보 조회 (한국관광공사 API 사용)"""
         # 한국관광공사 API로 도시 정보 검색
         if self.korea_tourism_api_key:
@@ -80,8 +105,9 @@ class LocalInfoService:
         # 내장 데이터로 보완
         return await self._get_local_city_info(city)
 
-    async def _search_kakao_restaurants(self, city: str, category: str = None,
-                                      keyword: str = None, limit: int = 20) -> List[Dict]:
+    async def _search_kakao_restaurants(
+        self, city: str, category: str = None, keyword: str = None, limit: int = 20
+    ) -> list[dict]:
         """카카오 API를 사용한 맛집 검색"""
         if not self.kakao_api_key:
             return []
@@ -91,14 +117,14 @@ class LocalInfoService:
             params = {
                 "query": f"{city} {keyword or ''} 맛집",
                 "category_group_code": "FD6",  # 음식점 카테고리
-                "size": limit
+                "size": limit,
             }
 
             try:
                 response = await client.get(
                     "https://dapi.kakao.com/v2/local/search/keyword.json",
                     headers=headers,
-                    params=params
+                    params=params,
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -108,7 +134,9 @@ class LocalInfoService:
                         "name": place["place_name"],
                         "address": place["address_name"],
                         "phone": place.get("phone", ""),
-                        "category": self._categorize_restaurant(place.get("category_name", "")),
+                        "category": self._categorize_restaurant(
+                            place.get("category_name", "")
+                        ),
                         "rating": None,
                         "price_range": "보통",
                         "description": f"{place.get('category_name', '')}",
@@ -116,8 +144,12 @@ class LocalInfoService:
                         "latitude": float(place["y"]),
                         "longitude": float(place["x"]),
                         "city": city,
-                        "region": place.get("address_name", "").split()[0] if place.get("address_name") else "",
-                        "source": "카카오"
+                        "region": (
+                            place.get("address_name", "").split()[0]
+                            if place.get("address_name")
+                            else ""
+                        ),
+                        "source": "카카오",
                     }
                     for place in data.get("documents", [])
                 ]
@@ -125,8 +157,9 @@ class LocalInfoService:
                 print(f"카카오 API 오류: {e}")
                 return []
 
-    async def _search_korea_tourism_restaurants(self, city: str, keyword: str = None,
-                                              limit: int = 20) -> List[Dict]:
+    async def _search_korea_tourism_restaurants(
+        self, city: str, keyword: str = None, limit: int = 20
+    ) -> list[dict]:
         """한국관광공사 API를 사용한 맛집 검색"""
         if not self.korea_tourism_api_key:
             return []
@@ -143,24 +176,31 @@ class LocalInfoService:
                 "arrange": "A",  # 이름순 정렬
                 "contentTypeId": "39",  # 음식점
                 "areaCode": self._get_area_code(city),
-                "keyword": keyword or ""
+                "keyword": keyword or "",
             }
 
             try:
                 response = await client.get(
                     "http://api.visitkorea.or.kr/openapi/service/rest/KorService/searchKeyword",
-                    params=params
+                    params=params,
                 )
                 response.raise_for_status()
                 data = response.json()
 
-                items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+                items = (
+                    data.get("response", {})
+                    .get("body", {})
+                    .get("items", {})
+                    .get("item", [])
+                )
                 if not isinstance(items, list):
                     items = [items]
 
                 return [
                     {
-                        "name": item.get("title", "").replace("<b>", "").replace("</b>", ""),
+                        "name": item.get("title", "")
+                        .replace("<b>", "")
+                        .replace("</b>", ""),
                         "address": item.get("addr1", ""),
                         "phone": item.get("tel", ""),
                         "category": "한식",  # 기본값
@@ -172,7 +212,7 @@ class LocalInfoService:
                         "longitude": float(item.get("mapX", 0)),
                         "city": city,
                         "region": "",
-                        "source": "한국관광공사"
+                        "source": "한국관광공사",
                     }
                     for item in items
                 ]
@@ -180,8 +220,9 @@ class LocalInfoService:
                 print(f"한국관광공사 API 오류: {e}")
                 return []
 
-    async def _search_public_transportation(self, city: str, transport_type: str = None,
-                                          limit: int = 20) -> List[Dict]:
+    async def _search_public_transportation(
+        self, city: str, transport_type: str = None, limit: int = 20
+    ) -> list[dict]:
         """공공데이터포털 API를 사용한 교통 정보 검색"""
         if not self.public_data_api_key:
             return []
@@ -193,7 +234,7 @@ class LocalInfoService:
 
         return []
 
-    async def _search_subway_info(self, city: str, limit: int = 20) -> List[Dict]:
+    async def _search_subway_info(self, city: str, limit: int = 20) -> list[dict]:
         """지하철 정보 검색"""
         subway_data = {
             "서울": [
@@ -207,7 +248,7 @@ class LocalInfoService:
                     "contact": "02-6110-1234",
                     "city": "서울",
                     "region": "전체",
-                    "source": "공공데이터"
+                    "source": "공공데이터",
                 },
                 {
                     "name": "서울 지하철 2호선",
@@ -219,8 +260,8 @@ class LocalInfoService:
                     "contact": "02-6110-1234",
                     "city": "서울",
                     "region": "전체",
-                    "source": "공공데이터"
-                }
+                    "source": "공공데이터",
+                },
             ],
             "부산": [
                 {
@@ -233,15 +274,16 @@ class LocalInfoService:
                     "contact": "051-123-4567",
                     "city": "부산",
                     "region": "전체",
-                    "source": "공공데이터"
+                    "source": "공공데이터",
                 }
-            ]
+            ],
         }
 
         return subway_data.get(city, [])
 
-    async def _search_korea_tourism_accommodations(self, city: str, accommodation_type: str = None,
-                                                 limit: int = 20) -> List[Dict]:
+    async def _search_korea_tourism_accommodations(
+        self, city: str, accommodation_type: str = None, limit: int = 20
+    ) -> list[dict]:
         """한국관광공사 API를 사용한 숙소 검색"""
         if not self.korea_tourism_api_key:
             return []
@@ -257,24 +299,31 @@ class LocalInfoService:
                 "listYN": "Y",
                 "arrange": "A",
                 "contentTypeId": "32",  # 숙박
-                "areaCode": self._get_area_code(city)
+                "areaCode": self._get_area_code(city),
             }
 
             try:
                 response = await client.get(
                     "http://api.visitkorea.or.kr/openapi/service/rest/KorService/areaBasedList",
-                    params=params
+                    params=params,
                 )
                 response.raise_for_status()
                 data = response.json()
 
-                items = data.get("response", {}).get("body", {}).get("items", {}).get("item", [])
+                items = (
+                    data.get("response", {})
+                    .get("body", {})
+                    .get("items", {})
+                    .get("item", [])
+                )
                 if not isinstance(items, list):
                     items = [items]
 
                 return [
                     {
-                        "name": item.get("title", "").replace("<b>", "").replace("</b>", ""),
+                        "name": item.get("title", "")
+                        .replace("<b>", "")
+                        .replace("</b>", ""),
                         "address": item.get("addr1", ""),
                         "phone": item.get("tel", ""),
                         "type": self._categorize_accommodation(item.get("cat3", "")),
@@ -288,7 +337,7 @@ class LocalInfoService:
                         "longitude": float(item.get("mapX", 0)),
                         "city": city,
                         "region": "",
-                        "source": "한국관광공사"
+                        "source": "한국관광공사",
                     }
                     for item in items
                 ]
@@ -296,7 +345,7 @@ class LocalInfoService:
                 print(f"한국관광공사 숙소 API 오류: {e}")
                 return []
 
-    async def _get_korea_tourism_city_info(self, city: str) -> Optional[Dict]:
+    async def _get_korea_tourism_city_info(self, city: str) -> dict | None:
         """한국관광공사 API로 도시 정보 조회"""
         if not self.korea_tourism_api_key:
             return None
@@ -307,13 +356,23 @@ class LocalInfoService:
     def _categorize_restaurant(self, category_name: str) -> str:
         """카테고리명을 기반으로 맛집 분류"""
         category_name = category_name.lower()
-        if any(keyword in category_name for keyword in ["한식", "국밥", "김치", "비빔밥"]):
+        if any(
+            keyword in category_name for keyword in ["한식", "국밥", "김치", "비빔밥"]
+        ):
             return "한식"
-        elif any(keyword in category_name for keyword in ["중식", "짜장면", "탕수육", "마파두부"]):
+        elif any(
+            keyword in category_name
+            for keyword in ["중식", "짜장면", "탕수육", "마파두부"]
+        ):
             return "중식"
-        elif any(keyword in category_name for keyword in ["일식", "초밥", "라멘", "우동"]):
+        elif any(
+            keyword in category_name for keyword in ["일식", "초밥", "라멘", "우동"]
+        ):
             return "일식"
-        elif any(keyword in category_name for keyword in ["양식", "파스타", "피자", "스테이크"]):
+        elif any(
+            keyword in category_name
+            for keyword in ["양식", "파스타", "피자", "스테이크"]
+        ):
             return "양식"
         elif any(keyword in category_name for keyword in ["카페", "커피", "디저트"]):
             return "카페"
@@ -355,11 +414,11 @@ class LocalInfoService:
             "경남": "36",
             "전북": "37",
             "전남": "38",
-            "제주": "39"
+            "제주": "39",
         }
         return area_codes.get(city, "1")
 
-    def _remove_duplicates(self, results: List[Dict]) -> List[Dict]:
+    def _remove_duplicates(self, results: list[dict]) -> list[dict]:
         """중복 결과 제거"""
         seen = set()
         unique_results = []
@@ -373,9 +432,14 @@ class LocalInfoService:
 
         return unique_results
 
-    async def _search_local_restaurants(self, city: str, region: str = None,
-                                      category: str = None, keyword: str = None,
-                                      limit: int = 20) -> List[Dict]:
+    async def _search_local_restaurants(
+        self,
+        city: str,
+        region: str = None,
+        category: str = None,
+        keyword: str = None,
+        limit: int = 20,
+    ) -> list[dict]:
         """내장 맛집 데이터 검색"""
         # 주요 도시별 맛집 데이터
         restaurants_data = {
@@ -392,7 +456,7 @@ class LocalInfoService:
                     "latitude": 37.5704,
                     "longitude": 126.9997,
                     "city": "서울",
-                    "region": "종로구"
+                    "region": "종로구",
                 },
                 {
                     "name": "명동교자",
@@ -406,8 +470,8 @@ class LocalInfoService:
                     "latitude": 37.5636,
                     "longitude": 126.9834,
                     "city": "서울",
-                    "region": "중구"
-                }
+                    "region": "중구",
+                },
             ],
             "부산": [
                 {
@@ -422,7 +486,7 @@ class LocalInfoService:
                     "latitude": 35.1586,
                     "longitude": 129.1603,
                     "city": "부산",
-                    "region": "해운대구"
+                    "region": "해운대구",
                 }
             ],
             "대구": [
@@ -438,9 +502,9 @@ class LocalInfoService:
                     "latitude": 35.8714,
                     "longitude": 128.6014,
                     "city": "대구",
-                    "region": "중구"
+                    "region": "중구",
                 }
-            ]
+            ],
         }
 
         results = restaurants_data.get(city, [])
@@ -451,12 +515,18 @@ class LocalInfoService:
         if category:
             results = [r for r in results if r["category"] == category]
         if keyword:
-            results = [r for r in results if keyword.lower() in r["name"].lower() or keyword.lower() in r["description"].lower()]
+            results = [
+                r
+                for r in results
+                if keyword.lower() in r["name"].lower()
+                or keyword.lower() in r["description"].lower()
+            ]
 
         return results[:limit]
 
-    async def _search_local_transportation(self, city: str, region: str = None,
-                                         transport_type: str = None, limit: int = 20) -> List[Dict]:
+    async def _search_local_transportation(
+        self, city: str, region: str = None, transport_type: str = None, limit: int = 20
+    ) -> list[dict]:
         """내장 교통 정보 데이터 검색"""
         transportation_data = {
             "서울": [
@@ -469,7 +539,7 @@ class LocalInfoService:
                     "fare_info": "기본요금 1,250원",
                     "contact": "02-6110-1234",
                     "city": "서울",
-                    "region": "전체"
+                    "region": "전체",
                 },
                 {
                     "name": "공항철도",
@@ -480,8 +550,8 @@ class LocalInfoService:
                     "fare_info": "기본요금 4,150원",
                     "contact": "02-6110-1234",
                     "city": "서울",
-                    "region": "전체"
-                }
+                    "region": "전체",
+                },
             ],
             "부산": [
                 {
@@ -493,9 +563,9 @@ class LocalInfoService:
                     "fare_info": "기본요금 1,300원",
                     "contact": "051-123-4567",
                     "city": "부산",
-                    "region": "전체"
+                    "region": "전체",
                 }
-            ]
+            ],
         }
 
         results = transportation_data.get(city, [])
@@ -505,8 +575,13 @@ class LocalInfoService:
 
         return results[:limit]
 
-    async def _search_local_accommodations(self, city: str, region: str = None,
-                                         accommodation_type: str = None, limit: int = 20) -> List[Dict]:
+    async def _search_local_accommodations(
+        self,
+        city: str,
+        region: str = None,
+        accommodation_type: str = None,
+        limit: int = 20,
+    ) -> list[dict]:
         """내장 숙소 정보 데이터 검색"""
         accommodation_data = {
             "서울": [
@@ -524,7 +599,7 @@ class LocalInfoService:
                     "latitude": 37.5644,
                     "longitude": 126.9819,
                     "city": "서울",
-                    "region": "중구"
+                    "region": "중구",
                 },
                 {
                     "name": "명동 게스트하우스",
@@ -540,8 +615,8 @@ class LocalInfoService:
                     "latitude": 37.5636,
                     "longitude": 126.9834,
                     "city": "서울",
-                    "region": "중구"
-                }
+                    "region": "중구",
+                },
             ],
             "부산": [
                 {
@@ -558,9 +633,9 @@ class LocalInfoService:
                     "latitude": 35.1586,
                     "longitude": 129.1603,
                     "city": "부산",
-                    "region": "해운대구"
+                    "region": "해운대구",
                 }
-            ]
+            ],
         }
 
         results = accommodation_data.get(city, [])
@@ -570,7 +645,7 @@ class LocalInfoService:
 
         return results[:limit]
 
-    async def _get_local_city_info(self, city: str) -> Optional[Dict]:
+    async def _get_local_city_info(self, city: str) -> dict | None:
         """내장 도시 정보 데이터"""
         city_info_data = {
             "서울": {
@@ -580,7 +655,7 @@ class LocalInfoService:
                 "attractions": ["경복궁", "남산타워", "홍대", "강남", "명동"],
                 "best_time_to_visit": "3월-5월, 9월-11월",
                 "population": 9700000,
-                "area": 605.2
+                "area": 605.2,
             },
             "부산": {
                 "city": "부산",
@@ -589,7 +664,7 @@ class LocalInfoService:
                 "attractions": ["해운대", "광안대교", "감천문화마을", "태종대"],
                 "best_time_to_visit": "6월-8월 (해수욕장)",
                 "population": 3400000,
-                "area": 770.0
+                "area": 770.0,
             },
             "대구": {
                 "city": "대구",
@@ -598,7 +673,7 @@ class LocalInfoService:
                 "attractions": ["동성로", "수성못", "팔공산", "앞산공원"],
                 "best_time_to_visit": "4월-5월 (벚꽃), 10월-11월",
                 "population": 2400000,
-                "area": 884.0
+                "area": 884.0,
             },
             "인천": {
                 "city": "인천",
@@ -607,7 +682,7 @@ class LocalInfoService:
                 "attractions": ["인천공항", "월미도", "차이나타운", "송도"],
                 "best_time_to_visit": "4월-10월",
                 "population": 2900000,
-                "area": 1062.6
+                "area": 1062.6,
             },
             "광주": {
                 "city": "광주",
@@ -616,14 +691,30 @@ class LocalInfoService:
                 "attractions": ["무등산", "광주비엔날레", "상무지구", "양림동"],
                 "best_time_to_visit": "3월-5월, 9월-11월",
                 "population": 1500000,
-                "area": 501.2
-            }
+                "area": 501.2,
+            },
         }
 
         return city_info_data.get(city)
 
-    async def get_supported_cities(self) -> List[str]:
+    async def get_supported_cities(self) -> list[str]:
         """지원되는 도시 목록"""
-        return ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "수원", "고양", "용인", "창원", "포항", "제주"]
+        return [
+            "서울",
+            "부산",
+            "대구",
+            "인천",
+            "광주",
+            "대전",
+            "울산",
+            "세종",
+            "수원",
+            "고양",
+            "용인",
+            "창원",
+            "포항",
+            "제주",
+        ]
+
 
 local_info_service = LocalInfoService()

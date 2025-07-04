@@ -6,6 +6,7 @@
 import asyncio
 import os
 import sys
+
 from dotenv import load_dotenv
 
 # 환경 변수 로드
@@ -15,7 +16,8 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.services.kma_weather_service import kma_weather_service
-from app.utils.kma_utils import get_supported_cities, get_city_coordinates
+from app.utils.kma_utils import get_city_coordinates, get_supported_cities
+
 
 async def test_kma_api():
     """기상청 API 테스트"""

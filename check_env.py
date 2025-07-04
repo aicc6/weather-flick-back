@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 # 1. .env 파일을 읽어들일 설정 클래스를 간단하게 정의합니다.
 #    이 클래스는 .env 파일에서 KAKAO_API_KEY 만 찾아보도록 설정됩니다.
 class EnvChecker(BaseSettings):

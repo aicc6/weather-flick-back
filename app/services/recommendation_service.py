@@ -1,6 +1,7 @@
-from typing import List, Dict, Any
-from sqlalchemy.orm import Session
 from datetime import datetime
+from typing import Any
+
+from sqlalchemy.orm import Session
 
 from app.models import User
 from app.services.destination_service import destination_service
@@ -21,7 +22,7 @@ weather_to_tags_map = {
 
 async def get_weather_based_recommendations(
     db: Session, weather_status: str, city: str, user: User
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     날씨, 도시, 사용자 선호도를 기반으로 여행지를 추천합니다.
     '맑은 날'에는 현재 진행중인 축제 정보를 추가로 추천합니다.
@@ -36,19 +37,23 @@ async def get_weather_based_recommendations(
     if weather_status == "맑음":
         area_code = get_area_code_for_city(city)
         if area_code:
-            today_str = datetime.now().strftime('%Y%m%d')
+            today_str = datetime.now().strftime("%Y%m%d")
             try:
-                festivals = await get_festivals_from_tour_api(area_code=area_code, event_start_date=today_str)
+                festivals = await get_festivals_from_tour_api(
+                    area_code=area_code, event_start_date=today_str
+                )
                 for festival in festivals:
-                    events_recommendations.append({
-                        "id": festival.get("contentid"),
-                        "name": f"[축제] {festival.get('title')}",
-                        "description": festival.get("addr1"),
-                        "province": city,
-                        "tags": ["#축제", "#이벤트", "#야외"],
-                        "is_indoor": False,
-                        "recommendation_score": 100,
-                    })
+                    events_recommendations.append(
+                        {
+                            "id": festival.get("contentid"),
+                            "name": f"[축제] {festival.get('title')}",
+                            "description": festival.get("addr1"),
+                            "province": city,
+                            "tags": ["#축제", "#이벤트", "#야외"],
+                            "is_indoor": False,
+                            "recommendation_score": 100,
+                        }
+                    )
             except Exception as e:
                 print(f"Error fetching festival data: {e}")
 
@@ -56,7 +61,9 @@ async def get_weather_based_recommendations(
     destinations = destination_service.get_destinations_by_tags(db, recommended_tags)
 
     # 4. 개인화 점수 계산
-    user_preferences = set(user.preferences.get("tags", [])) if user.preferences else set()
+    user_preferences = (
+        set(user.preferences.get("tags", [])) if user.preferences else set()
+    )
     recommended_destinations = []
     for dest in destinations:
         dest_tags = set(dest.tags)
@@ -66,21 +73,23 @@ async def get_weather_based_recommendations(
         total_score = weather_score + personalization_score
 
         if total_score > 0:
-            recommended_destinations.append({
-                "id": dest.id,
-                "name": dest.name,
-                "description": dest.description,
-                "province": dest.province,
-                "tags": dest.tags,
-                "is_indoor": dest.is_indoor,
-                "recommendation_score": total_score,
-            })
+            recommended_destinations.append(
+                {
+                    "id": dest.id,
+                    "name": dest.name,
+                    "description": dest.description,
+                    "province": dest.province,
+                    "tags": dest.tags,
+                    "is_indoor": dest.is_indoor,
+                    "recommendation_score": total_score,
+                }
+            )
 
     # 5. 최종 추천 목록 생성 및 정렬
     final_recommendations = sorted(
         events_recommendations + recommended_destinations,
         key=lambda x: x["recommendation_score"],
-        reverse=True
+        reverse=True,
     )
 
     return final_recommendations
