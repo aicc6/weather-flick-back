@@ -734,3 +734,21 @@ class Region(Base):
     region_level = Column(Integer)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class UnifiedRegion(Base):
+    __tablename__ = "unified_regions"
+    region_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    region_code = Column(String, index=True)
+    region_name = Column(String, nullable=False)
+    region_name_full = Column(String)
+    region_name_en = Column(String)
+    parent_region_id = Column(UUID(as_uuid=True), index=True, nullable=True)
+    region_level = Column(Integer)
+    center_latitude = Column(String)
+    center_longitude = Column(String)
+    boundary_data = Column(JSONB)
+    administrative_code = Column(String)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

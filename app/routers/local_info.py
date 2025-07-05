@@ -300,11 +300,11 @@ async def get_nearby_places(
 
 
 @router.get("/resions")
-async def get_regions_with_si_gun(db: Session = Depends(get_db)):
+async def get_unified_regions_level1(db: Session = Depends(get_db)):
     """
-    region_name이 '시' 또는 '군'으로 끝나는 지역만 반환
+    unified_regions 테이블에서 region_level=1인 지역만 반환
     """
-    regions = await local_info_service.get_regions_with_si_gun(db)
+    regions = await local_info_service.get_unified_regions_level1(db)
     return {"regions": regions, "total": len(regions)}
 
 
