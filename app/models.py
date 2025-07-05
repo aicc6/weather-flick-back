@@ -1,7 +1,7 @@
 import enum
 import uuid
-from datetime import datetime
-from typing import Any
+from datetime import datetime, date
+from typing import Any, Optional
 
 from pydantic import BaseModel
 from sqlalchemy import (
@@ -152,6 +152,8 @@ class TravelPlan(Base):
     budget = Column(DECIMAL(10, 2))
     status = Column(Enum(TravelPlanStatus), default=TravelPlanStatus.PLANNING)
     itinerary = Column(JSONB)
+    participants = Column(Integer, nullable=True)         # ← 추가
+    transportation = Column(String, nullable=True)        # ← 추가
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="travel_plans")
@@ -573,6 +575,8 @@ class TravelPlanCreate(BaseModel):
     end_date: str
     budget: float | None = None
     itinerary: dict[str, Any | None] = {}
+    participants: int | None = None
+    transportation: str | None = None
 
 
 class TravelPlanUpdate(BaseModel):
@@ -590,11 +594,11 @@ class TravelPlanResponse(BaseModel):
     user_id: uuid.UUID
     title: str
     description: str | None = None
-    start_date: str
-    end_date: str
+    start_date: date
+    end_date: date
     budget: float | None = None
     status: str
-    itinerary: dict[str, Any | None] = {}
+    itinerary: Optional[dict[str, Any]] = None
     created_at: datetime
 
     class Config:
