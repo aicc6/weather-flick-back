@@ -186,3 +186,47 @@ async def get_weather_by_place_id(place_id: str):
             "temp": current.get("temp_c"),
             "summary": condition.get("text"),
         }
+
+
+@router.get("/forecast-by-place-id")
+async def get_forecast_by_place_id(place_id: str, date: str):
+    """Google place_id로 위경도 변환 후, 해당 날짜의 예보 반환 (최고/최저기온, 강수확률 포함)"""
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    WEATHER_API_URL = os.getenv("WEATHER_API_URL")
+    WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+    if not (GOOGLE_API_KEY and WEATHER_API_URL and WEATHER_API_KEY):
+        raise HTTPException(status_code=500, detail="API 키 또는 URL 누락")
+    # 1. place_id로 위경도 조회
+    details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(details_url, params={
+            "place_id": place_id,
+            "key": GOOGLE_API_KEY,
+            "fields": "geometry"
+        })
+        details = resp.json()
+        if "result" not in details or "geometry" not in details["result"]:
+            raise HTTPException(status_code=404, detail="장소 정보를 찾을 수 없음")
+        location = details["result"]["geometry"]["location"]
+        lat, lon = location["lat"], location["lng"]
+        # 2. weatherapi.com에서 예보 조회 (최대 7일)
+        weather_resp = await client.get(
+            f"{WEATHER_API_URL}/forecast.json",
+            params={"key": WEATHER_API_KEY, "q": f"{lat},{lon}", "lang": "ko", "days": 7}
+        )
+        if weather_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="날씨 API 호출 실패")
+        weather = weather_resp.json()
+        # 3. date에 해당하는 예보만 추출
+        for day in weather.get("forecast", {}).get("forecastday", []):
+            if day["date"] == date:
+                return {
+                    "date": day["date"],
+                    "icon": day["day"]["condition"]["icon"],
+                    "temp": day["day"]["avgtemp_c"],
+                    "max_temp": day["day"]["maxtemp_c"],
+                    "min_temp": day["day"]["mintemp_c"],
+                    "chance_of_rain": day["day"].get("daily_chance_of_rain", 0),
+                    "summary": day["day"]["condition"]["text"],
+                }
+        raise HTTPException(status_code=404, detail="해당 날짜의 예보 없음")
