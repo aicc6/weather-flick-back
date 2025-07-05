@@ -175,3 +175,41 @@ def check_password_strength(password: str) -> dict:
         "errors": errors,
         "strength": "strong" if len(errors) == 0 else "weak",
     }
+
+
+def generate_temporary_password(length: int = 12) -> str:
+    """
+    보안 강화된 임시 비밀번호 생성
+    
+    Args:
+        length: 비밀번호 길이 (기본값: 12)
+        
+    Returns:
+        str: 생성된 임시 비밀번호
+    """
+    import secrets
+    import string
+    
+    # 각 문자 유형별로 최소 1개씩 포함
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    special_chars = "!@#$%^&*"  # 호환성을 위해 제한된 특수문자 사용
+    
+    # 각 유형에서 최소 1개씩 선택
+    password_chars = [
+        secrets.choice(lowercase),
+        secrets.choice(uppercase),
+        secrets.choice(digits),
+        secrets.choice(special_chars)
+    ]
+    
+    # 나머지 자리는 모든 문자에서 랜덤 선택
+    all_chars = lowercase + uppercase + digits + special_chars
+    for _ in range(length - 4):
+        password_chars.append(secrets.choice(all_chars))
+    
+    # 문자 순서 섞기 (패턴 예측 방지)
+    secrets.SystemRandom().shuffle(password_chars)
+    
+    return ''.join(password_chars)

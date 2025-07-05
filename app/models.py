@@ -54,7 +54,7 @@ class User(Base):
     hashed_password = Column(
         String, nullable=True
     )  # OAuth 사용자는 비밀번호가 없을 수 있음
-    nickname = Column(String, unique=True, index=True, nullable=False)
+    nickname = Column(String, index=True, nullable=False)
     profile_image = Column(String)
     preferences = Column(JSONB)
     preferred_region = Column(String)  # 선호 지역
@@ -454,7 +454,7 @@ class Token(BaseModel):
 class UserUpdate(BaseModel):
     nickname: str | None = None
     profile_image: str | None = None
-    preferences: list[str | None] = None
+    preferences: list[str | None] = []
     preferred_region: str | None = None
     preferred_theme: str | None = None
     bio: str | None = None
@@ -511,7 +511,7 @@ class ResendVerificationRequest(BaseModel):
 class StandardResponse(BaseModel):
     success: bool
     message: str
-    data: dict[str, Any | None] = None
+    data: dict[str, Any | None] = {}
 
 
 class PaginationInfo(BaseModel):
@@ -527,10 +527,10 @@ class DestinationCreate(BaseModel):
     region: str | None = None
     category: str | None = None
     is_indoor: bool | None = False
-    tags: list[str | None] = None
+    tags: list[str | None] = []
     latitude: float | None = None
     longitude: float | None = None
-    amenities: dict[str, Any | None] = None
+    amenities: dict[str, Any | None] = {}
     image_url: str | None = None
 
 
@@ -541,10 +541,10 @@ class DestinationResponse(BaseModel):
     region: str | None = None
     category: str | None = None
     is_indoor: bool | None = None
-    tags: list[str | None] = None
+    tags: list[str | None] = []
     latitude: float | None = None
     longitude: float | None = None
-    amenities: dict[str, Any | None] = None
+    amenities: dict[str, Any | None] = {}
     image_url: str | None = None
     rating: float | None = None
     recommendation_weight: float | None = None
@@ -554,10 +554,10 @@ class DestinationResponse(BaseModel):
 
 
 class RecommendationRequest(BaseModel):
-    destination_types: list[str | None] = None
-    budget_range: dict[str, float | None] = None
-    travel_dates: dict[str, str | None] = None
-    preferences: dict[str, Any | None] = None
+    destination_types: list[str | None] = []
+    budget_range: dict[str, float | None] = {}
+    travel_dates: dict[str, str | None] = {}
+    preferences: dict[str, Any | None] = {}
 
 
 class RecommendationResponse(BaseModel):
@@ -572,7 +572,7 @@ class TravelPlanCreate(BaseModel):
     start_date: str
     end_date: str
     budget: float | None = None
-    itinerary: dict[str, Any | None] = None
+    itinerary: dict[str, Any | None] = {}
 
 
 class TravelPlanUpdate(BaseModel):
@@ -582,7 +582,7 @@ class TravelPlanUpdate(BaseModel):
     end_date: str | None = None
     budget: float | None = None
     status: str | None = None
-    itinerary: dict[str, Any | None] = None
+    itinerary: dict[str, Any | None] = {}
 
 
 class TravelPlanResponse(BaseModel):
@@ -594,7 +594,7 @@ class TravelPlanResponse(BaseModel):
     end_date: str
     budget: float | None = None
     status: str
-    itinerary: dict[str, Any | None] = None
+    itinerary: dict[str, Any | None] = {}
     created_at: datetime
 
     class Config:
@@ -659,7 +659,7 @@ class AccommodationResponse(BaseModel):
     phone: str | None = None
     rating: float | None = None
     price_range: str | None = None
-    amenities: list[str | None] = None
+    amenities: list[str | None] = []
     latitude: float | None = None
     longitude: float | None = None
 
@@ -669,7 +669,7 @@ class TransportationResponse(BaseModel):
     name: str
     type: str  # bus, subway, taxi, etc.
     route: str | None = None
-    schedule: dict[str, Any | None] = None
+    schedule: dict[str, Any | None] = {}
     fare: str | None = None
     contact: str | None = None
 
@@ -680,8 +680,8 @@ class CityInfoResponse(BaseModel):
     population: int | None = None
     area: float | None = None
     description: str | None = None
-    attractions: list[str | None] = None
-    weather_info: dict[str, Any | None] = None
+    attractions: list[str | None] = []
+    weather_info: dict[str, Any | None] = {}
 
 
 class FavoritePlaceResponse(BaseModel):
@@ -703,7 +703,7 @@ class ReviewCreate(BaseModel):
     travel_plan_id: uuid.UUID | None = None
     rating: int
     content: str | None = None
-    photos: list[str | None] = None
+    photos: list[str | None] = []
 
 
 class ReviewResponse(BaseModel):
@@ -713,7 +713,7 @@ class ReviewResponse(BaseModel):
     travel_plan_id: uuid.UUID | None = None
     rating: int
     content: str | None = None
-    photos: list[str | None] = None
+    photos: list[str | None] = []
     created_at: datetime
 
     class Config:
@@ -734,3 +734,58 @@ class Region(Base):
     region_level = Column(Integer)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+# 임시 비밀번호 관련 스키마
+class ForgotPasswordRequest(BaseModel):
+    """비밀번호 찾기 요청"""
+    email: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com"
+            }
+        }
+
+
+class ForgotPasswordResponse(BaseModel):
+    """비밀번호 찾기 응답"""
+    message: str
+    success: bool = True
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "임시 비밀번호가 이메일로 전송되었습니다.",
+                "success": True
+            }
+        }
+
+
+# 회원탈퇴 관련 스키마
+class WithdrawRequest(BaseModel):
+    """회원탈퇴 요청"""
+    password: str | None = None  # 소셜 로그인 사용자는 비밀번호 불필요
+    reason: str | None = None  # 탈퇴 사유 (선택사항)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "password": "current_password",
+                "reason": "서비스 이용이 불필요해짐"
+            }
+        }
+
+
+class WithdrawResponse(BaseModel):
+    """회원탈퇴 응답"""
+    message: str
+    success: bool = True
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "회원탈퇴가 완료되었습니다.",
+                "success": True
+            }
+        }
