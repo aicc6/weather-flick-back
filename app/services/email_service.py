@@ -169,6 +169,92 @@ class EmailService:
                 code="WELCOME_EMAIL_SEND_FAILED",
             )
 
+    async def send_temporary_password_email(self, email: str, temporary_password: str, nickname: str = None):
+        """임시 비밀번호 이메일 발송"""
+        try:
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Weather Flick 임시 비밀번호</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                    .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+                    .temp-password {{ background: #fff; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; font-size: 20px; font-weight: bold; color: #e74c3c; border: 2px solid #e74c3c; }}
+                    .warning {{ background: #fff5f5; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0; }}
+                    .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
+                    .security-notice {{ background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🌤️ Weather Flick</h1>
+                        <p>임시 비밀번호 발급</p>
+                    </div>
+                    <div class="content">
+                        <h2>안녕하세요{f", {nickname}" if nickname else ""}!</h2>
+                        <p>요청하신 임시 비밀번호가 발급되었습니다.</p>
+
+                        <div class="temp-password">
+                            {temporary_password}
+                        </div>
+
+                        <div class="warning">
+                            <h3>⚠️ 보안 주의사항</h3>
+                            <ul>
+                                <li><strong>이 임시 비밀번호는 24시간 후에 사용이 권장되지 않습니다.</strong></li>
+                                <li><strong>로그인 후 즉시 새로운 비밀번호로 변경해주세요.</strong></li>
+                                <li>이 이메일을 다른 사람과 공유하지 마세요.</li>
+                                <li>본인이 요청하지 않았다면 즉시 고객센터에 문의하세요.</li>
+                            </ul>
+                        </div>
+
+                        <div class="security-notice">
+                            <h4>🔒 보안 가이드라인</h4>
+                            <p>새 비밀번호는 다음 조건을 만족해야 합니다:</p>
+                            <ul>
+                                <li>8자 이상의 길이</li>
+                                <li>대문자, 소문자, 숫자, 특수문자 포함</li>
+                                <li>이전 비밀번호와 다른 비밀번호</li>
+                            </ul>
+                        </div>
+
+                        <p>Weather Flick을 안전하게 이용해주셔서 감사합니다.</p>
+                    </div>
+                    <div class="footer">
+                        <p>© 2024 Weather Flick. All rights reserved.</p>
+                        <p>이 이메일은 자동으로 발송되었습니다.</p>
+                        <p>문의사항이 있으시면 고객센터로 연락주세요.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            message = MessageSchema(
+                subject="Weather Flick 임시 비밀번호 발급",
+                recipients=[email],
+                body=html_content,
+                subtype="html",
+            )
+
+            await self.fastmail.send_message(message)
+            return True
+
+        except Exception as e:
+            self.logger.error(
+                f"임시 비밀번호 이메일 발송 실패: {email}", extra={"error": str(e)}
+            )
+            raise EmailServiceError(
+                message="임시 비밀번호 이메일 발송에 실패했습니다.",
+                code="TEMP_PASSWORD_EMAIL_SEND_FAILED",
+                details=[{"field": "email", "message": f"이메일 전송 실패: {str(e)}"}],
+            )
+
 
 # 이메일 인증 관리 클래스
 class EmailVerificationService:

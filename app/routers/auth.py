@@ -12,6 +12,7 @@ from app.auth import (
     authenticate_user,
     check_password_strength,
     create_access_token,
+    generate_temporary_password,
     get_current_active_user,
     get_password_hash,
     log_user_activity,
@@ -27,6 +28,8 @@ from app.models import (
     EmailVerificationConfirm,
     EmailVerificationRequest,
     EmailVerificationResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     GoogleAuthCodeRequest,
     GoogleAuthUrlResponse,
     GoogleLoginRequest,
@@ -38,6 +41,8 @@ from app.models import (
     UserCreate,
     UserResponse,
     UserUpdate,
+    WithdrawRequest,
+    WithdrawResponse,
 )
 from app.services.email_service import email_service, email_verification_service
 from app.services.google_oauth_service import google_oauth_service
@@ -97,32 +102,50 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     try:
         logger.info(f"회원가입 시도: {user.email}")
 
-        # 이메일 및 닉네임 중복 확인을 단일 쿼리로 최적화
-        existing_user = (
+        # 입력값 전처리
+        if user.nickname and user.nickname.strip():
+            user.nickname = user.nickname.strip()
+            
+        # 이메일 중복 확인 (활성 사용자만)
+        existing_email = (
             db.query(User)
-            .filter((User.email == user.email) | (User.nickname == user.nickname))
+            .filter(
+                User.email == user.email,
+                User.is_active == True
+            )
             .first()
         )
-
-        if existing_user:
-            if existing_user.email == user.email:
-                logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
-                raise ValidationError(
-                    message="이미 등록된 이메일입니다.",
-                    code="EMAIL_ALREADY_EXISTS",
-                    details=[
-                        {"field": "email", "message": "이미 사용 중인 이메일입니다."}
-                    ],
-                )
-            elif existing_user.nickname == user.nickname:
-                logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
-                raise ValidationError(
-                    message="이미 등록된 닉네임입니다.",
-                    code="NICKNAME_ALREADY_EXISTS",
-                    details=[
-                        {"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}
-                    ],
-                )
+        
+        if existing_email:
+            logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
+            raise ValidationError(
+                message="이미 등록된 이메일입니다.",
+                code="EMAIL_ALREADY_EXISTS",
+                details=[
+                    {"field": "email", "message": "이미 사용 중인 이메일입니다."}
+                ],
+            )
+        
+        # 닉네임 중복 확인 (대소문자 무시, 활성 사용자만)
+        from sqlalchemy import func
+        existing_nickname = (
+            db.query(User)
+            .filter(
+                func.lower(User.nickname) == func.lower(user.nickname),
+                User.is_active == True
+            )
+            .first()
+        )
+        
+        if existing_nickname:
+            logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
+            raise ValidationError(
+                message="이미 등록된 닉네임입니다.",
+                code="NICKNAME_ALREADY_EXISTS",
+                details=[
+                    {"field": "nickname", "message": "이미 사용 중인 닉네임입니다."}
+                ],
+            )
 
         # 비밀번호 강도 검사
         password_check = check_password_strength(user.password)
@@ -252,18 +275,36 @@ async def update_user_profile(
     db: Session = Depends(get_db),
 ):
     """사용자 프로필 업데이트"""
-    if user_update.nickname:
-        # 사용자명 중복 확인
-        existing_user = (
-            db.query(User)
-            .filter(User.nickname == user_update.nickname, User.id != current_user.id)
-            .first()
-        )
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
+    if user_update.nickname and user_update.nickname.strip():
+        user_update.nickname = user_update.nickname.strip()  # 공백 제거
+        logger.info(f"닉네임 업데이트 시도: {current_user.email} -> {user_update.nickname}")
+        logger.info(f"현재 사용자 ID: {current_user.id} (type: {type(current_user.id)})")
+        logger.info(f"현재 사용자 user_id: {current_user.user_id} (type: {type(current_user.user_id)})")
+        
+        # 현재 닉네임과 동일한 경우 스킵
+        if current_user.nickname and current_user.nickname.lower() == user_update.nickname.lower():
+            logger.info(f"동일한 닉네임으로 변경 시도, 스킵: {user_update.nickname}")
+        else:
+            # 사용자명 중복 확인 (활성 사용자만, 대소문자 구분 없이)
+            from sqlalchemy import func
+            existing_user = (
+                db.query(User)
+                .filter(
+                    func.lower(User.nickname) == func.lower(user_update.nickname), 
+                    User.user_id != current_user.user_id,  # user_id 사용으로 변경
+                    User.is_active == True  # 활성 사용자만 중복 체크
+                )
+                .first()
             )
-        current_user.nickname = user_update.nickname
+            
+            if existing_user:
+                logger.warning(f"닉네임 중복 발견: {user_update.nickname} - 기존 사용자 ID: {existing_user.user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
+                )
+            
+            logger.info(f"닉네임 중복 체크 통과: {user_update.nickname}")
+            current_user.nickname = user_update.nickname
 
     if user_update.profile_image is not None:
         current_user.profile_image = user_update.profile_image
@@ -573,8 +614,11 @@ async def send_email_verification(
 ):
     """이메일 인증 코드 발송"""
     try:
-        # 이미 가입된 이메일인지 확인
-        existing_user = db.query(User.email).filter(User.email == request.email).first()
+        # 이미 가입된 이메일인지 확인 (활성 사용자만)
+        existing_user = db.query(User.email).filter(
+            User.email == request.email,
+            User.is_active == True  # 활성 사용자만 확인
+        ).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -641,8 +685,11 @@ async def resend_verification(
 ):
     """인증 코드 재발송"""
     try:
-        # 이미 가입된 이메일인지 확인
-        existing_user = db.query(User.email).filter(User.email == request.email).first()
+        # 이미 가입된 이메일인지 확인 (활성 사용자만)
+        existing_user = db.query(User.email).filter(
+            User.email == request.email,
+            User.is_active == True  # 활성 사용자만 확인
+        ).first()
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -670,4 +717,165 @@ async def resend_verification(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to resend verification: {str(e)}",
+        )
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    request: ForgotPasswordRequest, 
+    db: Session = Depends(get_db),
+    http_request: Request = None,
+):
+    """비밀번호 찾기 - 임시 비밀번호 발급"""
+    try:
+        logger.info(f"비밀번호 찾기 요청: {request.email}")
+        
+        # 이메일로 사용자 조회
+        user = db.query(User).filter(User.email == request.email).first()
+        if not user:
+            logger.warning(f"존재하지 않는 이메일로 비밀번호 찾기 시도: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 이메일로 등록된 계정을 찾을 수 없습니다.",
+            )
+        
+        # 비활성화된 계정 확인
+        if not user.is_active:
+            logger.warning(f"비활성화된 계정으로 비밀번호 찾기 시도: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="비활성화된 계정입니다. 고객센터에 문의하세요.",
+            )
+        
+        # OAuth 계정 확인 (구글 계정 등)
+        if user.google_id and user.auth_provider != "local":
+            logger.warning(f"OAuth 계정으로 비밀번호 찾기 시도: {request.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="소셜 로그인 계정입니다. 해당 서비스를 통해 로그인해주세요.",
+            )
+        
+        # 임시 비밀번호 생성
+        temp_password = generate_temporary_password()
+        
+        # 데이터베이스에 임시 비밀번호 저장
+        user.hashed_password = get_password_hash(temp_password)
+        db.commit()
+        
+        logger.info(f"임시 비밀번호 생성 완료: {request.email}")
+        
+        # 이메일로 임시 비밀번호 전송
+        try:
+            await email_service.send_temporary_password_email(
+                email=request.email,
+                temporary_password=temp_password,
+                nickname=user.nickname
+            )
+            
+            logger.info(f"임시 비밀번호 이메일 발송 완료: {request.email}")
+            
+            # 사용자 활동 로그 기록
+            if http_request:
+                log_user_activity(
+                    db=db,
+                    user_id=user.id,
+                    activity_type="password_reset",
+                    description="Temporary password issued",
+                    ip_address=http_request.client.host if http_request.client else None,
+                    user_agent=http_request.headers.get("User-Agent") if http_request else None,
+                )
+            
+            return ForgotPasswordResponse(
+                message="임시 비밀번호가 이메일로 전송되었습니다. 로그인 후 새로운 비밀번호로 변경해주세요.",
+                success=True
+            )
+            
+        except Exception as email_error:
+            logger.error(f"임시 비밀번호 이메일 발송 실패: {request.email}, 오류: {str(email_error)}")
+            
+            # 이메일 발송 실패 시에도 임시 비밀번호는 이미 설정되었으므로
+            # 사용자에게 알림 (실제 서비스에서는 다른 방식으로 전달)
+            return ForgotPasswordResponse(
+                message="임시 비밀번호가 발급되었으나 이메일 전송에 실패했습니다. 고객센터에 문의하세요.",
+                success=False
+            )
+    
+    except HTTPException:
+        # HTTPException은 그대로 전파
+        raise
+    except Exception as e:
+        logger.error(f"비밀번호 찾기 중 예상치 못한 오류 발생: {request.email}, 오류: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="비밀번호 찾기 처리 중 오류가 발생했습니다.",
+        )
+
+
+@router.delete("/withdraw", response_model=WithdrawResponse)
+async def withdraw_user(
+    request: WithdrawRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    http_request: Request = None,
+):
+    """회원탈퇴"""
+    try:
+        logger.info(f"회원탈퇴 요청: {current_user.email}")
+        
+        # 소셜 로그인 사용자가 아닌 경우 비밀번호 확인
+        if current_user.auth_provider == "local" and current_user.hashed_password:
+            if not request.password:
+                logger.warning(f"비밀번호 누락으로 회원탈퇴 실패: {current_user.email}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="비밀번호를 입력해주세요.",
+                )
+            
+            # 비밀번호 확인
+            if not authenticate_user(db, current_user.email, request.password):
+                logger.warning(f"잘못된 비밀번호로 회원탈퇴 시도: {current_user.email}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="비밀번호가 일치하지 않습니다.",
+                )
+        
+        # 사용자 계정 비활성화 (소프트 삭제) 및 이메일 마스킹
+        current_user.is_active = False
+        current_user.email = f"deleted_{current_user.user_id}_{current_user.email}"
+        current_user.updated_at = datetime.utcnow()
+        
+        # 탈퇴 사유가 있는 경우 로그에 기록
+        if request.reason:
+            logger.info(f"회원탈퇴 사유: {current_user.email} - {request.reason}")
+        
+        # 사용자 활동 로그 기록
+        if http_request:
+            log_user_activity(
+                db=db,
+                user_id=current_user.id,
+                activity_type="account_withdrawal",
+                description=f"Account withdrawn. Reason: {request.reason or 'No reason provided'}",
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("User-Agent") if http_request else None,
+            )
+        
+        db.commit()
+        
+        logger.info(f"회원탈퇴 완료: {current_user.email}")
+        
+        return WithdrawResponse(
+            message="회원탈퇴가 완료되었습니다. 그동안 서비스를 이용해주셔서 감사합니다.",
+            success=True
+        )
+        
+    except HTTPException:
+        # HTTPException은 그대로 전파
+        raise
+    except Exception as e:
+        logger.error(f"회원탈퇴 중 예상치 못한 오류 발생: {current_user.email}, 오류: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="회원탈퇴 처리 중 오류가 발생했습니다.",
         )
