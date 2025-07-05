@@ -1,5 +1,6 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Query
+import os
+import httpx
 
 from app.auth import get_current_active_user
 from app.models import ForecastResponse, User, WeatherRequest, WeatherResponse
@@ -146,3 +147,42 @@ async def get_favorites_weather(current_user: User = Depends(get_current_active_
             continue
 
     return {"user_id": current_user.id, "favorites_weather": weather_data}
+
+
+@router.get("/by-place-id")
+async def get_weather_by_place_id(place_id: str):
+    """Google place_id로 위경도 변환 후, weatherapi.com에서 날씨 조회"""
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    WEATHER_API_URL = os.getenv("WEATHER_API_URL")
+    WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+    if not (GOOGLE_API_KEY and WEATHER_API_URL and WEATHER_API_KEY):
+        raise HTTPException(status_code=500, detail="API 키 또는 URL 누락")
+    # 1. place_id로 위경도 조회
+    details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(details_url, params={
+            "place_id": place_id,
+            "key": GOOGLE_API_KEY,
+            "fields": "geometry"
+        })
+        details = resp.json()
+        if "result" not in details or "geometry" not in details["result"]:
+            raise HTTPException(status_code=404, detail="장소 정보를 찾을 수 없음")
+        location = details["result"]["geometry"]["location"]
+        lat, lon = location["lat"], location["lng"]
+        # 2. weatherapi.com에서 날씨 조회
+        weather_resp = await client.get(
+            f"{WEATHER_API_URL}/current.json",
+            params={"key": WEATHER_API_KEY, "q": f"{lat},{lon}", "lang": "ko"}
+        )
+        if weather_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="날씨 API 호출 실패")
+        weather = weather_resp.json()
+        # 3. 필요한 정보만 추출
+        current = weather.get("current", {})
+        condition = current.get("condition", {})
+        return {
+            "icon": condition.get("icon"),
+            "temp": current.get("temp_c"),
+            "summary": condition.get("text"),
+        }
