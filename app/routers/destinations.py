@@ -1,4 +1,3 @@
-
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -41,8 +40,38 @@ async def search_destination(query: str = Query(...)):
             },
         )
         data = resp.json()
-    suggestions = [item["description"] for item in data.get("predictions", [])]
-    return suggestions
+
+        # 각 prediction에서 place_id 추출 후, Details API로 대표 사진 얻기
+        suggestions = []
+        for item in data.get("predictions", []):
+            description = item["description"]
+            place_id = item.get("place_id")
+            photo_url = None
+            if place_id:
+                # Place Details API 호출
+                details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+                details_resp = await client.get(
+                    details_url,
+                    params={
+                        "place_id": place_id,
+                        "fields": "photo",
+                        "key": GOOGLE_API_KEY,
+                        "language": "ko",
+                    },
+                )
+                details_data = details_resp.json()
+                photos = details_data.get("result", {}).get("photos", [])
+                if photos:
+                    # 대표 사진의 photo_reference로 실제 이미지 URL 생성
+                    photo_reference = photos[0].get("photo_reference")
+                    if photo_reference:
+                        photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference={photo_reference}&key={GOOGLE_API_KEY}"
+            suggestions.append({
+                "description": description,
+                "place_id": place_id,
+                "photo_url": photo_url,
+            })
+    return {"suggestions": suggestions}
 
 
 @router.get("/{province}", response_model=list[DestinationResponse])
