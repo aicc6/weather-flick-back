@@ -294,17 +294,39 @@ class FavoritePlace(Base):
 
 class Restaurant(Base):
     __tablename__ = "restaurants"
-    id = Column(String, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    category = Column(String, nullable=False)
-    address = Column(String, nullable=False)
-    phone = Column(String)
-    rating = Column(Float)
-    price_range = Column(String)
-    opening_hours = Column(JSONB)
+    content_id = Column(String, primary_key=True)
+    region_code = Column(String, primary_key=True)
+    restaurant_name = Column(String, nullable=False)
+    category_code = Column(String)
+    sub_category_code = Column(String)
+    address = Column(String)
+    detail_address = Column(String)
+    zipcode = Column(String)
+    tel = Column(String)
+    homepage = Column(String)
+    overview = Column(Text)
+    first_image = Column(String)
+    first_image_small = Column(String)
+    cuisine_type = Column(String)
+    specialty_dish = Column(String)
+    operating_hours = Column(String)
+    rest_date = Column(String)
+    reservation_info = Column(String)
+    credit_card = Column(String)
+    smoking = Column(String)
+    parking = Column(String)
+    room_available = Column(String)
+    children_friendly = Column(String)
+    takeout = Column(String)
+    delivery = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
+    data_quality_score = Column(Float)
+    raw_data_id = Column(UUID(as_uuid=True))
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime, server_default=func.now())
+    processing_status = Column(String, default="processed")
 
 
 class Transportation(Base):
@@ -594,16 +616,39 @@ class SearchResult(BaseModel):
 
 
 class RestaurantResponse(BaseModel):
-    id: str
-    name: str
-    category: str
-    address: str
-    phone: str | None = None
-    rating: float | None = None
-    price_range: str | None = None
-    opening_hours: dict[str, Any | None] = None
+    content_id: str
+    region_code: str
+    restaurant_name: str
+    category_code: str | None = None
+    sub_category_code: str | None = None
+    address: str | None = None
+    detail_address: str | None = None
+    zipcode: str | None = None
+    tel: str | None = None
+    homepage: str | None = None
+    overview: str | None = None
+    first_image: str | None = None
+    first_image_small: str | None = None
+    cuisine_type: str | None = None
+    specialty_dish: str | None = None
+    operating_hours: str | None = None
+    rest_date: str | None = None
+    reservation_info: str | None = None
+    credit_card: str | None = None
+    smoking: str | None = None
+    parking: str | None = None
+    room_available: str | None = None
+    children_friendly: str | None = None
+    takeout: str | None = None
+    delivery: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    data_quality_score: float | None = None
+    raw_data_id: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    last_sync_at: datetime | None = None
+    processing_status: str | None = None
 
 
 class AccommodationResponse(BaseModel):
@@ -677,3 +722,15 @@ class ReviewResponse(BaseModel):
 
 # 사용자 활동 로그 테이블 (이미 UserActivityLog가 있으므로 별칭으로 사용)
 UserActivity = UserActivityLog
+
+
+class Region(Base):
+    __tablename__ = "regions"
+    region_code = Column(String, primary_key=True)
+    region_name = Column(String, nullable=False)
+    parent_region_code = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    region_level = Column(Integer)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

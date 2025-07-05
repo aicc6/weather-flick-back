@@ -1,7 +1,9 @@
-
 import httpx
+from sqlalchemy.orm import Session
+from typing import Any, Optional
 
 from app.config import settings
+from app.models import Region
 
 
 class LocalInfoService:
@@ -13,38 +15,101 @@ class LocalInfoService:
         self.public_data_api_key = getattr(settings, "public_data_api_key", None)
         self.korea_tourism_api_key = getattr(settings, "korea_tourism_api_key", None)
 
+    async def _search_db_restaurants(
+        self,
+        db: Session,
+        city: Optional[str],
+        region: Optional[str] = None,
+        category: Optional[str] = None,
+        keyword: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """DB restaurants 테이블에서 직접 맛집 검색"""
+        from app.models import Restaurant
+        query = db.query(Restaurant)
+        if city:
+            query = query.filter(Restaurant.address.ilike(f"%{city}%"))
+        if region:
+            query = query.filter(Restaurant.address.ilike(f"%{region}%"))
+        if category:
+            query = query.filter(Restaurant.category_code == category)
+        if keyword:
+            query = query.filter(Restaurant.restaurant_name.ilike(f"%{keyword}%"))
+        results = query.limit(limit).all()
+        return [
+            {
+                "content_id": r.content_id,
+                "region_code": r.region_code,
+                "restaurant_name": r.restaurant_name,
+                "category_code": r.category_code,
+                "sub_category_code": r.sub_category_code,
+                "address": r.address,
+                "detail_address": r.detail_address,
+                "zipcode": r.zipcode,
+                "tel": r.tel,
+                "homepage": r.homepage,
+                "overview": r.overview,
+                "first_image": r.first_image,
+                "first_image_small": r.first_image_small,
+                "cuisine_type": r.cuisine_type,
+                "specialty_dish": r.specialty_dish,
+                "operating_hours": r.operating_hours,
+                "rest_date": r.rest_date,
+                "reservation_info": r.reservation_info,
+                "credit_card": r.credit_card,
+                "smoking": r.smoking,
+                "parking": r.parking,
+                "room_available": r.room_available,
+                "children_friendly": r.children_friendly,
+                "takeout": r.takeout,
+                "delivery": r.delivery,
+                "latitude": float(r.latitude) if r.latitude is not None else None,
+                "longitude": float(r.longitude) if r.longitude is not None else None,
+                "data_quality_score": float(r.data_quality_score) if r.data_quality_score is not None else None,
+                "raw_data_id": str(r.raw_data_id) if r.raw_data_id else None,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
+                "last_sync_at": r.last_sync_at,
+                "processing_status": r.processing_status,
+            }
+            for r in results
+        ]
+
     async def search_restaurants(
         self,
-        city: str,
-        region: str = None,
-        category: str = None,
-        keyword: str = None,
+        city: Optional[str],
+        region: Optional[str] = None,
+        category: Optional[str] = None,
+        keyword: Optional[str] = None,
         limit: int = 20,
-    ) -> list[dict]:
-        """맛집 검색 (카카오 API 또는 한국관광공사 API 사용)"""
+        db: Optional[Session] = None,
+    ) -> list[dict[str, Any]]:
+        """맛집 검색 (DB → 외부 API → 내장 데이터)"""
         results = []
-
-        # 카카오 API로 맛집 검색
-        if self.kakao_api_key:
-            kakao_results = await self._search_kakao_restaurants(
-                city, category, keyword, limit
+        if db is not None:
+            db_results = await self._search_db_restaurants(
+                db, city, region, category, keyword, limit
             )
-            results.extend(kakao_results)
-
-        # 한국관광공사 API로 맛집 검색
-        if self.korea_tourism_api_key:
-            tourism_results = await self._search_korea_tourism_restaurants(
-                city, keyword, limit
-            )
-            results.extend(tourism_results)
-
-        # 내장 데이터로 보완
+            results.extend(db_results)
+        # 기존 외부 API/내장 데이터 로직 유지
         if not results:
-            results = await self._search_local_restaurants(
-                city, region, category, keyword, limit
-            )
-
-        # 중복 제거 및 정렬
+            # 카카오 API로 맛집 검색
+            if self.kakao_api_key:
+                kakao_results = await self._search_kakao_restaurants(
+                    city or "", category or "", keyword or "", limit
+                )
+                results.extend(kakao_results)
+            # 한국관광공사 API로 맛집 검색
+            if self.korea_tourism_api_key:
+                tourism_results = await self._search_korea_tourism_restaurants(
+                    city or "", keyword or "", limit
+                )
+                results.extend(tourism_results)
+            # 내장 데이터로 보완
+            if not results:
+                results = await self._search_local_restaurants(
+                    city or "", region or "", category or "", keyword or "", limit
+                )
         unique_results = self._remove_duplicates(results)
         return unique_results[:limit]
 
@@ -424,8 +489,10 @@ class LocalInfoService:
         unique_results = []
 
         for result in results:
-            # 이름과 주소로 중복 판단
-            key = (result["name"], result["address"])
+            # DB 결과는 restaurant_name, 외부/내장 데이터는 name
+            name = result.get("restaurant_name") or result.get("name")
+            address = result.get("address")
+            key = (name, address)
             if key not in seen:
                 seen.add(key)
                 unique_results.append(result)
@@ -714,6 +781,42 @@ class LocalInfoService:
             "창원",
             "포항",
             "제주",
+        ]
+
+    async def get_regions_with_si_gun(self, db):
+        """
+        region_name이 '시' 또는 '군'으로 끝나는 지역만 조회
+        """
+        query = db.query(Region).filter(
+            (Region.region_name.like('%시')) | (Region.region_name.like('%군'))
+        )
+        regions = query.all()
+        return [
+            {
+                "region_code": r.region_code,
+                "region_name": r.region_name,
+                "parent_region_code": r.parent_region_code,
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+            }
+            for r in regions
+        ]
+
+    async def get_regions_point(self, db):
+        """
+        region_level이 1인 지역만 조회
+        """
+        query = db.query(Region).filter(Region.region_level == 1)
+        regions = query.all()
+        return [
+            {
+                "region_code": r.region_code,
+                "region_name": r.region_name,
+                "parent_region_code": r.parent_region_code,
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+            }
+            for r in regions
         ]
 
 

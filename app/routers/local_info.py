@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -42,10 +41,11 @@ async def search_restaurants(
     ),
     keyword: str | None = Query(None, description="검색 키워드"),
     limit: int = Query(20, description="결과 개수", ge=1, le=100),
+    db: Session = Depends(get_db),
 ):
     """맛집 검색"""
     restaurants = await local_info_service.search_restaurants(
-        city=city, region=region, category=category, keyword=keyword, limit=limit
+        city=city, region=region, category=category, keyword=keyword, limit=limit, db=db
     )
     return {"restaurants": restaurants, "total": len(restaurants)}
 
@@ -297,3 +297,21 @@ async def get_nearby_places(
         "radius": radius,
         "category": category,
     }
+
+
+@router.get("/resions")
+async def get_regions_with_si_gun(db: Session = Depends(get_db)):
+    """
+    region_name이 '시' 또는 '군'으로 끝나는 지역만 반환
+    """
+    regions = await local_info_service.get_regions_with_si_gun(db)
+    return {"regions": regions, "total": len(regions)}
+
+
+@router.get("/resions_point")
+async def get_regions_point(db: Session = Depends(get_db)):
+    """
+    region_level이 1인 지역만 반환
+    """
+    regions = await local_info_service.get_regions_point(db)
+    return {"regions": regions, "total": len(regions)}
