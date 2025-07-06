@@ -42,6 +42,7 @@ async def create_travel_plan(
             start_date=plan_data.start_date,
             end_date=plan_data.end_date,
             budget=plan_data.budget,
+            itinerary=plan_data.itinerary,
             participants=plan_data.participants,
             transportation=plan_data.transportation,
             start_location=plan_data.start_location,

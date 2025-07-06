@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime, date
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 from pydantic import BaseModel
 from sqlalchemy import (
@@ -575,7 +575,7 @@ class TravelPlanCreate(BaseModel):
     start_date: str
     end_date: str
     budget: float | None = None
-    itinerary: dict[str, Any | None] = {}
+    itinerary: Optional[dict[str, List[dict[str, Any]]]] = None
     participants: int | None = None
     transportation: str | None = None
     start_location: str | None = None  # 출발지 추가
@@ -588,7 +588,7 @@ class TravelPlanUpdate(BaseModel):
     end_date: str | None = None
     budget: float | None = None
     status: str | None = None
-    itinerary: dict[str, Any | None] = {}
+    itinerary: Optional[dict[str, List[dict[str, Any]]]] = None
     participants: int | None = None
     transportation: str | None = None
     start_location: str | None = None
@@ -607,7 +607,7 @@ class TravelPlanResponse(BaseModel):
     end_date: date
     budget: float | None = None
     status: str
-    itinerary: Optional[dict[str, Any]] = None
+    itinerary: Optional[dict[str, List[dict[str, Any]]]] = None
     participants: int | None = None
     transportation: str | None = None
     start_location: str | None = None
