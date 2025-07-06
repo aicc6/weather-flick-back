@@ -599,6 +599,8 @@ class TravelPlanResponse(BaseModel):
     budget: float | None = None
     status: str
     itinerary: Optional[dict[str, Any]] = None
+    participants: int | None = None
+    transportation: str | None = None
     created_at: datetime
 
     class Config:
