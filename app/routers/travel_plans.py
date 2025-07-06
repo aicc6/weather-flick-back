@@ -120,7 +120,7 @@ async def get_travel_plan(
     try:
         plan = (
             db.query(TravelPlan)
-            .filter(TravelPlan.id == plan_id, TravelPlan.user_id == current_user.id)
+            .filter(TravelPlan.plan_id == plan_id, TravelPlan.user_id == current_user.id)
             .first()
         )
 
@@ -152,7 +152,7 @@ async def update_travel_plan(
     try:
         plan = (
             db.query(TravelPlan)
-            .filter(TravelPlan.id == plan_id, TravelPlan.user_id == current_user.id)
+            .filter(TravelPlan.plan_id == plan_id, TravelPlan.user_id == current_user.id)
             .first()
         )
 
@@ -199,7 +199,7 @@ async def delete_travel_plan(
     try:
         plan = (
             db.query(TravelPlan)
-            .filter(TravelPlan.id == plan_id, TravelPlan.user_id == current_user.id)
+            .filter(TravelPlan.plan_id == plan_id, TravelPlan.user_id == current_user.id)
             .first()
         )
 
