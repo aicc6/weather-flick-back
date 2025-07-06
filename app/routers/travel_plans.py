@@ -44,6 +44,7 @@ async def create_travel_plan(
             budget=plan_data.budget,
             participants=plan_data.participants,
             transportation=plan_data.transportation,
+            start_location=plan_data.start_location,
         )
 
         db.add(db_plan)

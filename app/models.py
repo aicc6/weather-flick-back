@@ -152,8 +152,9 @@ class TravelPlan(Base):
     budget = Column(DECIMAL(10, 2))
     status = Column(Enum(TravelPlanStatus), default=TravelPlanStatus.PLANNING)
     itinerary = Column(JSONB)
-    participants = Column(Integer, nullable=True)         # ← 추가
-    transportation = Column(String, nullable=True)        # ← 추가
+    participants = Column(Integer, nullable=True)
+    transportation = Column(String, nullable=True)
+    start_location = Column(String, nullable=True)  # 출발지
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="travel_plans")
@@ -577,6 +578,7 @@ class TravelPlanCreate(BaseModel):
     itinerary: dict[str, Any | None] = {}
     participants: int | None = None
     transportation: str | None = None
+    start_location: str | None = None  # 출발지 추가
 
 
 class TravelPlanUpdate(BaseModel):
@@ -587,6 +589,13 @@ class TravelPlanUpdate(BaseModel):
     budget: float | None = None
     status: str | None = None
     itinerary: dict[str, Any | None] = {}
+    participants: int | None = None
+    transportation: str | None = None
+    start_location: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class TravelPlanResponse(BaseModel):
@@ -601,6 +610,7 @@ class TravelPlanResponse(BaseModel):
     itinerary: Optional[dict[str, Any]] = None
     participants: int | None = None
     transportation: str | None = None
+    start_location: str | None = None
     created_at: datetime
 
     class Config:
