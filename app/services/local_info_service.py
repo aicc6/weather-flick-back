@@ -91,6 +91,7 @@ class LocalInfoService:
                 db, city, region, category, keyword, limit
             )
             results.extend(db_results)
+
         # 기존 외부 API/내장 데이터 로직 유지
         if not results:
             # 카카오 API로 맛집 검색
@@ -99,17 +100,20 @@ class LocalInfoService:
                     city or "", category or "", keyword or "", limit
                 )
                 results.extend(kakao_results)
+
             # 한국관광공사 API로 맛집 검색
             if self.korea_tourism_api_key:
                 tourism_results = await self._search_korea_tourism_restaurants(
                     city or "", keyword or "", limit
                 )
                 results.extend(tourism_results)
+
             # 내장 데이터로 보완
             if not results:
                 results = await self._search_local_restaurants(
                     city or "", region or "", category or "", keyword or "", limit
                 )
+
         unique_results = self._remove_duplicates(results)
         return unique_results[:limit]
 

@@ -15,10 +15,13 @@ router = APIRouter(prefix="/local", tags=["local_info"])
 
 
 @router.get("/cities")
-async def get_supported_cities():
-    """지원되는 도시 목록 조회"""
-    cities = await local_info_service.get_supported_cities()
-    return {"cities": cities}
+async def get_supported_cities(db: Session = Depends(get_db)):
+    """
+    활성화된 지역 목록 조회 (unified_regions 테이블에서)
+    프론트엔드 지도 컴포넌트용
+    """
+    regions = await local_info_service.get_unified_regions_level1(db)
+    return {"cities": regions}
 
 
 @router.get("/cities/{city}/info")
