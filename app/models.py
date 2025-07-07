@@ -155,6 +155,7 @@ class TravelPlan(Base):
     participants = Column(Integer, nullable=True)
     transportation = Column(String, nullable=True)
     start_location = Column(String, nullable=True)  # 출발지
+    weather_info = Column(JSONB, nullable=True)  # 날씨 정보
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="travel_plans")
@@ -683,6 +684,7 @@ class TravelPlanCreate(BaseModel):
     participants: int | None = None
     transportation: str | None = None
     start_location: str | None = None  # 출발지 추가
+    weather_info: Optional[dict[str, Any]] = None  # 날씨 정보 추가
 
 
 class TravelPlanUpdate(BaseModel):
@@ -696,10 +698,7 @@ class TravelPlanUpdate(BaseModel):
     participants: int | None = None
     transportation: str | None = None
     start_location: str | None = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    weather_info: Optional[dict[str, Any]] = None
 
 
 class TravelPlanResponse(BaseModel):
@@ -715,6 +714,7 @@ class TravelPlanResponse(BaseModel):
     participants: int | None = None
     transportation: str | None = None
     start_location: str | None = None
+    weather_info: Optional[dict[str, Any]] = None
     created_at: datetime
 
     class Config:

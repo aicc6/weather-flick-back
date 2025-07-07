@@ -46,6 +46,7 @@ async def create_travel_plan(
             participants=plan_data.participants,
             transportation=plan_data.transportation,
             start_location=plan_data.start_location,
+            weather_info=plan_data.weather_info,
         )
 
         db.add(db_plan)
@@ -170,6 +171,12 @@ async def update_travel_plan(
         if "itinerary" in update_data and update_data["itinerary"]:
             update_data["itinerary"] = json.dumps(
                 update_data["itinerary"], ensure_ascii=False
+            )
+        
+        # weather_info가 dict인 경우 JSON 문자열로 변환
+        if "weather_info" in update_data and update_data["weather_info"]:
+            update_data["weather_info"] = json.dumps(
+                update_data["weather_info"], ensure_ascii=False
             )
 
         for field, value in update_data.items():
