@@ -167,7 +167,9 @@ async def get_weather_by_place_id(place_id: str):
         })
         details = resp.json()
         if "result" not in details or "geometry" not in details["result"]:
-            raise HTTPException(status_code=404, detail="장소 정보를 찾을 수 없음")
+            error_msg = details.get("error_message", "장소 정보를 찾을 수 없음")
+            status = details.get("status", "UNKNOWN")
+            raise HTTPException(status_code=404, detail=f"장소 정보를 찾을 수 없음: {status} - {error_msg}")
         location = details["result"]["geometry"]["location"]
         lat, lon = location["lat"], location["lng"]
         # 2. weatherapi.com에서 날씨 조회
@@ -195,7 +197,14 @@ async def get_forecast_by_place_id(place_id: str, date: str):
     WEATHER_API_URL = os.getenv("WEATHER_API_URL")
     WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
     if not (GOOGLE_API_KEY and WEATHER_API_URL and WEATHER_API_KEY):
-        raise HTTPException(status_code=500, detail="API 키 또는 URL 누락")
+        missing_keys = []
+        if not GOOGLE_API_KEY:
+            missing_keys.append("GOOGLE_API_KEY")
+        if not WEATHER_API_URL:
+            missing_keys.append("WEATHER_API_URL")
+        if not WEATHER_API_KEY:
+            missing_keys.append("WEATHER_API_KEY")
+        raise HTTPException(status_code=500, detail=f"API 키 또는 URL 누락: {', '.join(missing_keys)}")
     # 1. place_id로 위경도 조회
     details_url = "https://maps.googleapis.com/maps/api/place/details/json"
     async with httpx.AsyncClient() as client:
@@ -206,7 +215,9 @@ async def get_forecast_by_place_id(place_id: str, date: str):
         })
         details = resp.json()
         if "result" not in details or "geometry" not in details["result"]:
-            raise HTTPException(status_code=404, detail="장소 정보를 찾을 수 없음")
+            error_msg = details.get("error_message", "장소 정보를 찾을 수 없음")
+            status = details.get("status", "UNKNOWN")
+            raise HTTPException(status_code=404, detail=f"장소 정보를 찾을 수 없음: {status} - {error_msg}")
         location = details["result"]["geometry"]["location"]
         lat, lon = location["lat"], location["lng"]
         # 2. weatherapi.com에서 예보 조회 (최대 7일)
