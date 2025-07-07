@@ -3,6 +3,7 @@
 """
 
 import uuid
+import json
 from datetime import datetime
 from typing import Any
 
@@ -59,7 +60,16 @@ def convert_uuids_to_strings(obj: dict | list | Any) -> dict | list | Any:
                 data[key] = str(value)
             elif hasattr(value, "hex"):  # UUID 객체인 경우 (구 버전 호환)
                 data[key] = str(value)
-            elif isinstance(value, (dict, list)):  # 중첩된 객체 처리
+            elif key in ['itinerary', 'weather_info'] and isinstance(value, str):
+                # JSON 문자열인 경우 파싱
+                try:
+                    parsed_value = json.loads(value)
+                    data[key] = parsed_value
+                except (json.JSONDecodeError, TypeError) as e:
+                    # 파싱 실패시 None으로 설정하여 Pydantic 검증 오류 방지
+                    print(f"JSON parsing failed for {key}: {e}")
+                    data[key] = None
+            elif isinstance(value, dict | list):  # 중첩된 객체 처리
                 data[key] = convert_uuids_to_strings(value)
 
     # 리스트 처리

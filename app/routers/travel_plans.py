@@ -93,10 +93,16 @@ async def get_travel_plans(
         plans = query.offset(offset).limit(limit).all()
 
         # 응답 데이터 구성
-        response_data = [
-            convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
-            for plan in plans
-        ]
+        response_data = []
+        for plan in plans:
+            # weather_info가 JSON 문자열인 경우 파싱
+            if hasattr(plan, 'weather_info') and plan.weather_info and isinstance(plan.weather_info, str):
+                try:
+                    plan.weather_info = json.loads(plan.weather_info)
+                except (json.JSONDecodeError, TypeError):
+                    plan.weather_info = None
+            
+            response_data.append(convert_uuids_to_strings(TravelPlanResponse.from_orm(plan)))
 
         # 페이지네이션 정보
         pagination = create_pagination_info(page, limit, total)
@@ -132,6 +138,13 @@ async def get_travel_plan(
                 code="NOT_FOUND", message="여행 계획을 찾을 수 없습니다."
             )
 
+        # weather_info가 JSON 문자열인 경우 파싱
+        if hasattr(plan, 'weather_info') and plan.weather_info and isinstance(plan.weather_info, str):
+            try:
+                plan.weather_info = json.loads(plan.weather_info)
+            except (json.JSONDecodeError, TypeError):
+                plan.weather_info = None
+        
         response_data = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
 
         return create_standard_response(success=True, data=response_data)
