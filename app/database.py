@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 
+
 # PostgreSQL 데이터베이스 URL
 SQLALCHEMY_DATABASE_URL = settings.database_url
 

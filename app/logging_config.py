@@ -45,7 +45,7 @@ def get_logging_config():
     handlers = {
         "console": {
             "class": "logging.StreamHandler",
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "default",
             "stream": "ext://sys.stdout",
         },
@@ -92,12 +92,12 @@ def get_logging_config():
         "handlers": handlers,
         "loggers": {
             "app": {
-                "level": "DEBUG" if settings.debug else "INFO",
+                "level": "DEBUG",
                 "handlers": app_handlers,
                 "propagate": False,
             },
             "uvicorn": {
-                "level": "INFO",
+                "level": "DEBUG",
                 "handlers": ["console", "file"],
                 "propagate": False,
             },

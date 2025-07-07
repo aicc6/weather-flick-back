@@ -16,6 +16,7 @@ from app.routers import (
     recommendations,
     travel_plans,
     weather,
+    attractions,
 )
 
 # 로깅 설정 초기화
@@ -52,6 +53,7 @@ app.include_router(events.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(location.router, prefix="/api")
 app.include_router(plan.router, prefix="/api")
+app.include_router(attractions.router, prefix="/api")
 
 
 @app.get("/")
@@ -67,4 +69,4 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=8000, log_config=None)
