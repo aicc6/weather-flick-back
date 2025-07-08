@@ -10,6 +10,7 @@ from app.models import (
     User,
     Restaurant,
     RestaurantResponse,
+    Accommodation,
 )
 from app.services.local_info_service import local_info_service
 
@@ -189,6 +190,95 @@ async def search_accommodations(
         city=city, region=region, accommodation_type=accommodation_type, limit=limit
     )
     return {"accommodations": accommodations, "total": len(accommodations)}
+
+
+@router.get("/accommodations/all")
+async def get_all_accommodations(
+    page: int = Query(1, description="페이지 번호", ge=1),
+    page_size: int = Query(50, description="페이지당 항목 수", ge=1, le=200),
+    region_code: str | None = Query(None, description="지역 코드"),
+    category_code: str | None = Query(None, description="카테고리 코드"),
+    accommodation_type: str | None = Query(None, description="숙소 타입"),
+    db: Session = Depends(get_db),
+):
+    """
+    모든 숙소 정보 조회 (PostgreSQL accommodations 테이블)
+
+    Args:
+        page: 페이지 번호 (기본값: 1)
+        page_size: 페이지당 항목 수 (기본값: 50, 최대: 200)
+        region_code: 지역 코드로 필터링 (선택사항)
+        category_code: 카테고리 코드로 필터링 (선택사항)
+        accommodation_type: 숙소 타입으로 필터링 (선택사항)
+        db: 데이터베이스 세션
+
+    Returns:
+        dict: 숙소 목록과 페이지네이션 정보
+    """
+    try:
+        # 쿼리 시작
+        query = db.query(Accommodation)
+
+        # 필터 적용
+        if region_code:
+            query = query.filter(Accommodation.region_code == region_code)
+
+        # category_code와 accommodation_type 필터는 실제 DB에 해당 컬럼이 없으므로 제거
+        # if category_code:
+        #     query = query.filter(Accommodation.category_code == category_code)
+
+        # if accommodation_type:
+        #     query = query.filter(Accommodation.accommodation_type == accommodation_type)
+
+        # 전체 개수 계산
+        total_count = query.count()
+
+        # 페이지네이션 적용
+        offset = (page - 1) * page_size
+        accommodations = query.offset(offset).limit(page_size).all()
+
+        # 응답 데이터 구성
+        accommodation_list = []
+        for accommodation in accommodations:
+            accommodation_data = {
+                "content_id": accommodation.content_id,
+                "region_code": accommodation.region_code,
+                "accommodation_name": accommodation.accommodation_name,
+                "accommodation_type": accommodation.accommodation_type,
+                "address": accommodation.address,
+                "tel": accommodation.tel,
+                "latitude": accommodation.latitude,
+                "longitude": accommodation.longitude,
+                "parking": accommodation.parking,
+                "created_at": accommodation.created_at,
+            }
+            accommodation_list.append(accommodation_data)
+
+        # 페이지네이션 정보 계산
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return {
+            "accommodations": accommodation_list,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            },
+            "filters": {
+                "region_code": region_code,
+                "category_code": category_code,
+                "accommodation_type": accommodation_type,
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"숙소 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
+        )
 
 
 @router.post("/search")

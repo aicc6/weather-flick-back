@@ -393,70 +393,72 @@ class Accommodation(Base):
     region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
-    # 기존 필드들 유지 (호환성)
-    name = Column(String, nullable=False)  # accommodation_name에서 매핑
-    type = Column(String, nullable=False)  # accommodation_type에서 매핑
+    # 기본 정보 - 한국관광공사 API 스키마에 맞춤
+    accommodation_name = Column(String, nullable=False)  # 실제 DB 컬럼명
+    accommodation_type = Column(String, nullable=False)  # 실제 DB 컬럼명
     address = Column(String, nullable=False)
-    phone = Column(String)  # tel에서 매핑
-    rating = Column(Float)
-    price_range = Column(String)
-    amenities = Column(JSONB)
+    tel = Column(String)  # 실제 DB 컬럼명
+
+    # 선택적 컬럼들 (실제 DB에 존재하지 않을 수 있음)
+    # rating = Column(Float)
+    # price_range = Column(String)
+    # amenities = Column(JSONB)
     latitude = Column(Float)
     longitude = Column(Float)
     created_at = Column(DateTime, server_default=func.now())
 
-    # 새로운 상세 필드들 추가
-    category_code = Column(String(10))
-    sub_category_code = Column(String(10))
-    detail_address = Column(String)
-    zipcode = Column(String(10))
-    homepage = Column(Text)
+    # 새로운 상세 필드들 추가 (실제 DB에 존재하지 않을 수 있음)
+    # category_code = Column(String(10))
+    # sub_category_code = Column(String(10))
+    # detail_address = Column(String)
+    # zipcode = Column(String(10))
+    # homepage = Column(Text)
 
-    # 숙박 정보
-    room_count = Column(String)
-    checkin_time = Column(String)
-    checkout_time = Column(String)
+    # 숙박 정보 (실제 DB에 존재하지 않을 수 있음)
+    # room_count = Column(String)
+    # checkin_time = Column(String)
+    # checkout_time = Column(String)
     parking = Column(String)
-    cooking = Column(String)
-    room_amenities = Column(Text)
+    # cooking = Column(String)
+    # room_amenities = Column(Text)
 
-    # 부대시설
-    barbecue = Column(String)
-    beauty = Column(String)
-    bicycle = Column(String)
-    campfire = Column(String)
-    fitness = Column(String)
-    karaoke = Column(String)
-    public_bath = Column(String)
-    public_pc = Column(String)
-    sauna = Column(String)
-    seminar = Column(String)
-    sports = Column(String)
-    pickup_service = Column(String)
+    # 부대시설 (실제 DB에 존재하지 않을 수 있음)
+    # barbecue = Column(String)
+    # beauty = Column(String)
+    # bicycle = Column(String)
+    # campfire = Column(String)
+    # fitness = Column(String)
+    # karaoke = Column(String)
+    # public_bath = Column(String)
+    # public_pc = Column(String)
+    # sauna = Column(String)
+    # seminar = Column(String)
+    # sports = Column(String)
+    # pickup_service = Column(String)
 
-    # 설명 및 이미지
-    description = Column(Text)
-    overview = Column(Text)
-    first_image = Column(String)
-    first_image_small = Column(String)
+    # 설명 및 이미지 (실제 DB에 존재하지 않을 수 있음)
+    # description = Column(Text)
+    # overview = Column(Text)
+    # first_image = Column(String)
+    # first_image_small = Column(String)
 
-    # API 원본 필드
-    booktour = Column(String(1))
-    createdtime = Column(String(14))
-    modifiedtime = Column(String(14))
-    telname = Column(String(100))
-    faxno = Column(String(50))
-    mlevel = Column(Integer)
+    # API 원본 필드 (실제 DB에 존재하지 않을 수 있음)
+    # booktour = Column(String(1))
+    # createdtime = Column(String(14))
+    # modifiedtime = Column(String(14))
+    # telname = Column(String(100))
+    # faxno = Column(String(50))
+    # mlevel = Column(Integer)
 
-    # JSON 데이터
-    detail_intro_info = Column(JSONB)
-    detail_additional_info = Column(JSONB)
+    # JSON 데이터 (실제 DB에 존재하지 않을 수 있음)
+    # detail_intro_info = Column(JSONB)
+    # detail_additional_info = Column(JSONB)
 
-    # 메타데이터
-    data_quality_score = Column(DECIMAL(5, 2))
-    processing_status = Column(String(20), default="processed")
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    # 메타데이터 (실제 DB에 존재하지 않을 수 있음)
+    # data_quality_score = Column(DECIMAL(5, 2))
+    # processing_status = Column(String(20), default="processed")
+    # updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    # last_sync_at = Column(DateTime, server_default=func.now())
 
     # 기존 API 호환성을 위한 프로퍼티
     @property
@@ -465,19 +467,19 @@ class Accommodation(Base):
         return self.content_id
 
     @property
-    def accommodation_name(self):
-        """새로운 API에서 사용할 accommodation_name 프로퍼티"""
-        return self.name
+    def name(self):
+        """기존 API 호환성을 위한 name 프로퍼티"""
+        return self.accommodation_name
 
     @property
-    def accommodation_type(self):
-        """새로운 API에서 사용할 accommodation_type 프로퍼티"""
-        return self.type
+    def type(self):
+        """기존 API 호환성을 위한 type 프로퍼티"""
+        return self.accommodation_type
 
     @property
-    def tel(self):
-        """새로운 API에서 사용할 tel 프로퍼티"""
-        return self.phone
+    def phone(self):
+        """기존 API 호환성을 위한 phone 프로퍼티"""
+        return self.tel
 
 
 class CityInfo(Base):
@@ -1211,7 +1213,7 @@ Index("idx_tourist_attractions_region_category", TouristAttraction.region_code, 
 Index("idx_cultural_facilities_region_type", CulturalFacility.region_code, CulturalFacility.facility_type)
 Index("idx_festivals_events_region_dates", FestivalEvent.region_code, FestivalEvent.event_start_date, FestivalEvent.event_end_date)
 Index("idx_restaurants_region_cuisine", Restaurant.region_code, Restaurant.cuisine_type)
-Index("idx_accommodations_region_type", Accommodation.region_code, Accommodation.type)
+Index("idx_accommodations_region_type", Accommodation.region_code, Accommodation.accommodation_type)
 Index("idx_shopping_region_type", Shopping.region_code, Shopping.shop_type)
 Index("idx_pet_tour_info_content_id", PetTourInfo.content_id)
 Index("idx_unified_regions_code_level", UnifiedRegionNew.region_code, UnifiedRegionNew.region_level)
