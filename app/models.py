@@ -881,25 +881,26 @@ class TouristAttraction(Base):
     attraction_name = Column(String, nullable=False, index=True)
     category_code = Column(String(10))
     category_name = Column(String(50))
-    sub_category_code = Column(String(10))
-    sub_category_name = Column(String(50))
+    # sub_category_code = Column(String(10))  # 실제 DB에 없음
+    # sub_category_name = Column(String(50))  # 실제 DB에 없음
 
     # 주소 및 위치 정보
     address = Column(String)
-    detail_address = Column(String)
+    # detail_address = Column(String)  # 실제 DB에 없음
     zipcode = Column(String(10))
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
 
     # 연락처 정보
-    tel = Column(String(50))
+    # tel = Column(String(50))  # 실제 DB에 없음
     homepage = Column(Text)
 
     # 설명 및 이미지
     description = Column(Text)
-    overview = Column(Text)
-    first_image = Column(String)
-    first_image_small = Column(String)
+    # overview = Column(Text)  # 실제 DB에 없음
+    image_url = Column(String)
+    # first_image = Column(String)  # 실제 DB에 없음
+    # first_image_small = Column(String)  # 실제 DB에 없음
 
     # API 원본 필드
     booktour = Column(String(1))

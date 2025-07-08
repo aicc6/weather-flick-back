@@ -11,6 +11,7 @@ from app.models import (
     Restaurant,
     RestaurantResponse,
     Accommodation,
+    TouristAttraction,
 )
 from app.services.local_info_service import local_info_service
 
@@ -278,6 +279,95 @@ async def get_all_accommodations(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"숙소 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
+        )
+
+
+@router.get("/tourist_attractions")
+async def get_all_tourist_attractions(
+    page: int = Query(1, description="페이지 번호", ge=1),
+    page_size: int = Query(50, description="페이지당 항목 수", ge=1, le=200),
+    region_code: str | None = Query(None, description="지역 코드"),
+    category_code: str | None = Query(None, description="카테고리 코드"),
+    db: Session = Depends(get_db),
+):
+    """
+    모든 관광지 정보 조회 (PostgreSQL tourist_attractions 테이블)
+
+    Args:
+        page: 페이지 번호 (기본값: 1)
+        page_size: 페이지당 항목 수 (기본값: 50, 최대: 200)
+        region_code: 지역 코드로 필터링 (선택사항)
+        category_code: 카테고리 코드로 필터링 (선택사항)
+        db: 데이터베이스 세션
+
+    Returns:
+        dict: 관광지 목록과 페이지네이션 정보
+    """
+    try:
+        # 쿼리 시작
+        query = db.query(TouristAttraction)
+
+        # 필터 적용
+        if region_code:
+            query = query.filter(TouristAttraction.region_code == region_code)
+
+        if category_code:
+            query = query.filter(TouristAttraction.category_code == category_code)
+
+        # 전체 개수 계산
+        total_count = query.count()
+
+        # 페이지네이션 적용
+        offset = (page - 1) * page_size
+        attractions = query.offset(offset).limit(page_size).all()
+
+        # 응답 데이터 구성
+        attraction_list = []
+        for attraction in attractions:
+            attraction_data = {
+                "content_id": attraction.content_id,
+                "region_code": attraction.region_code,
+                "attraction_name": attraction.attraction_name,
+                "category_code": attraction.category_code,
+                "category_name": attraction.category_name,
+                "address": attraction.address,
+                "latitude": attraction.latitude,
+                "longitude": attraction.longitude,
+                "description": attraction.description,
+                "image_url": attraction.image_url,
+                "homepage": attraction.homepage,
+                "zipcode": attraction.zipcode,
+                "data_quality_score": attraction.data_quality_score,
+                "processing_status": attraction.processing_status,
+                "created_at": attraction.created_at,
+                "updated_at": attraction.updated_at,
+                "last_sync_at": attraction.last_sync_at,
+            }
+            attraction_list.append(attraction_data)
+
+        # 페이지네이션 정보 계산
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return {
+            "tourist_attractions": attraction_list,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            },
+            "filters": {
+                "region_code": region_code,
+                "category_code": category_code,
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"관광지 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
         )
 
 

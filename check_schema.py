@@ -11,8 +11,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.config import settings
 
-def check_accommodations_schema():
-    """accommodations 테이블 스키마 확인"""
+def check_tourist_attractions_schema():
+    """tourist_attractions 테이블 스키마 확인"""
     try:
         # 데이터베이스 연결
         engine = create_engine(settings.database_url)
@@ -23,54 +23,68 @@ def check_accommodations_schema():
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables
                     WHERE table_schema = 'public'
-                    AND table_name = 'accommodations'
+                    AND table_name = 'tourist_attractions'
                 );
             """))
             table_exists = result.scalar()
 
             if not table_exists:
-                print("❌ accommodations 테이블이 존재하지 않습니다.")
+                print("❌ tourist_attractions 테이블이 존재하지 않습니다.")
                 return
 
-            print("✅ accommodations 테이블이 존재합니다.")
+            print("✅ tourist_attractions 테이블이 존재합니다.")
 
             # 컬럼 정보 조회
             result = connection.execute(text("""
                 SELECT column_name, data_type, is_nullable, column_default
                 FROM information_schema.columns
-                WHERE table_name = 'accommodations'
+                WHERE table_schema = 'public'
+                AND table_name = 'tourist_attractions'
                 ORDER BY ordinal_position;
             """))
 
-            print("\n📋 accommodations 테이블 스키마:")
+            columns = result.fetchall()
+            print(f"\n📋 tourist_attractions 테이블 컬럼 목록 ({len(columns)}개):")
             print("-" * 80)
-            print(f"{'컬럼명':<30} {'타입':<20} {'NULL':<8} {'기본값'}")
+            print(f"{'컬럼명':<25} {'데이터타입':<15} {'NULL':<8} {'기본값'}")
             print("-" * 80)
 
-            for row in result:
-                column_name = row[0]
-                data_type = row[1]
-                is_nullable = row[2]
-                default_value = row[3] or ''
-                print(f"{column_name:<30} {data_type:<20} {is_nullable:<8} {default_value}")
+            for column in columns:
+                column_name = column[0]
+                data_type = column[1]
+                is_nullable = column[2]
+                column_default = column[3] or ''
+
+                print(f"{column_name:<25} {data_type:<15} {is_nullable:<8} {column_default}")
 
             # 샘플 데이터 확인
-            result = connection.execute(text("SELECT COUNT(*) FROM accommodations;"))
-            count = result.scalar()
-            print(f"\n📊 총 레코드 수: {count:,}개")
+            result = connection.execute(text("""
+                SELECT COUNT(*) as total_count
+                FROM tourist_attractions;
+            """))
+            total_count = result.scalar()
+            print(f"\n📊 총 레코드 수: {total_count:,}개")
 
-            if count and count > 0:
-                result = connection.execute(text("SELECT * FROM accommodations LIMIT 1;"))
+            if total_count > 0:
+                # 첫 번째 레코드 샘플
+                result = connection.execute(text("""
+                    SELECT * FROM tourist_attractions LIMIT 1;
+                """))
                 sample = result.fetchone()
-                if sample:
-                    print(f"\n📝 샘플 데이터 (첫 번째 레코드):")
-                    print("-" * 80)
-                    keys = list(result.keys())
-                    for idx, value in enumerate(sample):
-                        print(f"{keys[idx]}: {value}")
+                column_names = list(result.keys())
+
+                print(f"\n🔍 첫 번째 레코드 샘플:")
+                print("-" * 80)
+                for i, column_name in enumerate(column_names):
+                    value = sample[i]
+                    if value is None:
+                        value = "NULL"
+                    elif isinstance(value, str) and len(value) > 50:
+                        value = value[:50] + "..."
+                    print(f"{column_name}: {value}")
 
     except Exception as e:
         print(f"❌ 오류 발생: {e}")
 
 if __name__ == "__main__":
-    check_accommodations_schema()
+    check_tourist_attractions_schema()
