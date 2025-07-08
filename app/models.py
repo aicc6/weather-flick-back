@@ -263,6 +263,22 @@ class UserActivityLog(Base):
     user = relationship("User", back_populates="activity_logs")
 
 
+class ChatMessage(Base):
+    """챗봇 메시지 테이블"""
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    message = Column(Text, nullable=False)
+    sender = Column(String, nullable=False)  # 'user' 또는 'bot'
+    context = Column(JSONB, nullable=True)  # 대화 컨텍스트
+    suggestions = Column(JSONB, nullable=True)  # 추천 질문 목록
+    created_at = Column(DateTime, server_default=func.now())
+
+    # 관계 설정
+    user = relationship("User", backref="chat_messages")
+
+
 class SystemLog(Base):
     __tablename__ = "system_logs"
     log_id = Column(Integer, primary_key=True, index=True)
@@ -300,37 +316,37 @@ class Restaurant(Base):
     """음식점 정보 테이블 - 한국관광공사 API 데이터 기반 (통합됨)"""
     __tablename__ = "restaurants"
     __table_args__ = {"extend_existing": True, "autoload_replace": False}
-    
+
     # Primary Key (복합키)
     content_id = Column(String, primary_key=True)
     region_code = Column(String, ForeignKey("regions.region_code"), primary_key=True)
-    
+
     # Foreign Keys
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기본 정보
     restaurant_name = Column(String, nullable=False, index=True)
     category_code = Column(String)
     sub_category_code = Column(String)
-    
+
     # 주소 및 위치 정보
     address = Column(String)
     detail_address = Column(String)
     zipcode = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
-    
+
     # 연락처 정보
     tel = Column(String)
     homepage = Column(String)
-    
+
     # 음식점 정보
     cuisine_type = Column(String)
     specialty_dish = Column(String)
     operating_hours = Column(String)
     rest_date = Column(String)
     reservation_info = Column(String)
-    
+
     # 편의시설
     credit_card = Column(String)
     smoking = Column(String)
@@ -339,12 +355,12 @@ class Restaurant(Base):
     children_friendly = Column(String)
     takeout = Column(String)
     delivery = Column(String)
-    
+
     # 설명 및 이미지
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
-    
+
     # 메타데이터
     data_quality_score = Column(Float)
     processing_status = Column(String, default="processed")
@@ -369,14 +385,14 @@ class Accommodation(Base):
     """숙박시설 정보 테이블 - 한국관광공사 API 데이터 기반 (통합됨)"""
     __tablename__ = "accommodations"
     __table_args__ = {"extend_existing": True, "autoload_replace": False}
-    
+
     # Primary Key - 새로운 데이터 구조에 맞춘 변경
     content_id = Column(String(20), primary_key=True, index=True)
-    
+
     # Foreign Keys
     region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기존 필드들 유지 (호환성)
     name = Column(String, nullable=False)  # accommodation_name에서 매핑
     type = Column(String, nullable=False)  # accommodation_type에서 매핑
@@ -388,14 +404,14 @@ class Accommodation(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     created_at = Column(DateTime, server_default=func.now())
-    
+
     # 새로운 상세 필드들 추가
     category_code = Column(String(10))
     sub_category_code = Column(String(10))
     detail_address = Column(String)
     zipcode = Column(String(10))
     homepage = Column(Text)
-    
+
     # 숙박 정보
     room_count = Column(String)
     checkin_time = Column(String)
@@ -403,7 +419,7 @@ class Accommodation(Base):
     parking = Column(String)
     cooking = Column(String)
     room_amenities = Column(Text)
-    
+
     # 부대시설
     barbecue = Column(String)
     beauty = Column(String)
@@ -417,13 +433,13 @@ class Accommodation(Base):
     seminar = Column(String)
     sports = Column(String)
     pickup_service = Column(String)
-    
+
     # 설명 및 이미지
     description = Column(Text)
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
-    
+
     # API 원본 필드
     booktour = Column(String(1))
     createdtime = Column(String(14))
@@ -431,33 +447,33 @@ class Accommodation(Base):
     telname = Column(String(100))
     faxno = Column(String(50))
     mlevel = Column(Integer)
-    
+
     # JSON 데이터
     detail_intro_info = Column(JSONB)
     detail_additional_info = Column(JSONB)
-    
+
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     last_sync_at = Column(DateTime, server_default=func.now())
-    
+
     # 기존 API 호환성을 위한 프로퍼티
     @property
     def id(self):
         """기존 API 호환성을 위한 id 프로퍼티"""
         return self.content_id
-    
+
     @property
     def accommodation_name(self):
         """새로운 API에서 사용할 accommodation_name 프로퍼티"""
         return self.name
-    
+
     @property
     def accommodation_type(self):
         """새로운 API에서 사용할 accommodation_type 프로퍼티"""
         return self.type
-    
+
     @property
     def tel(self):
         """새로운 API에서 사용할 tel 프로퍼티"""
@@ -851,38 +867,38 @@ UserActivity = UserActivityLog
 class TouristAttraction(Base):
     """관광지 정보 테이블 - 한국관광공사 API 데이터 기반"""
     __tablename__ = "tourist_attractions"
-    
+
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
-    
+
     # Foreign Keys
     region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기본 정보
     attraction_name = Column(String, nullable=False, index=True)
     category_code = Column(String(10))
     category_name = Column(String(50))
     sub_category_code = Column(String(10))
     sub_category_name = Column(String(50))
-    
+
     # 주소 및 위치 정보
     address = Column(String)
     detail_address = Column(String)
     zipcode = Column(String(10))
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
-    
+
     # 연락처 정보
     tel = Column(String(50))
     homepage = Column(Text)
-    
+
     # 설명 및 이미지
     description = Column(Text)
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
-    
+
     # API 원본 필드
     booktour = Column(String(1))
     createdtime = Column(String(14))
@@ -890,11 +906,11 @@ class TouristAttraction(Base):
     telname = Column(String(100))
     faxno = Column(String(50))
     mlevel = Column(Integer)
-    
+
     # JSON 데이터
     detail_intro_info = Column(JSONB)
     detail_additional_info = Column(JSONB)
-    
+
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
@@ -906,31 +922,31 @@ class TouristAttraction(Base):
 class CulturalFacility(Base):
     """문화시설 정보 테이블"""
     __tablename__ = "cultural_facilities"
-    
+
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
-    
+
     # Foreign Keys
     region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기본 정보
     facility_name = Column(String, nullable=False, index=True)
     facility_type = Column(String)
     category_code = Column(String(10))
     sub_category_code = Column(String(10))
-    
+
     # 주소 및 위치 정보
     address = Column(String)
     detail_address = Column(String)
     zipcode = Column(String(10))
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
-    
+
     # 연락처 정보
     tel = Column(String(50))
     homepage = Column(Text)
-    
+
     # 시설 정보
     admission_fee = Column(String)
     operating_hours = Column(String)
@@ -938,13 +954,13 @@ class CulturalFacility(Base):
     rest_date = Column(String)
     use_season = Column(String)
     use_time = Column(String)
-    
+
     # 설명 및 이미지
     description = Column(Text)
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
-    
+
     # API 원본 필드
     booktour = Column(String(1))
     createdtime = Column(String(14))
@@ -952,11 +968,11 @@ class CulturalFacility(Base):
     telname = Column(String(100))
     faxno = Column(String(50))
     mlevel = Column(Integer)
-    
+
     # JSON 데이터
     detail_intro_info = Column(JSONB)
     detail_additional_info = Column(JSONB)
-    
+
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
@@ -968,35 +984,35 @@ class CulturalFacility(Base):
 class FestivalEvent(Base):
     """축제/행사 정보 테이블"""
     __tablename__ = "festivals_events"
-    
+
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
-    
+
     # Foreign Keys
     region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기본 정보
     event_name = Column(String, nullable=False, index=True)
     category_code = Column(String(10))
     sub_category_code = Column(String(10))
-    
+
     # 일정 정보
     event_start_date = Column(Date)
     event_end_date = Column(Date)
     event_place = Column(String)
-    
+
     # 주소 및 위치 정보
     address = Column(String)
     detail_address = Column(String)
     zipcode = Column(String(10))
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
-    
+
     # 연락처 정보
     tel = Column(String(50))
     homepage = Column(Text)
-    
+
     # 행사 정보
     event_program = Column(Text)
     sponsor = Column(String)
@@ -1005,13 +1021,13 @@ class FestivalEvent(Base):
     age_limit = Column(String)
     cost_info = Column(String)
     discount_info = Column(String)
-    
+
     # 설명 및 이미지
     description = Column(Text)
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
-    
+
     # API 원본 필드
     booktour = Column(String(1))
     createdtime = Column(String(14))
@@ -1019,11 +1035,11 @@ class FestivalEvent(Base):
     telname = Column(String(100))
     faxno = Column(String(50))
     mlevel = Column(Integer)
-    
+
     # JSON 데이터
     detail_intro_info = Column(JSONB)
     detail_additional_info = Column(JSONB)
-    
+
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
@@ -1041,31 +1057,31 @@ class FestivalEvent(Base):
 class Shopping(Base):
     """쇼핑 정보 테이블"""
     __tablename__ = "shopping"
-    
+
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
-    
+
     # Foreign Keys
     region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기본 정보
     shop_name = Column(String, nullable=False, index=True)
     shop_type = Column(String)
     category_code = Column(String(10))
     sub_category_code = Column(String(10))
-    
+
     # 주소 및 위치 정보
     address = Column(String)
     detail_address = Column(String)
     zipcode = Column(String(10))
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
-    
+
     # 연락처 정보
     tel = Column(String(50))
     homepage = Column(Text)
-    
+
     # 쇼핑 정보
     opening_hours = Column(String)
     rest_date = Column(String)
@@ -1075,13 +1091,13 @@ class Shopping(Base):
     baby_carriage = Column(String)
     sale_item = Column(String)
     fair_day = Column(String)
-    
+
     # 설명 및 이미지
     description = Column(Text)
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
-    
+
     # API 원본 필드
     booktour = Column(String(1))
     createdtime = Column(String(14))
@@ -1089,11 +1105,11 @@ class Shopping(Base):
     telname = Column(String(100))
     faxno = Column(String(50))
     mlevel = Column(Integer)
-    
+
     # JSON 데이터
     detail_intro_info = Column(JSONB)
     detail_additional_info = Column(JSONB)
-    
+
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
@@ -1105,45 +1121,45 @@ class Shopping(Base):
 class PetTourInfo(Base):
     """반려동물 관광정보 테이블"""
     __tablename__ = "pet_tour_info"
-    
+
     # Primary Key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
+
     # Unique 필드
     content_id = Column(String(50), unique=True)
-    
+
     # Foreign Keys
     raw_data_id = Column(UUID(as_uuid=True), index=True)
-    
+
     # 기본 정보
     content_type_id = Column(String)
     title = Column(String)
-    
+
     # 주소 및 위치 정보
     address = Column(String)
     latitude = Column(DECIMAL(10, 8))
     longitude = Column(DECIMAL(11, 8))
     area_code = Column(String)
     sigungu_code = Column(String)
-    
+
     # 연락처 정보
     tel = Column(String)
     homepage = Column(Text)
-    
+
     # 설명 및 이미지
     overview = Column(Text)
     first_image = Column(Text)
     first_image2 = Column(Text)
-    
+
     # 카테고리
     cat1 = Column(String)
     cat2 = Column(String)
     cat3 = Column(String)
-    
+
     # 반려동물 관련 정보
     pet_acpt_abl = Column(String)  # 반려동물 수용 가능 여부
     pet_info = Column(Text)  # 반려동물 관련 상세 정보
-    
+
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
@@ -1156,35 +1172,35 @@ class UnifiedRegionNew(Base):
     """통합 지역정보 테이블 (기존 UnifiedRegion 클래스와 구분)"""
     __tablename__ = "unified_regions"
     __table_args__ = {"extend_existing": True, "autoload_replace": False}
-    
+
     # Primary Key
     region_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
+
     # Unique 필드
     region_code = Column(String(20), unique=True, index=True)
-    
+
     # Foreign Keys (자기 참조)
     parent_region_id = Column(UUID(as_uuid=True), ForeignKey("unified_regions.region_id"), nullable=True, index=True)
-    
+
     # 기본 정보
     region_name = Column(String, nullable=False)
     region_name_full = Column(String)
     region_name_en = Column(String)
     region_level = Column(Integer)
-    
+
     # 좌표 정보
     center_latitude = Column(String)
     center_longitude = Column(String)
     boundary_data = Column(JSONB)
-    
+
     # 행정 정보
     administrative_code = Column(String)
     is_active = Column(Boolean, default=True)
-    
+
     # 메타데이터
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+
     # 관계 설정 (자기 참조) - 임시 주석 처리
     # children = relationship("UnifiedRegionNew", back_populates="parent")
     # parent = relationship("UnifiedRegionNew", remote_side=[region_id], back_populates="children")
@@ -1307,7 +1323,7 @@ class TouristAttractionResponse(BaseModel):
     first_image: str | None = None
     data_quality_score: float | None = None
     created_at: datetime | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -1331,7 +1347,7 @@ class CulturalFacilityResponse(BaseModel):
     first_image: str | None = None
     data_quality_score: float | None = None
     created_at: datetime | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -1358,7 +1374,7 @@ class FestivalEventResponse(BaseModel):
     first_image: str | None = None
     data_quality_score: float | None = None
     created_at: datetime | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -1388,7 +1404,7 @@ class ShoppingResponse(BaseModel):
     first_image: str | None = None
     data_quality_score: float | None = None
     created_at: datetime | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -1415,7 +1431,7 @@ class PetTourInfoResponse(BaseModel):
     pet_info: str | None = None
     data_quality_score: float | None = None
     created_at: datetime | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -1433,6 +1449,6 @@ class UnifiedRegionResponse(BaseModel):
     administrative_code: str | None = None
     is_active: bool | None = True
     created_at: datetime | None = None
-    
+
     class Config:
         from_attributes = True

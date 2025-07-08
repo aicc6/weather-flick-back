@@ -5,6 +5,7 @@ from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
 from app.routers import (
     auth,
+    chatbot,
     config,
     destinations,
     events,
@@ -16,7 +17,6 @@ from app.routers import (
     recommendations,
     travel_plans,
     weather,
-    attractions,
 )
 
 # 로깅 설정 초기화
@@ -53,7 +53,7 @@ app.include_router(events.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(location.router, prefix="/api")
 app.include_router(plan.router, prefix="/api")
-app.include_router(attractions.router, prefix="/api")
+app.include_router(chatbot.router, prefix="/api")
 
 
 @app.get("/")
