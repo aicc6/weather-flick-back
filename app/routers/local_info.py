@@ -8,6 +8,8 @@ from app.models import (
     SearchRequest,
     SearchResult,
     User,
+    Restaurant,
+    RestaurantResponse,
 )
 from app.services.local_info_service import local_info_service
 
@@ -51,6 +53,110 @@ async def search_restaurants(
         city=city, region=region, category=category, keyword=keyword, limit=limit, db=db
     )
     return {"restaurants": restaurants, "total": len(restaurants)}
+
+
+@router.get("/restaurants/all")
+async def get_all_restaurants(
+    page: int = Query(1, description="페이지 번호", ge=1),
+    page_size: int = Query(50, description="페이지당 항목 수", ge=1, le=200),
+    region_code: str | None = Query(None, description="지역 코드"),
+    category_code: str | None = Query(None, description="카테고리 코드"),
+    db: Session = Depends(get_db),
+):
+    """
+    모든 레스토랑 정보 조회 (PostgreSQL restaurants 테이블)
+
+    Args:
+        page: 페이지 번호 (기본값: 1)
+        page_size: 페이지당 항목 수 (기본값: 50, 최대: 200)
+        region_code: 지역 코드로 필터링 (선택사항)
+        category_code: 카테고리 코드로 필터링 (선택사항)
+        db: 데이터베이스 세션
+
+    Returns:
+        dict: 레스토랑 목록과 페이지네이션 정보
+    """
+    try:
+        # 쿼리 시작
+        query = db.query(Restaurant)
+
+        # 필터 적용
+        if region_code:
+            query = query.filter(Restaurant.region_code == region_code)
+
+        if category_code:
+            query = query.filter(Restaurant.category_code == category_code)
+
+        # 전체 개수 계산
+        total_count = query.count()
+
+        # 페이지네이션 적용
+        offset = (page - 1) * page_size
+        restaurants = query.offset(offset).limit(page_size).all()
+
+        # 응답 데이터 구성
+        restaurant_list = []
+        for restaurant in restaurants:
+            restaurant_data = {
+                "content_id": restaurant.content_id,
+                "region_code": restaurant.region_code,
+                "restaurant_name": restaurant.restaurant_name,
+                "category_code": restaurant.category_code,
+                "sub_category_code": restaurant.sub_category_code,
+                "address": restaurant.address,
+                "detail_address": restaurant.detail_address,
+                "zipcode": restaurant.zipcode,
+                "latitude": restaurant.latitude,
+                "longitude": restaurant.longitude,
+                "tel": restaurant.tel,
+                "homepage": restaurant.homepage,
+                "cuisine_type": restaurant.cuisine_type,
+                "specialty_dish": restaurant.specialty_dish,
+                "operating_hours": restaurant.operating_hours,
+                "rest_date": restaurant.rest_date,
+                "reservation_info": restaurant.reservation_info,
+                "credit_card": restaurant.credit_card,
+                "smoking": restaurant.smoking,
+                "parking": restaurant.parking,
+                "room_available": restaurant.room_available,
+                "children_friendly": restaurant.children_friendly,
+                "takeout": restaurant.takeout,
+                "delivery": restaurant.delivery,
+                "overview": restaurant.overview,
+                "first_image": restaurant.first_image,
+                "first_image_small": restaurant.first_image_small,
+                "data_quality_score": restaurant.data_quality_score,
+                "processing_status": restaurant.processing_status,
+                "created_at": restaurant.created_at,
+                "updated_at": restaurant.updated_at,
+                "last_sync_at": restaurant.last_sync_at,
+            }
+            restaurant_list.append(restaurant_data)
+
+        # 페이지네이션 정보 계산
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return {
+            "restaurants": restaurant_list,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            },
+            "filters": {
+                "region_code": region_code,
+                "category_code": category_code,
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"레스토랑 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
+        )
 
 
 @router.get("/transportation")
@@ -223,20 +329,24 @@ async def create_review(
     """리뷰 작성 (인증 필요)"""
     from app.models import Review
 
-    # 리뷰 생성
+    # 새 리뷰 생성
     new_review = Review(
         user_id=current_user.id,
-        place_id=review.place_id,
-        place_type=review.place_type,
+        destination_id=review.destination_id,
+        travel_plan_id=review.travel_plan_id,
         rating=review.rating,
-        comment=review.comment,
+        content=review.content,
+        photos=review.photos,
     )
 
     db.add(new_review)
     db.commit()
     db.refresh(new_review)
 
-    return {"message": "Review created successfully", "review_id": new_review.id}
+    return {
+        "message": "Review created successfully",
+        "review_id": new_review.review_id,
+    }
 
 
 @router.get("/reviews/{place_type}/{place_id}")
@@ -248,12 +358,11 @@ async def get_place_reviews(
     db: Session = Depends(get_db),
 ):
     """장소별 리뷰 조회"""
-    from app.models import Review, User
+    from app.models import Review
 
     reviews = (
-        db.query(Review, User.username)
-        .join(User, Review.user_id == User.id)
-        .filter(Review.place_id == place_id, Review.place_type == place_type)
+        db.query(Review)
+        .filter(Review.destination_id == place_id)
         .offset(skip)
         .limit(limit)
         .all()
@@ -261,12 +370,12 @@ async def get_place_reviews(
 
     return [
         {
-            "id": review.Review.id,
-            "user_id": review.Review.user_id,
-            "username": review.username,
-            "rating": review.Review.rating,
-            "comment": review.Review.comment,
-            "created_at": review.Review.created_at,
+            "review_id": review.review_id,
+            "user_id": review.user_id,
+            "rating": review.rating,
+            "content": review.content,
+            "photos": review.photos,
+            "created_at": review.created_at,
         }
         for review in reviews
     ]
@@ -276,10 +385,9 @@ async def get_place_reviews(
 async def get_categories():
     """카테고리 목록 조회"""
     return {
-        "restaurant_categories": ["한식", "중식", "일식", "양식", "카페", "기타"],
-        "transportation_types": ["지하철", "버스", "택시", "기차", "공항"],
-        "accommodation_types": ["호텔", "펜션", "게스트하우스", "모텔", "리조트"],
-        "price_ranges": ["저렴", "보통", "고급", "럭셔리"],
+        "restaurants": ["한식", "중식", "일식", "양식", "카페", "기타"],
+        "accommodations": ["호텔", "펜션", "게스트하우스", "모텔", "리조트"],
+        "transportation": ["지하철", "버스", "택시", "기차", "공항"],
     }
 
 
@@ -291,30 +399,26 @@ async def get_nearby_places(
     category: str | None = Query(None, description="카테고리"),
     limit: int = Query(20, description="결과 개수", ge=1, le=100),
 ):
-    """주변 장소 검색 (위치 기반)"""
-    # 간단한 구현 - 실제로는 더 정교한 거리 계산 필요
-    return {
-        "message": "Nearby search feature is under development",
-        "latitude": latitude,
-        "longitude": longitude,
-        "radius": radius,
-        "category": category,
-    }
+    """주변 장소 검색"""
+    nearby_places = await local_info_service.get_nearby_places(
+        latitude=latitude,
+        longitude=longitude,
+        radius=radius,
+        category=category,
+        limit=limit,
+    )
+    return {"places": nearby_places, "total": len(nearby_places)}
 
 
 @router.get("/resions")
 async def get_unified_regions_level1(db: Session = Depends(get_db)):
-    """
-    unified_regions 테이블에서 region_level=1인 지역만 반환
-    """
+    """통합 지역정보 레벨1 조회"""
     regions = await local_info_service.get_unified_regions_level1(db)
-    return {"regions": regions, "total": len(regions)}
+    return {"regions": regions}
 
 
 @router.get("/resions_point")
 async def get_regions_point(db: Session = Depends(get_db)):
-    """
-    region_level이 1인 지역만 반환
-    """
+    """통합 지역정보 포인트 조회"""
     regions = await local_info_service.get_regions_point(db)
-    return {"regions": regions, "total": len(regions)}
+    return {"regions": regions}
