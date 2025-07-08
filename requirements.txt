@@ -16,4 +16,5 @@ google-auth
 google-auth-oauthlib
 python-dotenv
 python-json-logger
+openai
 

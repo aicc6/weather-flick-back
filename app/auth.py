@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer
@@ -15,6 +16,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # HTTP Bearer 스키마
 bearer_scheme = HTTPBearer()
+
+# Optional Bearer 스키마 (인증 선택적)
+optional_bearer_scheme = HTTPBearer(auto_error=False)
 
 # JWT 설정
 SECRET_KEY = settings.secret_key
@@ -114,6 +118,31 @@ def get_current_user(token=Depends(bearer_scheme), db: Session = Depends(get_db)
     return user
 
 
+def get_current_user_optional(
+    token=Depends(optional_bearer_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    현재 사용자 조회 (선택적)
+    토큰이 없거나 유효하지 않으면 None을 반환합니다.
+    """
+    if token is None:
+        return None
+
+    try:
+        credentials_exception = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        token_data = verify_token(token.credentials, credentials_exception)
+        user = db.query(User).filter(User.email == token_data.email).first()
+        return user
+    except (HTTPException, JWTError):
+        # 토큰이 유효하지 않으면 None 반환 (에러 발생시키지 않음)
+        return None
+
+
 def get_current_active_user(current_user: User = Depends(get_current_user)):
     """현재 활성 사용자 조회"""
     if not current_user.is_active:
@@ -180,22 +209,22 @@ def check_password_strength(password: str) -> dict:
 def generate_temporary_password(length: int = 12) -> str:
     """
     보안 강화된 임시 비밀번호 생성
-    
+
     Args:
         length: 비밀번호 길이 (기본값: 12)
-        
+
     Returns:
         str: 생성된 임시 비밀번호
     """
     import secrets
     import string
-    
+
     # 각 문자 유형별로 최소 1개씩 포함
     lowercase = string.ascii_lowercase
     uppercase = string.ascii_uppercase
     digits = string.digits
     special_chars = "!@#$%^&*"  # 호환성을 위해 제한된 특수문자 사용
-    
+
     # 각 유형에서 최소 1개씩 선택
     password_chars = [
         secrets.choice(lowercase),
@@ -203,13 +232,13 @@ def generate_temporary_password(length: int = 12) -> str:
         secrets.choice(digits),
         secrets.choice(special_chars)
     ]
-    
+
     # 나머지 자리는 모든 문자에서 랜덤 선택
     all_chars = lowercase + uppercase + digits + special_chars
     for _ in range(length - 4):
         password_chars.append(secrets.choice(all_chars))
-    
+
     # 문자 순서 섞기 (패턴 예측 방지)
     secrets.SystemRandom().shuffle(password_chars)
-    
+
     return ''.join(password_chars)

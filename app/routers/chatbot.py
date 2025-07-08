@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 
 from app.database import get_db
-from app.auth import get_current_user
+from app.auth import get_current_user_optional, get_current_user
 from app.models import User, ChatMessage
 from app.schemas.chatbot import (
     ChatMessageRequest,
@@ -24,48 +24,54 @@ router = APIRouter(prefix="/chatbot", tags=["chatbot"])
 async def send_chat_message(
     request: ChatMessageRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> ChatMessageResponse:
     """
     챗봇에게 메시지를 전송하고 응답을 받습니다.
+    인증된 사용자의 경우 대화 히스토리가 저장되고, 익명 사용자는 저장되지 않습니다.
     """
     try:
         service = ChatbotService(db)
 
-        # 사용자 메시지 저장
-        user_message = ChatMessage(
-            user_id=current_user.id,
-            message=request.message,
-            sender="user",
-            context=request.context,
-            created_at=datetime.utcnow()
-        )
-        db.add(user_message)
-        db.commit()
+        # 인증된 사용자의 경우에만 메시지 저장
+        if current_user:
+            user_message = ChatMessage(
+                user_id=current_user.id,
+                message=request.message,
+                sender="user",
+                context=request.context,
+                created_at=datetime.utcnow()
+            )
+            db.add(user_message)
+            db.commit()
 
-        # 챗봇 응답 생성
+        # 챗봇 응답 생성 (사용자 ID는 선택적)
         bot_response = await service.generate_response(
-            user_id=current_user.id,
+            user_id=current_user.id if current_user else None,
             message=request.message,
             context=request.context
         )
 
-        # 챗봇 응답 저장
-        bot_message = ChatMessage(
-            user_id=current_user.id,
-            message=bot_response["response"],
-            sender="bot",
-            suggestions=bot_response.get("suggestions", []),
-            created_at=datetime.utcnow()
-        )
-        db.add(bot_message)
-        db.commit()
+        # 인증된 사용자의 경우에만 챗봇 응답 저장
+        if current_user:
+            bot_message = ChatMessage(
+                user_id=current_user.id,
+                message=bot_response["response"],
+                sender="bot",
+                suggestions=bot_response.get("suggestions", []),
+                created_at=datetime.utcnow()
+            )
+            db.add(bot_message)
+            db.commit()
+            message_id = bot_message.id
+        else:
+            message_id = None
 
         return ChatMessageResponse(
-            id=bot_message.id,
+            id=message_id,
             text=bot_response["response"],
             sender="bot",
-            timestamp=bot_message.created_at.isoformat(),
+            timestamp=datetime.utcnow().isoformat(),
             suggestions=bot_response.get("suggestions", [])
         )
 
@@ -75,7 +81,8 @@ async def send_chat_message(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"챗봇 메시지 처리 실패: {e}, 사용자: {current_user.id}")
+        user_info = f"사용자: {current_user.id}" if current_user else "익명 사용자"
+        logger.error(f"챗봇 메시지 처리 실패: {e}, {user_info}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="메시지 처리 중 오류가 발생했습니다"

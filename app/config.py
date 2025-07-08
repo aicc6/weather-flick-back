@@ -79,6 +79,12 @@ class Settings(BaseSettings):
         "http://api.visitkorea.or.kr/openapi/service/rest/KorService"
     )
 
+    # OpenAI 설정
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+    openai_max_tokens: int = int(os.getenv("OPENAI_MAX_TOKENS", "1500"))
+    openai_temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
+
     # 프론트엔드 설정
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
