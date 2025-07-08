@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     # OpenAI 설정
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     openai_max_tokens: int = int(os.getenv("OPENAI_MAX_TOKENS", "1500"))
     openai_temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
 
