@@ -102,6 +102,13 @@ async def get_travel_plans(
                 except (json.JSONDecodeError, TypeError):
                     plan.weather_info = None
             
+            # itinerary가 JSON 문자열인 경우 파싱
+            if hasattr(plan, 'itinerary') and plan.itinerary and isinstance(plan.itinerary, str):
+                try:
+                    plan.itinerary = json.loads(plan.itinerary)
+                except (json.JSONDecodeError, TypeError):
+                    plan.itinerary = None
+            
             response_data.append(convert_uuids_to_strings(TravelPlanResponse.from_orm(plan)))
 
         # 페이지네이션 정보
@@ -144,6 +151,13 @@ async def get_travel_plan(
                 plan.weather_info = json.loads(plan.weather_info)
             except (json.JSONDecodeError, TypeError):
                 plan.weather_info = None
+        
+        # itinerary가 JSON 문자열인 경우 파싱
+        if hasattr(plan, 'itinerary') and plan.itinerary and isinstance(plan.itinerary, str):
+            try:
+                plan.itinerary = json.loads(plan.itinerary)
+            except (json.JSONDecodeError, TypeError):
+                plan.itinerary = None
         
         response_data = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
 
