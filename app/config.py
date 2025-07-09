@@ -85,6 +85,13 @@ class Settings(BaseSettings):
     openai_max_tokens: int = int(os.getenv("OPENAI_MAX_TOKENS", "1500"))
     openai_temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
 
+    # 교통정보 API 설정
+    odsay_api_key: str = os.getenv("ODsay_API_KEY", "")
+    odsay_api_url: str = "https://api.odsay.com/v1/api"
+    
+    tmap_api_key: str = os.getenv("TMAP_API_KEY", "")
+    tmap_api_url: str = "https://apis.openapi.sk.com/tmap"
+
     # 프론트엔드 설정
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 

@@ -1288,6 +1288,71 @@ class UnifiedRegion(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class TravelRoute(Base):
+    """여행 경로 정보 테이블"""
+    __tablename__ = "travel_routes"
+    
+    route_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    day = Column(Integer, nullable=False)
+    sequence = Column(Integer, nullable=False)
+    
+    # 출발지 정보
+    departure_name = Column(String, nullable=False)
+    departure_lat = Column(Float)
+    departure_lng = Column(Float)
+    
+    # 도착지 정보
+    destination_name = Column(String, nullable=False)
+    destination_lat = Column(Float)
+    destination_lng = Column(Float)
+    
+    # 교통 정보
+    transport_type = Column(String)  # car, bus, subway, walk, taxi
+    route_data = Column(JSONB)  # 상세 경로 정보
+    duration = Column(Integer)  # 소요 시간 (분)
+    distance = Column(Float)  # 거리 (km)
+    cost = Column(Float)  # 교통비 (원)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    travel_plan = relationship("TravelPlan", backref="routes")
+
+
+class TransportationDetail(Base):
+    """교통수단 상세 정보 테이블"""
+    __tablename__ = "transportation_details"
+    
+    detail_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    route_id = Column(UUID(as_uuid=True), ForeignKey("travel_routes.route_id"), nullable=False)
+    
+    # 교통수단 정보
+    transport_name = Column(String)  # 지하철 2호선, 버스 146번 등
+    transport_color = Column(String)  # 노선 색상
+    
+    # 정류장/역 정보
+    departure_station = Column(String)
+    arrival_station = Column(String)
+    
+    # 시간 정보
+    departure_time = Column(DateTime)
+    arrival_time = Column(DateTime)
+    
+    # 요금 정보
+    fare = Column(Float)
+    
+    # 환승 정보
+    transfer_info = Column(JSONB)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    route = relationship("TravelRoute", backref="transport_details")
 # 임시 비밀번호 관련 스키마
 class ForgotPasswordRequest(BaseModel):
     """비밀번호 찾기 요청"""
@@ -1494,3 +1559,108 @@ class UnifiedRegionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# 경로 정보 관련 Pydantic 스키마
+class TravelRouteCreate(BaseModel):
+    """여행 경로 생성 요청"""
+    plan_id: uuid.UUID
+    day: int
+    sequence: int
+    departure_name: str
+    departure_lat: float | None = None
+    departure_lng: float | None = None
+    destination_name: str
+    destination_lat: float | None = None
+    destination_lng: float | None = None
+    transport_type: str | None = None
+
+
+class TravelRouteUpdate(BaseModel):
+    """여행 경로 수정 요청"""
+    day: int | None = None
+    sequence: int | None = None
+    departure_name: str | None = None
+    departure_lat: float | None = None
+    departure_lng: float | None = None
+    destination_name: str | None = None
+    destination_lat: float | None = None
+    destination_lng: float | None = None
+    transport_type: str | None = None
+    duration: int | None = None
+    distance: float | None = None
+    cost: float | None = None
+
+
+class TravelRouteResponse(BaseModel):
+    """여행 경로 응답"""
+    route_id: uuid.UUID
+    plan_id: uuid.UUID
+    day: int
+    sequence: int
+    departure_name: str
+    departure_lat: float | None = None
+    departure_lng: float | None = None
+    destination_name: str
+    destination_lat: float | None = None
+    destination_lng: float | None = None
+    transport_type: str | None = None
+    route_data: dict[str, Any] | None = None
+    duration: int | None = None
+    distance: float | None = None
+    cost: float | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TransportationDetailCreate(BaseModel):
+    """교통수단 상세 정보 생성 요청"""
+    route_id: uuid.UUID
+    transport_name: str | None = None
+    transport_color: str | None = None
+    departure_station: str | None = None
+    arrival_station: str | None = None
+    departure_time: datetime | None = None
+    arrival_time: datetime | None = None
+    fare: float | None = None
+    transfer_info: dict[str, Any] | None = None
+
+
+class TransportationDetailResponse(BaseModel):
+    """교통수단 상세 정보 응답"""
+    detail_id: uuid.UUID
+    route_id: uuid.UUID
+    transport_name: str | None = None
+    transport_color: str | None = None
+    departure_station: str | None = None
+    arrival_station: str | None = None
+    departure_time: datetime | None = None
+    arrival_time: datetime | None = None
+    fare: float | None = None
+    transfer_info: dict[str, Any] | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RouteCalculationRequest(BaseModel):
+    """경로 계산 요청"""
+    departure_lat: float
+    departure_lng: float
+    destination_lat: float
+    destination_lng: float
+    transport_type: str = "walk"  # walk, car, transit
+
+
+class RouteCalculationResponse(BaseModel):
+    """경로 계산 응답"""
+    success: bool
+    duration: int | None = None  # 분
+    distance: float | None = None  # km
+    cost: float | None = None  # 원
+    route_data: dict[str, Any] | None = None
+    transport_type: str
+    message: str | None = None

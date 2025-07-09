@@ -15,6 +15,7 @@ from app.routers import (
     naver_map,
     plan,
     recommendations,
+    routes,
     travel_plans,
     weather,
     travel_course,
@@ -56,6 +57,7 @@ app.include_router(location.router, prefix="/api")
 app.include_router(plan.router, prefix="/api")
 app.include_router(chatbot.router, prefix="/api")
 app.include_router(travel_course.router, prefix="/api")
+app.include_router(routes.router, prefix="/api")
 
 
 @app.get("/")
