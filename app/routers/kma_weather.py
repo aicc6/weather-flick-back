@@ -52,6 +52,8 @@ async def get_current_weather_kma(
         raise HTTPException(status_code=400, detail=f"지원하지 않는 도시입니다: {city}")
 
     coords = get_city_coordinates(city)
+    if coords is None:
+        raise HTTPException(status_code=500, detail=f"도시 좌표 정보를 찾을 수 없습니다: {city}")
     weather_data = await kma_weather_service.get_current_weather(
         coords["nx"], coords["ny"]
     )
@@ -73,6 +75,8 @@ async def get_short_forecast_kma(
         raise HTTPException(status_code=400, detail=f"지원하지 않는 도시입니다: {city}")
 
     coords = get_city_coordinates(city)
+    if coords is None:
+        raise HTTPException(status_code=500, detail=f"도시 좌표 정보를 찾을 수 없습니다: {city}")
     forecast_data = await kma_weather_service.get_short_forecast(
         coords["nx"], coords["ny"]
     )
@@ -131,6 +135,8 @@ async def compare_weather_sources(
 
     # 기상청 데이터 조회
     coords = get_city_coordinates(city)
+    if coords is None:
+        raise HTTPException(status_code=500, detail=f"도시 좌표 정보를 찾을 수 없습니다: {city}")
     kma_weather = await kma_weather_service.get_current_weather(
         coords["nx"], coords["ny"]
     )

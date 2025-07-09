@@ -1,25 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.auth import get_current_active_user
 from app.database import get_db
-from app.models import (
-    ReviewCreate,
-    SearchRequest,
-    SearchResult,
-    User,
-    Restaurant,
-    RestaurantResponse,
-    Accommodation,
-    TouristAttraction,
-)
+# ORM 모델만 별도로 import
+from app.models import Restaurant, Accommodation, TouristAttraction, User
+# Pydantic 모델은 필요할 때만 별도로 import
+from app.models import ReviewCreate, SearchRequest, SearchResult, RestaurantResponse
 from app.services.local_info_service import local_info_service
 
 router = APIRouter(prefix="/local", tags=["local_info"])
 
 
 @router.get("/cities")
-async def get_supported_cities(db: Session = Depends(get_db)):
+async def get_supported_cities(db: Any = Depends(get_db)):
     """
     활성화된 지역 목록 조회 (unified_regions 테이블에서)
     프론트엔드 지도 컴포넌트용
@@ -63,7 +58,7 @@ async def get_all_restaurants(
     page_size: int = Query(50, description="페이지당 항목 수", ge=1, le=200),
     region_code: str | None = Query(None, description="지역 코드"),
     category_code: str | None = Query(None, description="카테고리 코드"),
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
 ):
     """
     모든 레스토랑 정보 조회 (PostgreSQL restaurants 테이블)
@@ -200,7 +195,7 @@ async def get_all_accommodations(
     region_code: str | None = Query(None, description="지역 코드"),
     category_code: str | None = Query(None, description="카테고리 코드"),
     accommodation_type: str | None = Query(None, description="숙소 타입"),
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
 ):
     """
     모든 숙소 정보 조회 (PostgreSQL accommodations 테이블)
