@@ -18,7 +18,7 @@ class ChatMessageResponse(BaseModel):
     """챗봇 메시지 응답 스키마"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: Optional[int] = Field(None, description="메시지 ID (익명 사용자는 None)")
     text: str = Field(..., description="메시지 내용")
     sender: SenderType = Field(..., description="발신자 타입")
     timestamp: str = Field(..., description="메시지 시간")
