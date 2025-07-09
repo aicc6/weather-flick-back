@@ -55,7 +55,7 @@ app.include_router(config.router, prefix="/api")
 app.include_router(location.router, prefix="/api")
 app.include_router(plan.router, prefix="/api")
 app.include_router(chatbot.router, prefix="/api")
-app.include_router(travel_course.router)
+app.include_router(travel_course.router, prefix="/api")
 
 
 @app.get("/")
