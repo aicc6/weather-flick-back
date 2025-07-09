@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from sqlalchemy.orm import Session
@@ -277,7 +277,7 @@ class EmailVerificationService:
 
             # 새 인증 코드 생성
             code = self.email_service.generate_verification_code()
-            expires_at = datetime.now(UTC) + timedelta(minutes=10)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
             verification = EmailVerification(
                 email=email, code=code, expires_at=expires_at
@@ -320,7 +320,7 @@ class EmailVerificationService:
                     EmailVerification.email == email,
                     EmailVerification.code == code,
                     EmailVerification.is_used == False,  # noqa: E712
-                    EmailVerification.expires_at > datetime.now(UTC),
+                    EmailVerification.expires_at > datetime.now(timezone.utc),
                 )
                 .order_by(EmailVerification.id.desc())
                 .first()

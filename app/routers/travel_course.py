@@ -120,10 +120,10 @@ def generate_course_detail_data(course: TravelCourse, attractions: List[TouristA
 def generate_default_course_data(course_id: str) -> Dict[str, Any]:
     """코스 ID에 따라 다양한 지역의 기본 데이터 반환"""
 
-    # 코스 ID를 숫자로 변환하여 지역 결정
+    # 코스 ID를 숫자로 변환하여 지역 결정 (1부터 시작하므로 -1)
     try:
         id_num = int(course_id)
-        region_index = id_num % 6  # 6개 지역을 순환
+        region_index = (id_num - 1) % 6  # ID 1→인덱스0, ID 2→인덱스1, ...
     except:
         region_index = 0
 
@@ -133,14 +133,15 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "id": course_id,
             "title": "제주도 자연 힐링 여행 코스",
             "subtitle": "한라산부터 바다까지, 제주의 아름다운 자연을 만나보세요",
-            "region": "제주도",
+            "region": "jeju",
+            "regionName": "제주도",
             "duration": "2박 3일",
             "theme": ["자연", "힐링", "관광"],
-            "mainImage": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop",
+            "mainImage": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop"
+                "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
             "highlights": ["한라산 국립공원", "성산일출봉", "우도", "애월 카페거리", "협재해수욕장"],
             "summary": "제주도의 대표적인 자연 명소들을 둘러보며 힐링할 수 있는 여행 코스입니다."
@@ -150,14 +151,15 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "id": course_id,
             "title": "서울 전통과 현대의 만남",
             "subtitle": "경복궁부터 강남까지, 서울의 과거와 현재를 체험하세요",
-            "region": "서울",
+            "region": "seoul",
+            "regionName": "서울",
             "duration": "2박 3일",
             "theme": ["문화", "역사", "도시탐방"],
-            "mainImage": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop",
+            "mainImage": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1598212680973-2471c9becd79?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1553654685-78b84d7b9974?w=800&h=600&fit=crop"
+                "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1598212680973-2471c9becd79?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1553654685-78b84d7b9974?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
             "highlights": ["경복궁", "북촌한옥마을", "명동", "홍대", "동대문"],
             "summary": "전통 궁궐부터 현대적인 쇼핑가까지, 서울의 다양한 매력을 만끽하는 코스입니다."
@@ -167,14 +169,15 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "id": course_id,
             "title": "부산 바다와 문화 여행",
             "subtitle": "해운대부터 감천문화마을까지, 부산의 바다와 문화를 즐기세요",
-            "region": "부산",
+            "region": "busan",
+            "regionName": "부산",
             "duration": "2박 3일",
             "theme": ["해양", "문화", "맛집"],
-            "mainImage": "https://images.unsplash.com/photo-1561022470-509098e4dd5e?w=800&h=600&fit=crop",
+            "mainImage": "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1561022470-509098e4dd5e?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1584646098378-0874589d76b1?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1580656449195-2cb5d9b80a76?w=800&h=600&fit=crop"
+                "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1584646098378-0874589d76b1?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1580656449195-2cb5d9b80a76?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
             "highlights": ["해운대 해수욕장", "감천문화마을", "태종대", "광안리", "자갈치시장"],
             "summary": "푸른 바다와 알록달록한 문화마을, 신선한 해산물까지 부산의 모든 매력을 담은 코스입니다."
@@ -184,14 +187,15 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "id": course_id,
             "title": "경주 천년 고도 역사 탐방",
             "subtitle": "불국사부터 첨성대까지, 신라의 찬란한 역사를 만나보세요",
-            "region": "경주",
+            "region": "gyeongju",
+            "regionName": "경주",
             "duration": "2박 3일",
             "theme": ["역사", "문화", "유적"],
-            "mainImage": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop",
+            "mainImage": "https://images.unsplash.com/photo-1509909756405-be0199881695?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1504595403659-9088ce801e29?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&h=600&fit=crop"
+                "https://images.unsplash.com/photo-1509909756405-be0199881695?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1504595403659-9088ce801e29?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
             "highlights": ["불국사", "석굴암", "첨성대", "안압지", "대릉원"],
             "summary": "신라 천년의 역사가 살아 숨 쉬는 경주에서 우리나라의 찬란한 문화유산을 체험하는 코스입니다."
@@ -201,14 +205,15 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "id": course_id,
             "title": "강릉 바다와 커피 여행",
             "subtitle": "경포대부터 안목해변까지, 강릉의 바다와 커피 문화를 즐기세요",
-            "region": "강릉",
+            "region": "gangneung",
+            "regionName": "강릉",
             "duration": "2박 3일",
             "theme": ["해양", "커피", "자연"],
-            "mainImage": "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&h=600&fit=crop",
+            "mainImage": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1484300681262-5ceb8242ea1c?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop"
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1484300681262-5ceb8242ea1c?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
             "highlights": ["경포대", "안목해변", "정동진", "오죽헌", "강릉커피거리"],
             "summary": "동해의 푸른 바다와 향긋한 커피 향이 어우러지는 강릉의 낭만적인 여행 코스입니다."
@@ -218,14 +223,15 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "id": course_id,
             "title": "여수 밤바다와 섬 여행",
             "subtitle": "오동도부터 향일암까지, 여수의 아름다운 바다를 만나보세요",
-            "region": "여수",
+            "region": "yeosu",
+            "regionName": "여수",
             "duration": "2박 3일",
             "theme": ["해양", "섬", "야경"],
-            "mainImage": "https://images.unsplash.com/photo-1551918120-9739cb430c6d?w=800&h=600&fit=crop",
+            "mainImage": "https://images.unsplash.com/photo-1551918120-9739cb430c6d?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1551918120-9739cb430c6d?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
-                "https://images.unsplash.com/photo-1587139223877-04cb899fa3e8?w=800&h=600&fit=crop"
+                "https://images.unsplash.com/photo-1551918120-9739cb430c6d?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1587139223877-04cb899fa3e8?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
             "highlights": ["오동도", "향일암", "여수 밤바다", "돌산대교", "만성리해수욕장"],
             "summary": "아름다운 밤바다와 신비로운 섬들이 어우러진 여수에서 로맨틱한 바다 여행을 즐기는 코스입니다."
@@ -242,13 +248,13 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
         "viewCount": 1000 + (region_index * 300),
         "price": f"{250 + (region_index * 50)},000원",
         "bestMonths": [3, 4, 5, 9, 10, 11],
-        "description": f"{base_course['summary']} 이 코스는 {base_course['region']}의 대표적인 명소들을 효율적으로 둘러볼 수 있도록 구성되었습니다.",
-        "itinerary": generate_region_itinerary(base_course['region'], base_course['highlights']),
+        "description": f"{base_course['summary']} 이 코스는 {base_course['regionName']}의 대표적인 명소들을 효율적으로 둘러볼 수 있도록 구성되었습니다.",
+        "itinerary": generate_region_itinerary(base_course['regionName'], base_course['highlights']),
         "tips": [
             "편안한 신발을 착용하세요",
             "날씨를 확인하고 적절한 옷차림을 준비하세요",
             "현지 맛집을 미리 검색해보세요",
-            f"{base_course['region']} 특산품을 꼭 맛보세요"
+            f"{base_course['regionName']} 특산품을 꼭 맛보세요"
         ],
         "includes": [
             "주요 관광지 정보",
@@ -264,7 +270,7 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "개인 경비",
             "여행자 보험"
         ],
-        "tags": base_course['theme'] + [base_course['region'], "추천코스"]
+        "tags": base_course['theme'] + [base_course['regionName'], "추천코스"]
     })
 
     return base_course
