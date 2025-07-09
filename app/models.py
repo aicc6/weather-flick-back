@@ -127,12 +127,12 @@ class Destination(Base):
     category = Column(String)
     is_indoor = Column(Boolean, default=False)  # 실내/실외 여부
     tags = Column(JSONB)  # 여행지 특성 태그
-    latitude = Column(DECIMAL(10, 8))
-    longitude = Column(DECIMAL(11, 8))
+    latitude = Column(Float)
+    longitude = Column(Float)
     amenities = Column(JSONB)
     image_url = Column(String)
     rating = Column(Float)
-    recommendation_weight = Column(DECIMAL(3, 2))
+    recommendation_weight = Column(Float)
     created_at = Column(DateTime, server_default=func.now())
 
     weather_data = relationship("WeatherData", back_populates="destination")
@@ -149,7 +149,7 @@ class TravelPlan(Base):
     description = Column(Text)
     start_date = Column(Date)
     end_date = Column(Date)
-    budget = Column(DECIMAL(10, 2))
+    budget = Column(Float)
     status = Column(Enum(TravelPlanStatus), default=TravelPlanStatus.PLANNING)
     itinerary = Column(JSONB)
     participants = Column(Integer, nullable=True)
@@ -1207,6 +1207,45 @@ class UnifiedRegionNew(Base):
     # 관계 설정 (자기 참조) - 임시 주석 처리
     # children = relationship("UnifiedRegionNew", back_populates="parent")
     # parent = relationship("UnifiedRegionNew", remote_side=[region_id], back_populates="children")
+
+
+class TravelCourse(Base):
+    __tablename__ = "travel_courses"
+    content_id = Column(String, primary_key=True)
+    region_code = Column(String, primary_key=True)
+    course_name = Column(String, primary_key=True)
+    course_theme = Column(String)
+    required_time = Column(String)
+    difficulty_level = Column(String)
+    schedule = Column(Text)
+    course_distance = Column(String)
+    category_code = Column(String)
+    sub_category_code = Column(String)
+    address = Column(String)
+    detail_address = Column(String)
+    zipcode = Column(String)
+    tel = Column(String)
+    telname = Column(String)
+    faxno = Column(String)
+    homepage = Column(String)
+    overview = Column(Text)
+    first_image = Column(String)
+    first_image_small = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    data_quality_score = Column(Float)
+    processing_status = Column(String)
+    raw_data_id = Column(UUID(as_uuid=True))
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
+    last_sync_at = Column(DateTime)
+    mlevel = Column(Integer)
+    detail_intro_info = Column(JSONB)
+    detail_additional_info = Column(JSONB)
+    booktour = Column(String(1))
+    createdtime = Column(String)
+    modifiedtime = Column(String)
+    sigungu_code = Column(String)
 
 
 # 성능 최적화를 위한 인덱스들

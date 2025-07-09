@@ -17,6 +17,7 @@ from app.routers import (
     recommendations,
     travel_plans,
     weather,
+    travel_course,
 )
 
 # 로깅 설정 초기화
@@ -54,6 +55,7 @@ app.include_router(config.router, prefix="/api")
 app.include_router(location.router, prefix="/api")
 app.include_router(plan.router, prefix="/api")
 app.include_router(chatbot.router, prefix="/api")
+app.include_router(travel_course.router)
 
 
 @app.get("/")
