@@ -146,23 +146,23 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "highlights": ["한라산 국립공원", "성산일출봉", "우도", "애월 카페거리", "협재해수욕장"],
             "summary": "제주도의 대표적인 자연 명소들을 둘러보며 힐링할 수 있는 여행 코스입니다."
         },
-        # 2. 서울
+        # 2. 전주
         {
             "id": course_id,
-            "title": "서울 전통과 현대의 만남",
-            "subtitle": "경복궁부터 강남까지, 서울의 과거와 현재를 체험하세요",
-            "region": "seoul",
-            "regionName": "서울",
+            "title": "전주 한옥마을 감성 여행",
+            "subtitle": "한옥마을부터 비빔밥까지, 전주의 멋과 맛을 느껴보세요",
+            "region": "jeonju",
+            "regionName": "전주",
             "duration": "2박 3일",
-            "theme": ["문화", "역사", "도시탐방"],
-            "mainImage": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "theme": ["문화", "역사", "맛집"],
+            "mainImage": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
             "images": [
-                "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
-                "https://images.unsplash.com/photo-1598212680973-2471c9becd79?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
-                "https://images.unsplash.com/photo-1553654685-78b84d7b9974?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+                "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1464983953574-0892a716854b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
             ],
-            "highlights": ["경복궁", "북촌한옥마을", "명동", "홍대", "동대문"],
-            "summary": "전통 궁궐부터 현대적인 쇼핑가까지, 서울의 다양한 매력을 만끽하는 코스입니다."
+            "highlights": ["전주한옥마을", "경기전", "전동성당", "남부시장", "전주비빔밥"],
+            "summary": "전통 한옥의 정취와 전주만의 맛을 모두 즐길 수 있는 감성 여행 코스입니다."
         },
         # 3. 부산
         {
@@ -241,6 +241,14 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
     base_course = courses[region_index]
 
     # 공통 필드 추가
+    # regionName, highlights, theme이 항상 str이 아닌 list[str]임을 보장
+    if isinstance(base_course.get('theme'), str):
+        base_course['theme'] = [base_course['theme']]
+    if isinstance(base_course.get('highlights'), str):
+        base_course['highlights'] = [base_course['highlights']]
+    if not isinstance(base_course.get('regionName'), str):
+        base_course['regionName'] = str(base_course.get('regionName', ''))
+
     base_course.update({
         "rating": 4.5 + (region_index * 0.1),
         "reviewCount": 100 + (region_index * 20),
@@ -270,7 +278,7 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             "개인 경비",
             "여행자 보험"
         ],
-        "tags": base_course['theme'] + [base_course['regionName'], "추천코스"]
+        "tags": list(base_course['theme']) + [base_course['regionName'], "추천코스"]
     })
 
     return base_course
@@ -401,63 +409,119 @@ def generate_region_itinerary(region: str, highlights: List[str]) -> List[Dict[s
         "제주도": [
             {
                 "day": 1,
-                "title": "Day 1: 제주 도착 및 서부 지역 탐방",
+                "title": "제주 도착 및 서부 지역 탐방",
                 "activities": [
-                    {
-                        "time": "09:00",
-                        "place": "제주국제공항",
-                        "description": "제주 도착 및 렌터카 인수",
-                        "type": "transport",
-                        "address": "제주특별자치도 제주시 공항로 2",
-                        "duration": 60
-                    },
-                    {
-                        "time": "11:00",
-                        "place": "협재해수욕장",
-                        "description": "제주 서부의 아름다운 해변 산책",
-                        "type": "attraction",
-                        "address": "제주특별자치도 제주시 한림읍 협재리",
-                        "duration": 120
-                    },
-                    {
-                        "time": "14:00",
-                        "place": "애월 카페거리",
-                        "description": "제주의 유명한 카페거리에서 점심 및 카페 투어",
-                        "type": "cafe",
-                        "address": "제주특별자치도 제주시 애월읍 애월해안로",
-                        "duration": 180
-                    }
+                    {"time": "09:00", "place": "제주국제공항", "description": "제주 도착 및 렌터카 인수", "type": "transport", "address": "제주특별자치도 제주시 공항로 2", "duration": 60},
+                    {"time": "11:00", "place": "협재해수욕장", "description": "제주 서부의 아름다운 해변 산책", "type": "attraction", "address": "제주특별자치도 제주시 한림읍 협재리", "duration": 120},
+                    {"time": "14:00", "place": "애월 카페거리", "description": "제주의 유명한 카페거리에서 점심 및 카페 투어", "type": "cafe", "address": "제주특별자치도 제주시 애월읍 애월해안로", "duration": 180}
+                ]
+            },
+            {
+                "day": 2,
+                "title": "동부 명소와 자연 체험",
+                "activities": [
+                    {"time": "09:00", "place": "성산일출봉", "description": "제주 동쪽의 대표 명소에서 일출 감상", "type": "attraction", "address": "제주특별자치도 서귀포시 성산읍", "duration": 120},
+                    {"time": "12:00", "place": "우도", "description": "섬 투어 및 해산물 시식", "type": "attraction", "address": "제주특별자치도 제주시 우도면", "duration": 180},
+                    {"time": "16:00", "place": "섭지코지", "description": "해안 산책 및 사진 촬영", "type": "attraction", "address": "제주특별자치도 서귀포시 성산읍", "duration": 90}
+                ]
+            },
+            {
+                "day": 3,
+                "title": "한라산과 출발",
+                "activities": [
+                    {"time": "09:00", "place": "한라산 국립공원", "description": "한라산 등반 또는 산책", "type": "attraction", "address": "제주특별자치도 제주시 1100로", "duration": 180},
+                    {"time": "13:00", "place": "제주공항", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "제주특별자치도 제주시 공항로 2", "duration": 60}
                 ]
             }
         ],
-        "서울": [
+        "전주": [
             {
                 "day": 1,
-                "title": "Day 1: 전통 문화 체험",
+                "title": "전주 한옥마을과 전통 체험",
                 "activities": [
                     {
-                        "time": "09:00",
-                        "place": "경복궁",
-                        "description": "조선 왕조의 정궁에서 수문장 교대식 관람",
+                        "time": "10:00",
+                        "place": "전주한옥마을",
+                        "description": "전통 한옥의 정취를 느끼며 산책",
                         "type": "attraction",
-                        "address": "서울특별시 종로구 사직로 161",
+                        "address": "전라북도 전주시 완산구 기린대로 99",
                         "duration": 120
                     },
                     {
-                        "time": "11:30",
-                        "place": "북촌한옥마을",
-                        "description": "전통 한옥 마을 산책 및 사진 촬영",
+                        "time": "12:00",
+                        "place": "경기전",
+                        "description": "조선왕조의 역사를 만나는 시간",
                         "type": "attraction",
-                        "address": "서울특별시 종로구 계동길 37",
+                        "address": "전라북도 전주시 완산구 태조로 44",
                         "duration": 90
                     },
                     {
                         "time": "14:00",
-                        "place": "인사동",
-                        "description": "전통 찻집에서 점심 및 기념품 쇼핑",
-                        "type": "restaurant",
-                        "address": "서울특별시 종로구 인사동길",
+                        "place": "전동성당",
+                        "description": "고딕 양식의 아름다운 성당 방문",
+                        "type": "attraction",
+                        "address": "전라북도 전주시 완산구 태조로 51",
+                        "duration": 60
+                    }
+                ]
+            },
+            {
+                "day": 2,
+                "title": "전주 맛집 탐방",
+                "activities": [
+                    {
+                        "time": "11:00",
+                        "place": "남부시장",
+                        "description": "전주 대표 시장에서 다양한 먹거리 체험",
+                        "type": "market",
+                        "address": "전라북도 전주시 완산구 풍남문2길 21",
                         "duration": 120
+                    },
+                    {
+                        "time": "13:00",
+                        "place": "전주비빔밥",
+                        "description": "전주에서 꼭 먹어야 할 대표 음식",
+                        "type": "restaurant",
+                        "address": "전라북도 전주시 완산구 경기전길 135",
+                        "duration": 90
+                    },
+                    {
+                        "time": "15:00",
+                        "place": "풍남문",
+                        "description": "전주의 상징적인 문 방문",
+                        "type": "attraction",
+                        "address": "전라북도 전주시 완산구 풍남동3가 60-1",
+                        "duration": 60
+                    }
+                ]
+            },
+            {
+                "day": 3,
+                "title": "자유 일정 및 기념품 쇼핑",
+                "activities": [
+                    {
+                        "time": "10:00",
+                        "place": "한옥마을 골목길",
+                        "description": "골목길 산책 및 사진 촬영",
+                        "type": "attraction",
+                        "address": "전라북도 전주시 완산구 한옥마을 일대",
+                        "duration": 90
+                    },
+                    {
+                        "time": "12:00",
+                        "place": "기념품 가게",
+                        "description": "전주 특산품 및 기념품 쇼핑",
+                        "type": "shopping",
+                        "address": "전라북도 전주시 완산구 한옥마을 일대",
+                        "duration": 60
+                    },
+                    {
+                        "time": "14:00",
+                        "place": "출발지",
+                        "description": "여행 마무리 및 출발",
+                        "type": "transport",
+                        "address": "-",
+                        "duration": 60
                     }
                 ]
             }
@@ -465,128 +529,109 @@ def generate_region_itinerary(region: str, highlights: List[str]) -> List[Dict[s
         "부산": [
             {
                 "day": 1,
-                "title": "Day 1: 부산 바다와 문화 체험",
+                "title": "부산 바다와 문화 체험",
                 "activities": [
-                    {
-                        "time": "09:00",
-                        "place": "해운대 해수욕장",
-                        "description": "부산 대표 해수욕장에서 바다 산책",
-                        "type": "attraction",
-                        "address": "부산광역시 해운대구 우동",
-                        "duration": 120
-                    },
-                    {
-                        "time": "12:00",
-                        "place": "감천문화마을",
-                        "description": "알록달록한 마을 탐방 및 사진 촬영",
-                        "type": "attraction",
-                        "address": "부산광역시 사하구 감내2로 203",
-                        "duration": 150
-                    },
-                    {
-                        "time": "15:30",
-                        "place": "자갈치시장",
-                        "description": "신선한 해산물 시식 및 저녁 식사",
-                        "type": "restaurant",
-                        "address": "부산광역시 중구 자갈치해안로 52",
-                        "duration": 120
-                    }
+                    {"time": "09:00", "place": "해운대 해수욕장", "description": "부산 대표 해수욕장에서 바다 산책", "type": "attraction", "address": "부산광역시 해운대구 우동", "duration": 120},
+                    {"time": "12:00", "place": "감천문화마을", "description": "알록달록한 마을 탐방 및 사진 촬영", "type": "attraction", "address": "부산광역시 사하구 감내2로 203", "duration": 150},
+                    {"time": "15:30", "place": "자갈치시장", "description": "신선한 해산물 시식 및 저녁 식사", "type": "restaurant", "address": "부산광역시 중구 자갈치해안로 52", "duration": 120}
+                ]
+            },
+            {
+                "day": 2,
+                "title": "광안리와 태종대",
+                "activities": [
+                    {"time": "09:00", "place": "광안리 해수욕장", "description": "광안대교 전망과 해변 산책", "type": "attraction", "address": "부산광역시 수영구 광안해변로", "duration": 120},
+                    {"time": "12:00", "place": "태종대", "description": "절벽과 등대가 어우러진 절경 감상", "type": "attraction", "address": "부산광역시 영도구 전망로 24", "duration": 150},
+                    {"time": "16:00", "place": "국제시장", "description": "시장 투어 및 간식거리 시식", "type": "market", "address": "부산광역시 중구 국제시장2길", "duration": 90}
+                ]
+            },
+            {
+                "day": 3,
+                "title": "부산 도심과 출발",
+                "activities": [
+                    {"time": "09:00", "place": "부산타워", "description": "용두산공원 전망대에서 부산 시내 조망", "type": "attraction", "address": "부산광역시 중구 용두산길 37-55", "duration": 90},
+                    {"time": "11:00", "place": "부산역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "부산광역시 동구 중앙대로 206", "duration": 60}
                 ]
             }
         ],
         "경주": [
             {
                 "day": 1,
-                "title": "Day 1: 신라 역사 탐방",
+                "title": "신라 역사 탐방",
                 "activities": [
-                    {
-                        "time": "09:00",
-                        "place": "불국사",
-                        "description": "유네스코 세계문화유산 불국사 탐방",
-                        "type": "attraction",
-                        "address": "경상북도 경주시 진현동 15-1",
-                        "duration": 120
-                    },
-                    {
-                        "time": "12:00",
-                        "place": "석굴암",
-                        "description": "천년의 역사를 간직한 석굴암 방문",
-                        "type": "attraction",
-                        "address": "경상북도 경주시 진현동 999",
-                        "duration": 90
-                    },
-                    {
-                        "time": "15:00",
-                        "place": "첨성대",
-                        "description": "동양 최고의 천문관측대 견학",
-                        "type": "attraction",
-                        "address": "경상북도 경주시 인왕동",
-                        "duration": 60
-                    }
+                    {"time": "09:00", "place": "불국사", "description": "유네스코 세계문화유산 불국사 탐방", "type": "attraction", "address": "경상북도 경주시 진현동 15-1", "duration": 120},
+                    {"time": "12:00", "place": "석굴암", "description": "천년의 역사를 간직한 석굴암 방문", "type": "attraction", "address": "경상북도 경주시 진현동 999", "duration": 90},
+                    {"time": "15:00", "place": "첨성대", "description": "동양 최고의 천문관측대 견학", "type": "attraction", "address": "경상북도 경주시 인왕동", "duration": 60}
+                ]
+            },
+            {
+                "day": 2,
+                "title": "경주 문화유산과 자연",
+                "activities": [
+                    {"time": "09:00", "place": "안압지(동궁과 월지)", "description": "신라시대 연못과 야경 감상", "type": "attraction", "address": "경상북도 경주시 인왕동 26-1", "duration": 120},
+                    {"time": "12:00", "place": "대릉원", "description": "고분공원 산책 및 역사 체험", "type": "attraction", "address": "경상북도 경주시 황남동 31-1", "duration": 90},
+                    {"time": "15:00", "place": "황리단길", "description": "카페거리 및 기념품 쇼핑", "type": "shopping", "address": "경상북도 경주시 포석로 1080", "duration": 90}
+                ]
+            },
+            {
+                "day": 3,
+                "title": "경주 시내와 출발",
+                "activities": [
+                    {"time": "09:00", "place": "경주역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "경상북도 경주시 원화로 268", "duration": 60}
                 ]
             }
         ],
         "강릉": [
             {
                 "day": 1,
-                "title": "Day 1: 강릉 바다와 커피",
+                "title": "강릉 바다와 커피",
                 "activities": [
-                    {
-                        "time": "09:00",
-                        "place": "경포대",
-                        "description": "강릉 대표 해변에서 바다 감상",
-                        "type": "attraction",
-                        "address": "강원도 강릉시 운정동",
-                        "duration": 120
-                    },
-                    {
-                        "time": "12:00",
-                        "place": "안목해변 커피거리",
-                        "description": "바다를 보며 즐기는 커피 타임",
-                        "type": "cafe",
-                        "address": "강원도 강릉시 견소동",
-                        "duration": 150
-                    },
-                    {
-                        "time": "15:30",
-                        "place": "정동진",
-                        "description": "세계에서 바다와 가장 가까운 기차역",
-                        "type": "attraction",
-                        "address": "강원도 강릉시 강동면 정동진리",
-                        "duration": 120
-                    }
+                    {"time": "09:00", "place": "경포대", "description": "강릉 대표 해변에서 바다 감상", "type": "attraction", "address": "강원도 강릉시 운정동", "duration": 120},
+                    {"time": "12:00", "place": "안목해변 커피거리", "description": "바다를 보며 즐기는 커피 타임", "type": "cafe", "address": "강원도 강릉시 견소동", "duration": 150},
+                    {"time": "15:30", "place": "정동진", "description": "세계에서 바다와 가장 가까운 기차역", "type": "attraction", "address": "강원도 강릉시 강동면 정동진리", "duration": 120}
+                ]
+            },
+            {
+                "day": 2,
+                "title": "강릉 문화와 자연 체험",
+                "activities": [
+                    {"time": "09:00", "place": "오죽헌", "description": "신사임당과 율곡이이의 생가 방문", "type": "attraction", "address": "강원도 강릉시 율곡로 3139번길 24", "duration": 90},
+                    {"time": "11:00", "place": "초당두부마을", "description": "강릉 명물 두부 요리 체험", "type": "restaurant", "address": "강원도 강릉시 초당동", "duration": 90},
+                    {"time": "14:00", "place": "솔향수목원", "description": "숲길 산책 및 자연 체험", "type": "attraction", "address": "강원도 강릉시 구정면 수목원길 156", "duration": 120}
+                ]
+            },
+            {
+                "day": 3,
+                "title": "강릉 시내와 출발",
+                "activities": [
+                    {"time": "09:00", "place": "강릉역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "강원도 강릉시 용지로 176", "duration": 60}
                 ]
             }
         ],
         "여수": [
             {
                 "day": 1,
-                "title": "Day 1: 여수 밤바다와 섬",
+                "title": "여수 밤바다와 섬",
                 "activities": [
-                    {
-                        "time": "09:00",
-                        "place": "오동도",
-                        "description": "동백꽃으로 유명한 아름다운 섬",
-                        "type": "attraction",
-                        "address": "전라남도 여수시 수정동",
-                        "duration": 120
-                    },
-                    {
-                        "time": "12:00",
-                        "place": "향일암",
-                        "description": "일출과 바다가 어우러진 명소",
-                        "type": "attraction",
-                        "address": "전라남도 여수시 돌산읍 율림리",
-                        "duration": 90
-                    },
-                    {
-                        "time": "19:00",
-                        "place": "여수 밤바다",
-                        "description": "아름다운 야경과 함께하는 저녁",
-                        "type": "attraction",
-                        "address": "전라남도 여수시 돌산로",
-                        "duration": 120
-                    }
+                    {"time": "09:00", "place": "오동도", "description": "동백꽃으로 유명한 아름다운 섬", "type": "attraction", "address": "전라남도 여수시 수정동", "duration": 120},
+                    {"time": "12:00", "place": "향일암", "description": "일출과 바다가 어우러진 명소", "type": "attraction", "address": "전라남도 여수시 돌산읍 율림리", "duration": 90},
+                    {"time": "19:00", "place": "여수 밤바다", "description": "아름다운 야경과 함께하는 저녁", "type": "attraction", "address": "전라남도 여수시 돌산로", "duration": 120}
+                ]
+            },
+            {
+                "day": 2,
+                "title": "여수 명소와 맛집",
+                "activities": [
+                    {"time": "09:00", "place": "돌산대교", "description": "여수의 랜드마크 다리 산책", "type": "attraction", "address": "전라남도 여수시 돌산읍 돌산로 3617", "duration": 90},
+                    {"time": "11:00", "place": "만성리해수욕장", "description": "검은 모래 해변에서 휴식", "type": "attraction", "address": "전라남도 여수시 만흥동", "duration": 120},
+                    {"time": "13:00", "place": "여수 수산시장", "description": "신선한 해산물 시식", "type": "market", "address": "전라남도 여수시 교동 503", "duration": 90}
+                ]
+            },
+            {
+                "day": 3,
+                "title": "여수 시내와 출발",
+                "activities": [
+                    {"time": "09:00", "place": "여수엑스포역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "전라남도 여수시 박람회길 1", "duration": 60}
                 ]
             }
         ]
