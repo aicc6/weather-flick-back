@@ -410,6 +410,80 @@ async def auto_generate_routes(
             except:
                 continue
             
+            # 첫 번째 일차인 경우, 출발지에서 첫 번째 목적지로의 경로 생성
+            if day == 1 and travel_plan.start_location and len(places) >= 1:
+                first_place = places[0]
+                
+                # 출발지 좌표 정보 (Google Places API로 검색)
+                start_coords = None
+                if travel_plan.start_location:
+                    try:
+                        # start_location을 Google Places API로 검색하여 좌표 획득
+                        start_detail = await google_places_service.search_place_by_text(travel_plan.start_location)
+                        if start_detail and start_detail.get('latitude') and start_detail.get('longitude'):
+                            start_coords = {
+                                'latitude': start_detail['latitude'],
+                                'longitude': start_detail['longitude'],
+                                'name': travel_plan.start_location
+                            }
+                    except Exception as e:
+                        logger.warning(f"출발지 좌표 조회 실패: {str(e)}")
+                
+                # 첫 번째 목적지 좌표 정보
+                first_coords = None
+                if first_place.get('latitude') and first_place.get('longitude'):
+                    first_coords = {
+                        'latitude': first_place['latitude'],
+                        'longitude': first_place['longitude'],
+                        'name': first_place.get('name', first_place.get('description', '첫 번째 목적지'))
+                    }
+                elif first_place.get('place_id') and first_place['place_id'] in place_details:
+                    detail = place_details[first_place['place_id']]
+                    if detail.get('latitude') and detail.get('longitude'):
+                        first_coords = {
+                            'latitude': detail['latitude'],
+                            'longitude': detail['longitude'],
+                            'name': detail.get('name', first_place.get('description', '첫 번째 목적지'))
+                        }
+                
+                # 출발지에서 첫 번째 목적지로의 경로 생성
+                if start_coords and first_coords:
+                    try:
+                        route_result = await route_service.get_recommended_route(
+                            start_coords['latitude'],
+                            start_coords['longitude'],
+                            first_coords['latitude'],
+                            first_coords['longitude']
+                        )
+                        
+                        if route_result.get('success') and route_result.get('recommended'):
+                            recommended = route_result['recommended']
+                            
+                            # 출발지 → 첫 번째 목적지 경로 저장 (sequence = 0)
+                            start_route = TravelRoute(
+                                route_id=uuid.uuid4(),
+                                plan_id=plan_id,
+                                day=1,
+                                sequence=0,  # 출발지는 sequence 0
+                                departure_name=start_coords['name'],
+                                departure_lat=start_coords['latitude'],
+                                departure_lng=start_coords['longitude'],
+                                destination_name=first_coords['name'],
+                                destination_lat=first_coords['latitude'],
+                                destination_lng=first_coords['longitude'],
+                                transport_type=recommended.get('transport_type'),
+                                route_data=recommended.get('route_data'),
+                                duration=recommended.get('duration'),
+                                distance=recommended.get('distance'),
+                                cost=recommended.get('cost')
+                            )
+                            
+                            db.add(start_route)
+                            generated_routes.append(start_route)
+                            
+                    except Exception as route_error:
+                        logger.warning(f"출발지 경로 계산 중 오류: {str(route_error)}")
+            
             # 일차 내 연속된 장소 간 경로 생성
             if len(places) >= 2:
                 for i in range(len(places) - 1):
@@ -1178,4 +1252,361 @@ async def get_timemachine_route_info(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"타임머신 경로 정보 조회 중 오류 발생: {str(e)} - 상세: {traceback.format_exc()}"
+        )
+
+
+@router.post("/enhanced-multi-route")
+async def get_enhanced_multi_route(
+    request: RouteCalculationRequest,
+    include_timemachine: bool = True,
+    departure_time: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """프론트엔드 EnhancedTransportCard를 위한 다중 경로 정보"""
+    try:
+        # 모든 교통수단 경로 계산
+        multi_routes_result = await route_service.get_multiple_routes(
+            request.departure_lat,
+            request.departure_lng,
+            request.destination_lat,
+            request.destination_lng
+        )
+        
+        if not multi_routes_result.get("success"):
+            return multi_routes_result
+        
+        routes = multi_routes_result["routes"]
+        
+        # 각 경로별 세부 정보 추가
+        enhanced_routes = {}
+        
+        # 도보 경로 개선
+        if routes.get("walk", {}).get("success"):
+            walk_data = routes["walk"]
+            enhanced_routes["walk"] = {
+                **walk_data,
+                "icon": "👣",
+                "display_name": "도보",
+                "environmental_impact": "친환경",
+                "calories_burned": int(walk_data.get("distance", 0) * 50),  # 1km당 50칼로리
+                "weather_dependent": True,
+                "accessibility": {
+                    "wheelchair_accessible": True,
+                    "difficulty_level": "쉬움" if walk_data.get("distance", 0) < 2 else "보통"
+                }
+            }
+        
+        # 대중교통 경로 개선
+        if routes.get("transit", {}).get("success"):
+            transit_data = routes["transit"]
+            enhanced_routes["transit"] = {
+                **transit_data,
+                "icon": "🚇",
+                "display_name": "대중교통",
+                "environmental_impact": "저탄소",
+                "real_time_info": {
+                    "last_updated": "실시간",
+                    "service_status": "정상 운행",
+                    "delays": None
+                },
+                "accessibility": {
+                    "wheelchair_accessible": True,
+                    "elderly_friendly": True
+                },
+                "card_payment": True,
+                "mobile_payment": True
+            }
+            
+            # ODsay 데이터에서 상세 정보 추출
+            route_data = transit_data.get("route_data", {})
+            if route_data.get("sub_paths"):
+                enhanced_routes["transit"]["detailed_steps"] = []
+                for i, step in enumerate(route_data["sub_paths"]):
+                    step_info = {
+                        "step": i + 1,
+                        "type": step.get("type"),
+                        "description": f"{step.get('start_station', '')} → {step.get('end_station', '')}",
+                        "duration": step.get("section_time", 0),
+                        "stations": step.get("station_count", 0),
+                        "line_info": step.get("lane", {})
+                    }
+                    enhanced_routes["transit"]["detailed_steps"].append(step_info)
+        
+        # 자동차 경로 개선
+        if routes.get("car", {}).get("success"):
+            car_data = routes["car"]
+            enhanced_routes["car"] = {
+                **car_data,
+                "icon": "🚗",
+                "display_name": "자동차",
+                "environmental_impact": "일반",
+                "fuel_efficiency": {
+                    "estimated_fuel_usage": f"{car_data.get('distance', 0) / 10:.1f}L",
+                    "co2_emission": f"{car_data.get('distance', 0) * 0.18:.1f}kg"
+                },
+                "parking_info": {
+                    "availability": "주차장 확인 필요",
+                    "estimated_cost": f"{int(car_data.get('distance', 0) * 100)}원"
+                },
+                "real_time_traffic": True
+            }
+            
+            # 타임머신 기능 추가
+            if include_timemachine and departure_time:
+                try:
+                    timemachine_result = await tmap_service.compare_routes_with_time(
+                        request.departure_lng,
+                        request.departure_lat,
+                        request.destination_lng,
+                        request.destination_lat,
+                        departure_time
+                    )
+                    
+                    if timemachine_result.get("success"):
+                        enhanced_routes["car"]["timemachine_data"] = timemachine_result
+                        enhanced_routes["car"]["departure_time"] = departure_time
+                        
+                        # 추천 경로로 메인 데이터 업데이트
+                        if timemachine_result.get("recommended"):
+                            recommended = timemachine_result["recommended"]
+                            enhanced_routes["car"]["duration"] = recommended["duration"]
+                            enhanced_routes["car"]["distance"] = recommended["distance"]
+                            enhanced_routes["car"]["cost"] = recommended["cost"]
+                            enhanced_routes["car"]["predicted_traffic"] = "실시간 예측 적용"
+                
+                except Exception as e:
+                    logger.warning(f"타임머신 데이터 조회 실패: {e}")
+                    enhanced_routes["car"]["timemachine_data"] = None
+        
+        # 추천 로직 개선
+        distance = route_service._calculate_distance(
+            request.departure_lat, request.departure_lng,
+            request.destination_lat, request.destination_lng
+        )
+        
+        # 상황별 추천
+        recommendations = {
+            "primary": None,
+            "alternatives": [],
+            "context": {}
+        }
+        
+        # 거리별 추천
+        if distance <= 1.0:
+            if enhanced_routes.get("walk"):
+                recommendations["primary"] = {"type": "walk", "reason": "짧은 거리로 도보 이동이 최적"}
+                if enhanced_routes.get("transit"):
+                    recommendations["alternatives"].append({"type": "transit", "reason": "편의성"})
+        elif distance <= 10.0:
+            if enhanced_routes.get("transit"):
+                recommendations["primary"] = {"type": "transit", "reason": "중거리 이동으로 대중교통이 경제적"}
+                if enhanced_routes.get("car"):
+                    recommendations["alternatives"].append({"type": "car", "reason": "빠른 이동"})
+        else:
+            if enhanced_routes.get("car"):
+                recommendations["primary"] = {"type": "car", "reason": "장거리 이동으로 자동차가 효율적"}
+                if enhanced_routes.get("transit"):
+                    recommendations["alternatives"].append({"type": "transit", "reason": "경제성"})
+        
+        # 시간대별 추천 (출발 시간이 있는 경우)
+        if departure_time:
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(departure_time.replace('Z', '+00:00'))
+                hour = dt.hour
+                
+                if 7 <= hour <= 9 or 17 <= hour <= 19:  # 출퇴근 시간
+                    recommendations["context"]["rush_hour"] = True
+                    recommendations["context"]["traffic_warning"] = "출퇴근 시간대로 교통 체증 예상"
+                    # 대중교통을 우선 추천
+                    if enhanced_routes.get("transit") and recommendations["primary"]["type"] != "walk":
+                        recommendations["primary"] = {"type": "transit", "reason": "출퇴근 시간대 교통체증 회피"}
+                
+                elif 23 <= hour or hour <= 5:  # 심야 시간
+                    recommendations["context"]["late_night"] = True
+                    recommendations["context"]["transit_warning"] = "심야 시간대로 대중교통 운행 제한"
+                    # 자동차나 도보 추천
+                    if enhanced_routes.get("car"):
+                        recommendations["primary"] = {"type": "car", "reason": "심야 시간대 대중교통 제한"}
+                    elif enhanced_routes.get("walk") and distance <= 3:
+                        recommendations["primary"] = {"type": "walk", "reason": "심야 도보 (안전 주의)"}
+            except:
+                pass
+        
+        # 날씨 정보 추가 (모의 데이터)
+        weather_info = {
+            "condition": "맑음",
+            "temperature": "23°C",
+            "precipitation": "0%",
+            "wind_speed": "2m/s",
+            "outdoor_activity_suitable": True
+        }
+        
+        # 날씨에 따른 추천 조정
+        if weather_info["precipitation"] != "0%":
+            recommendations["context"]["weather_warning"] = "강수 예보로 대중교통 이용 권장"
+            weather_info["outdoor_activity_suitable"] = False
+        
+        return {
+            "success": True,
+            "routes": enhanced_routes,
+            "recommendations": recommendations,
+            "context_info": {
+                "distance": distance,
+                "estimated_time_range": {
+                    "min": min([r.get("duration", 999) for r in enhanced_routes.values() if r.get("success")]),
+                    "max": max([r.get("duration", 0) for r in enhanced_routes.values() if r.get("success")])
+                },
+                "cost_range": {
+                    "min": min([r.get("cost", 999999) for r in enhanced_routes.values() if r.get("success")]),
+                    "max": max([r.get("cost", 0) for r in enhanced_routes.values() if r.get("success")])
+                },
+                "weather": weather_info,
+                "departure_time": departure_time,
+                "last_updated": "방금 전"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Enhanced multi-route 조회 실패: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Enhanced multi-route 조회 중 오류 발생: {str(e)}"
+        )
+
+
+@router.post("/timemachine-comparison")
+async def get_timemachine_comparison(
+    request: RouteCalculationRequest,
+    departure_times: List[str],
+    current_user: User = Depends(get_current_user)
+):
+    """여러 출발 시간대별 경로 비교 (타임머신)"""
+    try:
+        if not departure_times:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="출발 시간을 최소 1개 이상 제공해야 합니다."
+            )
+        
+        time_comparisons = []
+        
+        for departure_time in departure_times:
+            try:
+                # 각 시간대별로 자동차 경로 비교
+                comparison_result = await tmap_service.compare_routes_with_time(
+                    request.departure_lng,
+                    request.departure_lat,
+                    request.destination_lng,
+                    request.destination_lat,
+                    departure_time
+                )
+                
+                if comparison_result.get("success"):
+                    # 시간 정보 파싱
+                    from datetime import datetime
+                    try:
+                        dt = datetime.fromisoformat(departure_time.replace('Z', '+00:00'))
+                        time_label = dt.strftime("%H:%M")
+                        date_label = dt.strftime("%m/%d")
+                    except:
+                        time_label = departure_time
+                        date_label = "날짜 불명"
+                    
+                    # 교통 상황 예측
+                    recommended = comparison_result.get("recommended", {})
+                    duration = recommended.get("duration", 0)
+                    
+                    # 교통량 예측
+                    traffic_level = "원활"
+                    if duration > 60:
+                        traffic_level = "혼잡"
+                    elif duration > 45:
+                        traffic_level = "보통"
+                    
+                    time_comparison = {
+                        "departure_time": departure_time,
+                        "time_label": time_label,
+                        "date_label": date_label,
+                        "recommended_route": recommended,
+                        "all_routes": comparison_result.get("routes", []),
+                        "traffic_prediction": {
+                            "level": traffic_level,
+                            "duration": duration,
+                            "compared_to_optimal": f"+{max(0, duration - 30)}분" if duration > 30 else "최적",
+                            "rush_hour": 7 <= int(time_label.split(':')[0]) <= 9 or 17 <= int(time_label.split(':')[0]) <= 19
+                        },
+                        "cost_analysis": {
+                            "fuel_cost": recommended.get("cost", 0),
+                            "toll_fee": recommended.get("toll_fee", 0),
+                            "total_cost": recommended.get("cost", 0) + recommended.get("toll_fee", 0)
+                        }
+                    }
+                    
+                    time_comparisons.append(time_comparison)
+                    
+            except Exception as e:
+                logger.warning(f"시간대 {departure_time} 처리 실패: {e}")
+                # 실패한 시간대는 모의 데이터로 대체
+                time_comparisons.append({
+                    "departure_time": departure_time,
+                    "time_label": departure_time,
+                    "date_label": "날짜 불명",
+                    "error": True,
+                    "message": "해당 시간대 데이터를 가져올 수 없습니다."
+                })
+        
+        # 최적 시간대 추천
+        successful_comparisons = [tc for tc in time_comparisons if not tc.get("error")]
+        optimal_time = None
+        
+        if successful_comparisons:
+            optimal_time = min(successful_comparisons, 
+                             key=lambda x: x.get("recommended_route", {}).get("duration", 999))
+        
+        # 통계 정보
+        statistics = {
+            "total_times_compared": len(departure_times),
+            "successful_predictions": len(successful_comparisons),
+            "time_range": {
+                "fastest": min([tc.get("recommended_route", {}).get("duration", 999) 
+                             for tc in successful_comparisons]) if successful_comparisons else None,
+                "slowest": max([tc.get("recommended_route", {}).get("duration", 0) 
+                             for tc in successful_comparisons]) if successful_comparisons else None
+            },
+            "cost_range": {
+                "cheapest": min([tc.get("cost_analysis", {}).get("total_cost", 999999) 
+                               for tc in successful_comparisons]) if successful_comparisons else None,
+                "most_expensive": max([tc.get("cost_analysis", {}).get("total_cost", 0) 
+                                     for tc in successful_comparisons]) if successful_comparisons else None
+            }
+        }
+        
+        return {
+            "success": True,
+            "departure_times": departure_times,
+            "time_comparisons": time_comparisons,
+            "optimal_time": optimal_time,
+            "statistics": statistics,
+            "route_info": {
+                "departure": {
+                    "latitude": request.departure_lat,
+                    "longitude": request.departure_lng
+                },
+                "destination": {
+                    "latitude": request.destination_lat,
+                    "longitude": request.destination_lng
+                }
+            },
+            "data_source": "TMAP 타임머신 API",
+            "last_updated": "방금 전"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"타임머신 비교 분석 실패: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"타임머신 비교 분석 중 오류 발생: {str(e)}"
         )

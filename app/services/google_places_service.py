@@ -95,6 +95,64 @@ class GooglePlacesService:
                 print(f"Place ID {place_id}의 정보를 가져올 수 없습니다.")
                 
         return place_details
+    
+    def _search_place_by_text_sync(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        텍스트로 장소를 검색하여 첫 번째 결과의 좌표를 동기적으로 조회
+        """
+        if not self.api_key:
+            print("Google Maps API 키가 설정되지 않았습니다.")
+            return None
+            
+        url = f"{self.base_url}/textsearch/json"
+        params = {
+            'query': text,
+            'fields': 'name,formatted_address,geometry,place_id',
+            'key': self.api_key,
+            'language': 'ko'
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('status') == 'OK' and 'results' in data and len(data['results']) > 0:
+                    result = data['results'][0]  # 첫 번째 결과 사용
+                    geometry = result.get('geometry', {})
+                    location = geometry.get('location', {})
+                    
+                    return {
+                        'place_id': result.get('place_id'),
+                        'name': result.get('name'),
+                        'formatted_address': result.get('formatted_address'),
+                        'latitude': location.get('lat'),
+                        'longitude': location.get('lng')
+                    }
+                else:
+                    print(f"Google Places Text Search API 오류: {data.get('status')}")
+                    return None
+            else:
+                print(f"HTTP 오류: {response.status_code}")
+                return None
+                        
+        except Exception as e:
+            print(f"Google Places Text Search API 호출 중 오류: {str(e)}")
+            return None
+    
+    async def search_place_by_text(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        텍스트로 장소를 검색하여 첫 번째 결과의 좌표를 조회
+        
+        Args:
+            text: 검색할 장소 텍스트 (예: "서울역", "인천공항")
+            
+        Returns:
+            장소 정보 딕셔너리 (좌표, 이름, 주소 등)
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self.executor, self._search_place_by_text_sync, text)
 
 
 # 전역 인스턴스
