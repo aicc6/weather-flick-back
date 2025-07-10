@@ -17,6 +17,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import declarative_base, relationship
@@ -1368,6 +1369,18 @@ class RecommendReview(Base):
     user = relationship("User")
 
 
+class RecommendLike(Base):
+    __tablename__ = "likes_recommend"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint('course_id', 'user_id', name='uq_likes_recommend_course_user'),)
+
+    user = relationship("User")
+
+
 # 임시 비밀번호 관련 스키마
 class ForgotPasswordRequest(BaseModel):
     """비밀번호 찾기 요청"""
@@ -1695,6 +1708,19 @@ class RecommendReviewResponse(BaseModel):
     nickname: str
     rating: int
     content: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
+
+
+class RecommendLikeCreate(BaseModel):
+    course_id: int
+
+
+class RecommendLikeResponse(BaseModel):
+    id: uuid.UUID
+    course_id: int
+    user_id: uuid.UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
