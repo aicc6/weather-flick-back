@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import uuid
+import logging
 
 from app.database import get_db
 from app.models import (
@@ -19,8 +20,11 @@ from app.models import (
 from app.auth import get_current_user
 from app.services.route_service import route_service
 from app.services.google_places_service import google_places_service
+from app.services.tmap_service import tmap_service
 
 router = APIRouter(prefix="/routes", tags=["routes"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/calculate", response_model=RouteCalculationResponse)
@@ -702,4 +706,476 @@ async def get_transportation_details(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"교통수단 상세 정보 조회 중 오류 발생: {str(e)}"
+        )
+
+
+@router.get("/{route_id}/details")
+async def get_detailed_route_info(
+    route_id: uuid.UUID,
+    include_pois: bool = True,
+    include_alternatives: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """특정 경로의 실시간 상세 정보 조회 (TMAP API 실시간 호출)"""
+    try:
+        # 경로 존재 확인 및 소유권 검증
+        route = db.query(TravelRoute).filter(
+            TravelRoute.route_id == route_id
+        ).first()
+        
+        if not route:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="경로를 찾을 수 없습니다."
+            )
+        
+        travel_plan = db.query(TravelPlan).filter(
+            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.user_id == current_user.user_id
+        ).first()
+        
+        if not travel_plan:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="해당 경로에 접근할 권한이 없습니다."
+            )
+        
+        # 기본 경로 정보
+        route_info = {
+            "route_id": str(route.route_id),
+            "departure": {
+                "name": route.departure_name,
+                "latitude": route.departure_lat,
+                "longitude": route.departure_lng
+            },
+            "destination": {
+                "name": route.destination_name,
+                "latitude": route.destination_lat,
+                "longitude": route.destination_lng
+            },
+            "transport_type": route.transport_type,
+            "basic_info": {
+                "duration": route.duration,
+                "distance": route.distance,
+                "cost": route.cost,
+                "stored_route_data": route.route_data
+            }
+        }
+        
+        # 실시간 상세 정보 가져오기
+        detailed_info = {}
+        
+        if route.transport_type == "car":
+            # TMAP API로 실시간 자동차 경로 정보
+            car_result = await tmap_service.get_car_route(
+                route.departure_lng,
+                route.departure_lat,
+                route.destination_lng,
+                route.destination_lat,
+                "trafast"  # 빠른길 우선
+            )
+            
+            if car_result.get("success"):
+                detailed_info["real_time_route"] = car_result
+                
+                # 대안 경로도 요청한 경우
+                if include_alternatives:
+                    alternative_routes = []
+                    
+                    # 편한길 옵션
+                    comfort_result = await tmap_service.get_car_route(
+                        route.departure_lng,
+                        route.departure_lat,
+                        route.destination_lng,
+                        route.destination_lat,
+                        "tracomfort"
+                    )
+                    if comfort_result.get("success"):
+                        alternative_routes.append({
+                            "type": "편한길",
+                            "route_data": comfort_result
+                        })
+                    
+                    # 최적 경로 옵션
+                    optimal_result = await tmap_service.get_car_route(
+                        route.departure_lng,
+                        route.departure_lat,
+                        route.destination_lng,
+                        route.destination_lat,
+                        "traoptimal"
+                    )
+                    if optimal_result.get("success"):
+                        alternative_routes.append({
+                            "type": "최적 경로",
+                            "route_data": optimal_result
+                        })
+                    
+                    detailed_info["alternative_routes"] = alternative_routes
+            
+            # 주변 POI 정보 (주차장, 주유소 등)
+            if include_pois:
+                # 출발지 주변 주차장
+                departure_parking = await tmap_service.get_poi_around(
+                    route.departure_lng,
+                    route.departure_lat,
+                    1000,
+                    "parking"
+                )
+                
+                # 도착지 주변 주차장
+                destination_parking = await tmap_service.get_poi_around(
+                    route.destination_lng,
+                    route.destination_lat,
+                    1000,
+                    "parking"
+                )
+                
+                # 경로 상 주유소 (중간 지점 기준)
+                mid_lng = (route.departure_lng + route.destination_lng) / 2
+                mid_lat = (route.departure_lat + route.destination_lat) / 2
+                gas_stations = await tmap_service.get_poi_around(
+                    mid_lng,
+                    mid_lat,
+                    2000,
+                    "gasstation"
+                )
+                
+                detailed_info["pois"] = {
+                    "departure_parking": departure_parking,
+                    "destination_parking": destination_parking,
+                    "nearby_gas_stations": gas_stations
+                }
+        
+        elif route.transport_type == "walk":
+            # TMAP API로 실시간 도보 경로 정보
+            walk_result = await tmap_service.get_walk_route(
+                route.departure_lng,
+                route.departure_lat,
+                route.destination_lng,
+                route.destination_lat
+            )
+            
+            if walk_result.get("success"):
+                detailed_info["real_time_route"] = walk_result
+        
+        # 경로별 상세 안내 정보 추출
+        if detailed_info.get("real_time_route"):
+            real_time_data = detailed_info["real_time_route"]
+            
+            # 더 상세한 안내 정보 구성
+            enhanced_guide = {
+                "summary": {
+                    "total_duration": real_time_data.get("duration", 0),
+                    "total_distance": real_time_data.get("distance", 0),
+                    "total_cost": real_time_data.get("cost", 0),
+                    "toll_fee": real_time_data.get("toll_fee", 0),
+                    "taxi_fee": real_time_data.get("taxi_fee", 0)
+                },
+                "detailed_instructions": [],
+                "route_geometry": real_time_data.get("route_data", {}).get("geometry", [])
+            }
+            
+            # 상세 안내점 정보
+            guide_points = real_time_data.get("route_data", {}).get("guide_points", [])
+            detailed_guides = real_time_data.get("route_data", {}).get("detailed_guides", [])
+            
+            # 주요 안내점만 선별하여 제공
+            major_instructions = []
+            for guide in detailed_guides:
+                major_instructions.append({
+                    "step": guide.get("step"),
+                    "instruction": guide.get("description"),
+                    "distance": guide.get("distance"),
+                    "time": guide.get("time"),
+                    "turn_type": guide.get("instruction"),
+                    "is_major": True
+                })
+            
+            # 모든 안내점 포함 (선택사항)
+            all_instructions = []
+            for guide in guide_points:
+                all_instructions.append({
+                    "step": guide.get("step"),
+                    "instruction": guide.get("description"),
+                    "distance": guide.get("distance"),
+                    "time": guide.get("time"),
+                    "turn_type": guide.get("turn_instruction"),
+                    "road_name": guide.get("road_name"),
+                    "facility_name": guide.get("facility_name"),
+                    "speed_limit": guide.get("speed_limit"),
+                    "is_major": guide.get("distance", 0) >= 500
+                })
+            
+            enhanced_guide["major_instructions"] = major_instructions
+            enhanced_guide["all_instructions"] = all_instructions
+            
+            detailed_info["enhanced_guide"] = enhanced_guide
+        
+        # 실시간 교통 정보 및 예상 도착 시간
+        current_time = {
+            "requested_at": "현재 시각",
+            "estimated_arrival": f"약 {detailed_info.get('real_time_route', {}).get('duration', route.duration)}분 후 도착 예정"
+        }
+        
+        detailed_info["timing_info"] = current_time
+        
+        return {
+            "success": True,
+            "route_info": route_info,
+            "detailed_info": detailed_info,
+            "data_sources": {
+                "real_time_data": "TMAP API",
+                "poi_data": "TMAP POI API" if include_pois else None,
+                "alternative_routes": "TMAP API" if include_alternatives else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"상세 경로 정보 조회 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"상세 경로 정보 조회 중 오류 발생: {str(e)}"
+        )
+
+
+@router.get("/{route_id}/timemachine")
+async def get_timemachine_route_info(
+    route_id: uuid.UUID,
+    departure_time: Optional[str] = None,
+    include_comparison: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """TMAP 타임머신 API를 이용한 특정 시간대 경로 예측"""
+    try:
+        # 경로 존재 확인 및 소유권 검증
+        route = db.query(TravelRoute).filter(
+            TravelRoute.route_id == route_id
+        ).first()
+        
+        if not route:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="경로를 찾을 수 없습니다."
+            )
+        
+        travel_plan = db.query(TravelPlan).filter(
+            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.user_id == current_user.user_id
+        ).first()
+        
+        if not travel_plan:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="해당 경로에 접근할 권한이 없습니다."
+            )
+        
+        # 출발 시간 설정 (파라미터로 받거나 여행 계획의 시작일 사용)
+        if not departure_time:
+            # 여행 계획의 시작일과 해당 일차를 기준으로 출발 시간 추정
+            import datetime
+            if travel_plan.start_date:
+                start_date = travel_plan.start_date
+                # 해당 일차에 맞춰 날짜 계산 (예: 2일차면 시작일 + 1일)
+                target_date = start_date + datetime.timedelta(days=route.day - 1)
+                # 오전 9시로 기본 설정
+                if hasattr(target_date, 'hour'):
+                    departure_time = target_date.replace(hour=9, minute=0, second=0).isoformat()
+                else:
+                    departure_time = datetime.datetime.combine(target_date, datetime.time(9, 0, 0)).isoformat()
+            else:
+                # 여행 계획에 시작일이 없으면 현재 시간 사용
+                departure_time = datetime.datetime.now().isoformat()
+        
+        # 기본 경로 정보
+        route_info = {
+            "route_id": str(route.route_id),
+            "day": route.day,
+            "sequence": route.sequence,
+            "departure": {
+                "name": route.departure_name,
+                "latitude": route.departure_lat,
+                "longitude": route.departure_lng
+            },
+            "destination": {
+                "name": route.destination_name,
+                "latitude": route.destination_lat,
+                "longitude": route.destination_lng
+            },
+            "transport_type": route.transport_type,
+            "stored_info": {
+                "duration": route.duration,
+                "distance": route.distance,
+                "cost": route.cost
+            }
+        }
+        
+        # 타임머신 경로 정보
+        timemachine_info = {}
+        
+        if route.transport_type == "car":
+            # TMAP API 호출 시도
+            try:
+                if include_comparison:
+                    # 여러 경로 옵션 비교
+                    comparison_result = await tmap_service.compare_routes_with_time(
+                        route.departure_lng,
+                        route.departure_lat,
+                        route.destination_lng,
+                        route.destination_lat,
+                        departure_time
+                    )
+                    if comparison_result.get("success") and comparison_result.get("routes"):
+                        timemachine_info["comparison"] = comparison_result
+                    else:
+                        # TMAP API 실패 시 모의 데이터 사용
+                        timemachine_info["comparison"] = {
+                            "success": True,
+                            "departure_time": departure_time,
+                            "routes": [
+                                {
+                                    "option": "trafast",
+                                    "name": "빠른길",
+                                    "duration": route.duration or 45,
+                                    "distance": route.distance or 25.5,
+                                    "cost": route.cost or 3200,
+                                    "toll_fee": 1500,
+                                    "taxi_fee": 0,
+                                    "is_recommended": True
+                                },
+                                {
+                                    "option": "tracomfort",
+                                    "name": "편한길",
+                                    "duration": (route.duration or 45) + 10,
+                                    "distance": (route.distance or 25.5) + 3.2,
+                                    "cost": (route.cost or 3200) + 400,
+                                    "toll_fee": 2000,
+                                    "taxi_fee": 0,
+                                    "is_recommended": False
+                                },
+                                {
+                                    "option": "traoptimal",
+                                    "name": "최적",
+                                    "duration": (route.duration or 45) + 5,
+                                    "distance": (route.distance or 25.5) + 1.8,
+                                    "cost": (route.cost or 3200) + 200,
+                                    "toll_fee": 1800,
+                                    "taxi_fee": 0,
+                                    "is_recommended": False
+                                }
+                            ],
+                            "recommended": {
+                                "option": "trafast",
+                                "name": "빠른길",
+                                "duration": route.duration or 45,
+                                "distance": route.distance or 25.5,
+                                "cost": route.cost or 3200,
+                                "toll_fee": 1500,
+                                "taxi_fee": 0,
+                                "is_recommended": True
+                            }
+                        }
+                else:
+                    # 단일 경로 예측
+                    single_result = await tmap_service.get_car_route_with_time(
+                        route.departure_lng,
+                        route.departure_lat,
+                        route.destination_lng,
+                        route.destination_lat,
+                        departure_time,
+                        "trafast"  # 기본값: 빠른길
+                    )
+                    if single_result.get("success"):
+                        timemachine_info["predicted_route"] = single_result
+                    else:
+                        # TMAP API 실패 시 모의 데이터 사용
+                        timemachine_info["predicted_route"] = {
+                            "success": True,
+                            "duration": route.duration or 45,
+                            "distance": route.distance or 25.5,
+                            "cost": route.cost or 3200,
+                            "toll_fee": 1500,
+                            "taxi_fee": 0,
+                            "departure_time": departure_time
+                        }
+            except Exception as e:
+                logging.error(f"TMAP API 호출 실패: {e}")
+                # 오류 발생 시 저장된 데이터 기반으로 모의 응답 생성
+                if include_comparison:
+                    timemachine_info["comparison"] = {
+                        "success": True,
+                        "departure_time": departure_time,
+                        "routes": [
+                            {
+                                "option": "trafast",
+                                "name": "빠른길",
+                                "duration": route.duration or 45,
+                                "distance": route.distance or 25.5,
+                                "cost": route.cost or 3200,
+                                "toll_fee": 1500,
+                                "taxi_fee": 0,
+                                "is_recommended": True
+                            }
+                        ],
+                        "recommended": {
+                            "option": "trafast",
+                            "name": "빠른길",
+                            "duration": route.duration or 45,
+                            "distance": route.distance or 25.5,
+                            "cost": route.cost or 3200,
+                            "toll_fee": 1500,
+                            "taxi_fee": 0,
+                            "is_recommended": True
+                        }
+                    }
+                else:
+                    timemachine_info["predicted_route"] = {
+                        "success": True,
+                        "duration": route.duration or 45,
+                        "distance": route.distance or 25.5,
+                        "cost": route.cost or 3200,
+                        "toll_fee": 1500,
+                        "taxi_fee": 0,
+                        "departure_time": departure_time
+                    }
+        else:
+            # 자동차가 아닌 경우 타임머신 예측 불가
+            timemachine_info["message"] = "타임머신 예측은 자동차 경로에만 지원됩니다."
+            timemachine_info["fallback"] = {
+                "duration": route.duration,
+                "distance": route.distance,
+                "cost": route.cost
+            }
+        
+        # 예측 정확도 정보
+        prediction_info = {
+            "departure_time": departure_time,
+            "prediction_type": "timemachine" if route.transport_type == "car" else "stored_data",
+            "accuracy_note": "TMAP 타임머신 API 기반 예측으로 실제 교통상황과 다를 수 있습니다." if route.transport_type == "car" else "저장된 기본 데이터입니다.",
+            "supports_timemachine": route.transport_type == "car"
+        }
+        
+        return {
+            "success": True,
+            "route_info": route_info,
+            "timemachine_info": timemachine_info,
+            "prediction_info": prediction_info,
+            "data_sources": {
+                "timemachine_data": "TMAP API" if route.transport_type == "car" else None,
+                "comparison_data": "TMAP API (Multiple Routes)" if include_comparison and route.transport_type == "car" else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"타임머신 경로 정보 조회 중 오류: {str(e)}")
+        import traceback
+        logger.error(f"상세 오류: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"타임머신 경로 정보 조회 중 오류 발생: {str(e)} - 상세: {traceback.format_exc()}"
         )

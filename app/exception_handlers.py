@@ -133,7 +133,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     return JSONResponse(
         status_code=500,
         content=create_error_response(
-            code="INTERNAL_SERVER_ERROR", message="예상치 못한 오류가 발생했습니다."
+            code="INTERNAL_SERVER_ERROR", message=f"예상치 못한 오류가 발생했습니다: {str(exc)}"
         ),
     )
 
