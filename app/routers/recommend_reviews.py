@@ -6,6 +6,8 @@ from app.auth import get_current_user
 from app.models import RecommendReview, RecommendReviewCreate, RecommendReviewResponse, User
 from fastapi import Query
 import uuid
+from sqlalchemy import func
+from app.models import ReviewLike
 
 router = APIRouter(
     prefix="/recommend-reviews",
@@ -63,4 +65,37 @@ async def get_recommend_reviews_tree(
             parent = review_dict.get(str(review.parent_id))
             if parent:
                 parent.children.append(review)
-    return tree
+    # likeCount, dislikeCount 추가 변환
+    def get_like_count(review_id):
+        return db.query(func.count()).select_from(ReviewLike).filter(
+            ReviewLike.review_id == review_id,
+            ReviewLike.is_like == True
+        ).scalar() or 0
+    def get_dislike_count(review_id):
+        return db.query(func.count()).select_from(ReviewLike).filter(
+            ReviewLike.review_id == review_id,
+            ReviewLike.is_like == False
+        ).scalar() or 0
+    def to_response(r):
+        # children도 정렬: likeCount 내림차순, dislikeCount 오름차순
+        children = sorted(
+            [to_response(child) for child in getattr(r, 'children', [])],
+            key=lambda x: (-x.likeCount, x.__dict__.get('dislikeCount', 0))
+        )
+        return RecommendReviewResponse(
+            id=r.id,
+            course_id=r.course_id,
+            user_id=r.user_id,
+            nickname=r.nickname,
+            rating=r.rating,
+            content=r.content,
+            created_at=r.created_at,
+            parent_id=r.parent_id,
+            children=children,
+            likeCount=get_like_count(r.id),
+            dislikeCount=get_dislike_count(r.id),
+        )
+    # 트리 최상위도 정렬
+    tree_res = [to_response(r) for r in tree]
+    tree_res_sorted = sorted(tree_res, key=lambda x: (-x.likeCount, x.__dict__.get('dislikeCount', 0)))
+    return tree_res_sorted

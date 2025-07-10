@@ -1727,6 +1727,8 @@ class RecommendReviewResponse(BaseModel):
     created_at: datetime
     parent_id: uuid.UUID | None = None  # 답글용
     children: list[RecommendReviewResponse] = []  # 트리 구조용
+    likeCount: int = 0  # 추천수 필드 추가
+    dislikeCount: int = 0  # 싫어요 수 필드 추가
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
