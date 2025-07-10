@@ -53,8 +53,14 @@ class OdsayService:
                 paths = result.get("path", [])
                 
                 if paths:
-                    # 가장 빠른 경로 선택
-                    best_path = min(paths, key=lambda x: x.get("info", {}).get("totalTime", float('inf')))
+                    # 가장 빠른 경로 선택 (paths가 리스트인지 확인)
+                    if isinstance(paths, list) and len(paths) > 0:
+                        best_path = min(paths, key=lambda x: x.get("info", {}).get("totalTime", float('inf')) if isinstance(x, dict) else float('inf'))
+                    else:
+                        return {
+                            "success": False,
+                            "message": "경로 데이터 형식이 올바르지 않습니다."
+                        }
                     
                     path_info = best_path.get("info", {})
                     sub_paths = best_path.get("subPath", [])
@@ -105,20 +111,35 @@ class OdsayService:
             path_type = sub_path.get("trafficType")
             
             if path_type == 1:  # 지하철
+                lane_info = sub_path.get("lane", [{}])[0] if sub_path.get("lane") else {}
                 processed_paths.append({
                     "type": "subway",
-                    "lane": sub_path.get("lane", [{}])[0],
+                    "lane": {
+                        "name": lane_info.get("name", "지하철"),
+                        "busNo": lane_info.get("busNo", ""),
+                        "type": lane_info.get("type", ""),
+                        "cityCode": lane_info.get("cityCode", ""),
+                        "cityName": lane_info.get("cityName", "")
+                    },
                     "start_station": sub_path.get("startName", ""),
                     "end_station": sub_path.get("endName", ""),
                     "station_count": sub_path.get("stationCount", 0),
                     "section_time": sub_path.get("sectionTime", 0),
                     "way": sub_path.get("way", ""),
-                    "way_code": sub_path.get("wayCode", 0)
+                    "way_code": sub_path.get("wayCode", 0),
+                    "door": sub_path.get("door", "")
                 })
             elif path_type == 2:  # 버스
+                lane_info = sub_path.get("lane", [{}])[0] if sub_path.get("lane") else {}
                 processed_paths.append({
                     "type": "bus",
-                    "lane": sub_path.get("lane", [{}])[0],
+                    "lane": {
+                        "name": lane_info.get("name", "버스"),
+                        "busNo": lane_info.get("busNo", ""),
+                        "type": lane_info.get("type", ""),
+                        "cityCode": lane_info.get("cityCode", ""),
+                        "cityName": lane_info.get("cityName", "")
+                    },
                     "start_station": sub_path.get("startName", ""),
                     "end_station": sub_path.get("endName", ""),
                     "station_count": sub_path.get("stationCount", 0),

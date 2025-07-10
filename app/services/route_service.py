@@ -130,11 +130,26 @@ class RouteService:
                 google_result["cost"] = fuel_cost
                 return google_result
             
-            # 3. 기본 계산
+            # 3. 기본 계산 (더 상세한 mock 데이터)
             distance = self._calculate_distance(departure_lat, departure_lng, 
                                               destination_lat, destination_lng)
             duration = int(distance * 1.5)  # 자동차 평균 속도 고려
             fuel_cost = distance * 150
+            
+            # 거리에 따른 mock 경로 안내점 생성
+            guide_points = []
+            if distance > 5:  # 5km 이상인 경우
+                guide_points = [
+                    {"description": "출발지에서 주요 도로로 진입", "distance": 500, "time": 2},
+                    {"description": "고속도로 또는 간선도로 이용", "distance": int(distance * 800), "time": int(duration * 0.7)},
+                    {"description": "목적지 근처 도로로 진입", "distance": 300, "time": 1}
+                ]
+            elif distance > 1:  # 1km 이상인 경우
+                guide_points = [
+                    {"description": "출발지에서 도로로 진입", "distance": 200, "time": 1},
+                    {"description": "목적지까지 직진", "distance": int(distance * 800), "time": int(duration * 0.8)},
+                    {"description": "목적지 도착", "distance": 100, "time": 1}
+                ]
             
             return {
                 "success": True,
@@ -146,7 +161,11 @@ class RouteService:
                 "route_data": {
                     "method": "estimated_calculation",
                     "departure": {"lat": departure_lat, "lng": departure_lng},
-                    "destination": {"lat": destination_lat, "lng": destination_lng}
+                    "destination": {"lat": destination_lat, "lng": destination_lng},
+                    "guide_points": guide_points if guide_points else [],
+                    "toll_fee": max(0, int(distance * 100 - 500)) if distance > 5 else 0,  # 5km 초과 시 통행료
+                    "taxi_fee": int(distance * 1000 + 3000),  # 택시 기본요금 + 거리요금
+                    "source": "calculation"
                 },
                 "message": "추정 계산 기반 자동차 경로"
             }
@@ -257,7 +276,10 @@ class RouteService:
                         "steps": leg.get("steps", []),
                         "start_address": leg.get("start_address", ""),
                         "end_address": leg.get("end_address", ""),
-                        "warnings": route.get("warnings", [])
+                        "warnings": route.get("warnings", []),
+                        "summary": route.get("summary", ""),
+                        "bounds": route.get("bounds", {}),
+                        "copyrights": route.get("copyrights", "")
                     }
                 }
             else:

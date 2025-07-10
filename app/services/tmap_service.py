@@ -76,7 +76,15 @@ class TmapService:
                         "toll_fee": route_info.get("toll_fee", 0),
                         "taxi_fee": route_info.get("taxi_fee", 0),
                         "guide_points": route_info.get("guide_points", []),
-                        "geometry": route_info.get("geometry", [])
+                        "detailed_guides": route_info.get("detailed_guides", []),
+                        "geometry": route_info.get("geometry", []),
+                        "source": "TMAP",
+                        "route_summary": {
+                            "total_steps": len(route_info.get("guide_points", [])),
+                            "major_steps": len(route_info.get("detailed_guides", [])),
+                            "estimated_fuel_cost": self._calculate_fuel_cost(route_info["total_distance"]),
+                            "total_cost_estimate": self._calculate_fuel_cost(route_info["total_distance"]) + route_info.get("toll_fee", 0)
+                        }
                     }
                 }
             else:
@@ -151,12 +159,13 @@ class TmapService:
             }
     
     def _extract_route_info(self, features: List[Dict]) -> Dict[str, Any]:
-        """자동차 경로 정보 추출"""
+        """자동차 경로 정보 추출 (상세 안내점 포함)"""
         total_time = 0
         total_distance = 0
         toll_fee = 0
         taxi_fee = 0
         guide_points = []
+        detailed_guides = []
         geometry = []
         
         for feature in features:
@@ -173,15 +182,61 @@ class TmapService:
             if props.get("taxiFare"):
                 taxi_fee = props["taxiFare"]
             
-            # 안내점 정보
+            # 상세 안내점 정보 추출
             if props.get("description"):
-                guide_points.append({
+                guide_point = {
+                    "step": len(guide_points) + 1,
                     "description": props["description"],
                     "distance": props.get("distance", 0),
                     "time": props.get("time", 0),
                     "point_type": props.get("pointType", ""),
-                    "turn_type": props.get("turnType", 0)
-                })
+                    "turn_type": props.get("turnType", 0),
+                    "road_name": props.get("roadName", ""),
+                    "facility_type": props.get("facilityType", ""),
+                    "facility_name": props.get("facilityName", ""),
+                    "direction": props.get("direction", ""),
+                    "intersection_name": props.get("intersectionName", ""),
+                    "guide_arrow": props.get("guideArrow", ""),
+                    "speed_limit": props.get("speedLimit", 0)
+                }
+                
+                # 턴 타입에 따른 상세 안내문 생성
+                if props.get("turnType"):
+                    turn_type = props["turnType"]
+                    if turn_type == 11:
+                        guide_point["turn_instruction"] = "직진"
+                    elif turn_type == 12:
+                        guide_point["turn_instruction"] = "좌회전"
+                    elif turn_type == 13:
+                        guide_point["turn_instruction"] = "우회전"
+                    elif turn_type == 14:
+                        guide_point["turn_instruction"] = "U턴"
+                    elif turn_type == 15:
+                        guide_point["turn_instruction"] = "좌측 방향"
+                    elif turn_type == 16:
+                        guide_point["turn_instruction"] = "우측 방향"
+                    elif turn_type == 17:
+                        guide_point["turn_instruction"] = "고속도로 진입"
+                    elif turn_type == 18:
+                        guide_point["turn_instruction"] = "고속도로 진출"
+                    elif turn_type == 19:
+                        guide_point["turn_instruction"] = "톨게이트"
+                    elif turn_type == 20:
+                        guide_point["turn_instruction"] = "분기점"
+                    else:
+                        guide_point["turn_instruction"] = "계속 진행"
+                
+                guide_points.append(guide_point)
+                
+                # 주요 안내점만 별도로 저장 (거리가 500m 이상인 경우)
+                if props.get("distance", 0) >= 500:
+                    detailed_guides.append({
+                        "step": len(detailed_guides) + 1,
+                        "description": props["description"],
+                        "distance": f"{props.get('distance', 0):,.0f}m",
+                        "time": f"{props.get('time', 0)//60}분" if props.get('time', 0) >= 60 else f"{props.get('time', 0)}초",
+                        "instruction": guide_point.get("turn_instruction", "계속 진행")
+                    })
             
             # 경로 geometry
             if geometry_data.get("coordinates"):
@@ -193,6 +248,7 @@ class TmapService:
             "toll_fee": toll_fee,
             "taxi_fee": taxi_fee,
             "guide_points": guide_points,
+            "detailed_guides": detailed_guides,
             "geometry": geometry
         }
     

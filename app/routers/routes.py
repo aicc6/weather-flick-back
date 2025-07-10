@@ -371,9 +371,19 @@ async def auto_generate_routes(
         
         generated_routes = []
         
+        # Itinerary JSON 파싱
+        import json
+        try:
+            itinerary = json.loads(travel_plan.itinerary) if isinstance(travel_plan.itinerary, str) else travel_plan.itinerary
+        except (json.JSONDecodeError, TypeError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"여행 일정 데이터 파싱 오류: {str(e)}"
+            )
+        
         # 먼저 모든 Place ID를 수집
         all_place_ids = set()
-        for day_str, places in travel_plan.itinerary.items():
+        for day_str, places in itinerary.items():
             for place in places:
                 if place.get('place_id'):
                     all_place_ids.add(place['place_id'])
@@ -383,9 +393,12 @@ async def auto_generate_routes(
         if all_place_ids:
             place_details = await google_places_service.get_multiple_place_details(list(all_place_ids))
         
+        # 일차별로 정렬된 리스트 생성
+        sorted_days = sorted(itinerary.items(), key=lambda x: int(x[0].replace('Day ', '').replace('day', '')))
+        
         # 각 일차별로 경로 생성
-        for day_str, places in travel_plan.itinerary.items():
-            if not places or len(places) < 2:
+        for day_str, places in sorted_days:
+            if not places:
                 continue
                 
             try:
@@ -393,87 +406,183 @@ async def auto_generate_routes(
             except:
                 continue
             
-            # 연속된 장소 간 경로 생성
-            for i in range(len(places) - 1):
-                current_place = places[i]
-                next_place = places[i + 1]
-                
-                # 좌표 정보 확인 및 가져오기
-                current_coords = None
-                next_coords = None
-                
-                # 기존 좌표 정보가 있으면 사용
-                if current_place.get('latitude') and current_place.get('longitude'):
-                    current_coords = {
-                        'latitude': current_place['latitude'],
-                        'longitude': current_place['longitude'],
-                        'name': current_place.get('name', current_place.get('description', '출발지'))
-                    }
-                # Place ID로 좌표 조회
-                elif current_place.get('place_id') and current_place['place_id'] in place_details:
-                    detail = place_details[current_place['place_id']]
-                    if detail.get('latitude') and detail.get('longitude'):
+            # 일차 내 연속된 장소 간 경로 생성
+            if len(places) >= 2:
+                for i in range(len(places) - 1):
+                    current_place = places[i]
+                    next_place = places[i + 1]
+                    
+                    # 좌표 정보 확인 및 가져오기
+                    current_coords = None
+                    next_coords = None
+                    
+                    # 기존 좌표 정보가 있으면 사용
+                    if current_place.get('latitude') and current_place.get('longitude'):
                         current_coords = {
-                            'latitude': detail['latitude'],
-                            'longitude': detail['longitude'],
-                            'name': detail.get('name', current_place.get('description', '출발지'))
+                            'latitude': current_place['latitude'],
+                            'longitude': current_place['longitude'],
+                            'name': current_place.get('name', current_place.get('description', '출발지'))
                         }
-                
-                # 다음 장소 좌표 확인
-                if next_place.get('latitude') and next_place.get('longitude'):
-                    next_coords = {
-                        'latitude': next_place['latitude'],
-                        'longitude': next_place['longitude'],
-                        'name': next_place.get('name', next_place.get('description', '도착지'))
-                    }
-                elif next_place.get('place_id') and next_place['place_id'] in place_details:
-                    detail = place_details[next_place['place_id']]
-                    if detail.get('latitude') and detail.get('longitude'):
+                    # Place ID로 좌표 조회
+                    elif current_place.get('place_id') and current_place['place_id'] in place_details:
+                        detail = place_details[current_place['place_id']]
+                        if detail.get('latitude') and detail.get('longitude'):
+                            current_coords = {
+                                'latitude': detail['latitude'],
+                                'longitude': detail['longitude'],
+                                'name': detail.get('name', current_place.get('description', '출발지'))
+                            }
+                    
+                    # 다음 장소 좌표 확인
+                    if next_place.get('latitude') and next_place.get('longitude'):
                         next_coords = {
-                            'latitude': detail['latitude'],
-                            'longitude': detail['longitude'],
-                            'name': detail.get('name', next_place.get('description', '도착지'))
+                            'latitude': next_place['latitude'],
+                            'longitude': next_place['longitude'],
+                            'name': next_place.get('name', next_place.get('description', '도착지'))
                         }
-                
-                # 두 장소 모두 좌표가 있는 경우만 경로 생성
-                if current_coords and next_coords:
-                    try:
-                        # 최적 경로 계산
-                        route_result = await route_service.get_recommended_route(
-                            current_coords['latitude'],
-                            current_coords['longitude'],
-                            next_coords['latitude'],
-                            next_coords['longitude']
-                        )
-                        
-                        if route_result.get('success') and route_result.get('recommended'):
-                            recommended = route_result['recommended']
-                            
-                            # 경로 정보 저장
-                            new_route = TravelRoute(
-                                route_id=uuid.uuid4(),
-                                plan_id=plan_id,
-                                day=day,
-                                sequence=i + 1,
-                                departure_name=current_coords['name'],
-                                departure_lat=current_coords['latitude'],
-                                departure_lng=current_coords['longitude'],
-                                destination_name=next_coords['name'],
-                                destination_lat=next_coords['latitude'],
-                                destination_lng=next_coords['longitude'],
-                                transport_type=recommended.get('transport_type'),
-                                route_data=recommended.get('route_data'),
-                                duration=recommended.get('duration'),
-                                distance=recommended.get('distance'),
-                                cost=recommended.get('cost')
+                    elif next_place.get('place_id') and next_place['place_id'] in place_details:
+                        detail = place_details[next_place['place_id']]
+                        if detail.get('latitude') and detail.get('longitude'):
+                            next_coords = {
+                                'latitude': detail['latitude'],
+                                'longitude': detail['longitude'],
+                                'name': detail.get('name', next_place.get('description', '도착지'))
+                            }
+                    
+                    # 두 장소 모두 좌표가 있는 경우만 경로 생성
+                    if current_coords and next_coords:
+                        try:
+                            # 최적 경로 계산
+                            route_result = await route_service.get_recommended_route(
+                                current_coords['latitude'],
+                                current_coords['longitude'],
+                                next_coords['latitude'],
+                                next_coords['longitude']
                             )
                             
-                            db.add(new_route)
-                            generated_routes.append(new_route)
-                            
-                    except Exception as route_error:
-                        print(f"경로 계산 중 오류: {str(route_error)}")
-                        continue
+                            if route_result.get('success') and route_result.get('recommended'):
+                                recommended = route_result['recommended']
+                                
+                                # 경로 정보 저장
+                                new_route = TravelRoute(
+                                    route_id=uuid.uuid4(),
+                                    plan_id=plan_id,
+                                    day=day,
+                                    sequence=i + 1,
+                                    departure_name=current_coords['name'],
+                                    departure_lat=current_coords['latitude'],
+                                    departure_lng=current_coords['longitude'],
+                                    destination_name=next_coords['name'],
+                                    destination_lat=next_coords['latitude'],
+                                    destination_lng=next_coords['longitude'],
+                                    transport_type=recommended.get('transport_type'),
+                                    route_data=recommended.get('route_data'),
+                                    duration=recommended.get('duration'),
+                                    distance=recommended.get('distance'),
+                                    cost=recommended.get('cost')
+                                )
+                                
+                                db.add(new_route)
+                                generated_routes.append(new_route)
+                                
+                        except Exception as route_error:
+                            print(f"경로 계산 중 오류: {str(route_error)}")
+                            continue
+        
+        # 일차 간 경로 생성 (1일차 마지막 → 2일차 첫 번째, 2일차 마지막 → 3일차 첫 번째 등)
+        for i in range(len(sorted_days) - 1):
+            current_day_str, current_places = sorted_days[i]
+            next_day_str, next_places = sorted_days[i + 1]
+            
+            if not current_places or not next_places:
+                continue
+                
+            try:
+                current_day = int(current_day_str.replace('Day ', '').replace('day', ''))
+                next_day = int(next_day_str.replace('Day ', '').replace('day', ''))
+            except:
+                continue
+            
+            # 현재 일차 마지막 장소
+            last_place = current_places[-1]
+            # 다음 일차 첫 번째 장소
+            first_place = next_places[0]
+            
+            # 좌표 정보 확인 및 가져오기
+            last_coords = None
+            first_coords = None
+            
+            # 마지막 장소 좌표 확인
+            if last_place.get('latitude') and last_place.get('longitude'):
+                last_coords = {
+                    'latitude': last_place['latitude'],
+                    'longitude': last_place['longitude'],
+                    'name': last_place.get('name', last_place.get('description', '출발지'))
+                }
+            elif last_place.get('place_id') and last_place['place_id'] in place_details:
+                detail = place_details[last_place['place_id']]
+                if detail.get('latitude') and detail.get('longitude'):
+                    last_coords = {
+                        'latitude': detail['latitude'],
+                        'longitude': detail['longitude'],
+                        'name': detail.get('name', last_place.get('description', '출발지'))
+                    }
+            
+            # 첫 번째 장소 좌표 확인
+            if first_place.get('latitude') and first_place.get('longitude'):
+                first_coords = {
+                    'latitude': first_place['latitude'],
+                    'longitude': first_place['longitude'],
+                    'name': first_place.get('name', first_place.get('description', '도착지'))
+                }
+            elif first_place.get('place_id') and first_place['place_id'] in place_details:
+                detail = place_details[first_place['place_id']]
+                if detail.get('latitude') and detail.get('longitude'):
+                    first_coords = {
+                        'latitude': detail['latitude'],
+                        'longitude': detail['longitude'],
+                        'name': detail.get('name', first_place.get('description', '도착지'))
+                    }
+            
+            # 두 장소 모두 좌표가 있는 경우만 일차 간 경로 생성
+            if last_coords and first_coords:
+                try:
+                    # 최적 경로 계산
+                    route_result = await route_service.get_recommended_route(
+                        last_coords['latitude'],
+                        last_coords['longitude'],
+                        first_coords['latitude'],
+                        first_coords['longitude']
+                    )
+                    
+                    if route_result.get('success') and route_result.get('recommended'):
+                        recommended = route_result['recommended']
+                        
+                        # 일차 간 경로 정보 저장 (다음 일차에 속하도록 설정)
+                        new_route = TravelRoute(
+                            route_id=uuid.uuid4(),
+                            plan_id=plan_id,
+                            day=next_day,
+                            sequence=0,  # 일차 간 경로는 sequence 0으로 설정
+                            departure_name=last_coords['name'],
+                            departure_lat=last_coords['latitude'],
+                            departure_lng=last_coords['longitude'],
+                            destination_name=first_coords['name'],
+                            destination_lat=first_coords['latitude'],
+                            destination_lng=first_coords['longitude'],
+                            transport_type=recommended.get('transport_type'),
+                            route_data=recommended.get('route_data'),
+                            duration=recommended.get('duration'),
+                            distance=recommended.get('distance'),
+                            cost=recommended.get('cost')
+                        )
+                        
+                        db.add(new_route)
+                        generated_routes.append(new_route)
+                        
+                except Exception as route_error:
+                    print(f"일차 간 경로 계산 중 오류: {str(route_error)}")
+                    continue
         
         if generated_routes:
             db.commit()
