@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, date
 from typing import Any, Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import (
     DECIMAL,
     Boolean,
@@ -1293,32 +1293,32 @@ class UnifiedRegion(Base):
 class TravelRoute(Base):
     """여행 경로 정보 테이블"""
     __tablename__ = "travel_routes"
-    
+
     route_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
     day = Column(Integer, nullable=False)
     sequence = Column(Integer, nullable=False)
-    
+
     # 출발지 정보
     departure_name = Column(String, nullable=False)
     departure_lat = Column(Float)
     departure_lng = Column(Float)
-    
+
     # 도착지 정보
     destination_name = Column(String, nullable=False)
     destination_lat = Column(Float)
     destination_lng = Column(Float)
-    
+
     # 교통 정보
     transport_type = Column(String)  # car, bus, subway, walk, taxi
     route_data = Column(JSONB)  # 상세 경로 정보
     duration = Column(Integer)  # 소요 시간 (분)
     distance = Column(Float)  # 거리 (km)
     cost = Column(Float)  # 교통비 (원)
-    
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+
     # 관계 설정
     travel_plan = relationship("TravelPlan", backref="routes")
 
@@ -1326,33 +1326,48 @@ class TravelRoute(Base):
 class TransportationDetail(Base):
     """교통수단 상세 정보 테이블"""
     __tablename__ = "transportation_details"
-    
+
     detail_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     route_id = Column(UUID(as_uuid=True), ForeignKey("travel_routes.route_id"), nullable=False)
-    
+
     # 교통수단 정보
     transport_name = Column(String)  # 지하철 2호선, 버스 146번 등
     transport_color = Column(String)  # 노선 색상
-    
+
     # 정류장/역 정보
     departure_station = Column(String)
     arrival_station = Column(String)
-    
+
     # 시간 정보
     departure_time = Column(DateTime)
     arrival_time = Column(DateTime)
-    
+
     # 요금 정보
     fare = Column(Float)
-    
+
     # 환승 정보
     transfer_info = Column(JSONB)
-    
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+
     # 관계 설정
     route = relationship("TravelRoute", backref="transport_details")
+
+
+class RecommendReview(Base):
+    __tablename__ = "reviews_recommend"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(Integer, nullable=False, index=True)  # 추천코스 ID
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    nickname = Column(String(50), nullable=False)
+    rating = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User")
+
+
 # 임시 비밀번호 관련 스키마
 class ForgotPasswordRequest(BaseModel):
     """비밀번호 찾기 요청"""
@@ -1664,3 +1679,22 @@ class RouteCalculationResponse(BaseModel):
     route_data: dict[str, Any] | None = None
     transport_type: str
     message: str | None = None
+
+
+class RecommendReviewCreate(BaseModel):
+    course_id: int
+    rating: int = Field(..., ge=1, le=5)
+    content: str
+    nickname: str
+
+
+class RecommendReviewResponse(BaseModel):
+    id: uuid.UUID
+    course_id: int
+    user_id: uuid.UUID
+    nickname: str
+    rating: int
+    content: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)

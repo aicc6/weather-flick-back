@@ -19,6 +19,7 @@ from app.routers import (
     travel_plans,
     weather,
     travel_course,
+    recommend_reviews,
 )
 
 # 로깅 설정 초기화
@@ -50,6 +51,7 @@ app.include_router(local_info.router, prefix="/api")
 app.include_router(naver_map.router, prefix="/api")
 app.include_router(travel_plans.router, prefix="/api")
 app.include_router(recommendations.router, prefix="/api")
+app.include_router(recommend_reviews.router, prefix="/api")
 app.include_router(destinations.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
