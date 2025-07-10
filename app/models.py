@@ -1383,6 +1383,19 @@ class RecommendLike(Base):
     user = relationship("User")
 
 
+class ReviewLike(Base):
+    __tablename__ = "review_likes"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    review_id = Column(UUID(as_uuid=True), ForeignKey("reviews_recommend.id"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    is_like = Column(Boolean, nullable=False)  # True=Like, False=Dislike
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('review_id', 'user_id', 'is_like', name='uq_review_like_user_type'),
+    )
+
+
 # 임시 비밀번호 관련 스키마
 class ForgotPasswordRequest(BaseModel):
     """비밀번호 찾기 요청"""
@@ -1729,3 +1742,19 @@ class RecommendLikeResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
+
+
+class ReviewLikeCreate(BaseModel):
+    review_id: uuid.UUID
+    is_like: bool
+
+
+class ReviewLikeResponse(BaseModel):
+    id: uuid.UUID
+    review_id: uuid.UUID
+    user_id: uuid.UUID
+    is_like: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

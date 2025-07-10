@@ -20,7 +20,8 @@ from app.routers import (
     weather,
     travel_course,
     recommend_reviews,
-    likes_recommend
+    likes_recommend,
+    review_likes
 )
 
 # 로깅 설정 초기화
@@ -62,6 +63,7 @@ app.include_router(chatbot.router, prefix="/api")
 app.include_router(travel_course.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(likes_recommend.router, prefix="/api")
+app.include_router(review_likes.router, prefix="/api")
 
 @app.get("/")
 async def root():
