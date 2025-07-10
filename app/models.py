@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime, date
@@ -1365,6 +1366,7 @@ class RecommendReview(Base):
     rating = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("reviews_recommend.id"), nullable=True)  # 답글용
 
     user = relationship("User")
 
@@ -1699,6 +1701,7 @@ class RecommendReviewCreate(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     content: str
     nickname: str
+    parent_id: uuid.UUID | None = None  # 답글용
 
 
 class RecommendReviewResponse(BaseModel):
@@ -1709,6 +1712,8 @@ class RecommendReviewResponse(BaseModel):
     rating: int
     content: str
     created_at: datetime
+    parent_id: uuid.UUID | None = None  # 답글용
+    children: list[RecommendReviewResponse] = []  # 트리 구조용
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
