@@ -244,6 +244,11 @@ async def delete_travel_plan(
                 code="NOT_FOUND", message="여행 계획을 찾을 수 없습니다."
             )
 
+        # 관련 경로 데이터 먼저 삭제
+        from app.models import TravelRoute
+        db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).delete()
+        
+        # 여행 계획 삭제
         db.delete(plan)
         db.commit()
 
