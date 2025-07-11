@@ -49,13 +49,20 @@ class ChatbotService:
 
                 # 응답이 성공적으로 생성되었다면 사용
                 if ai_response and "오류" not in ai_response:
-                    # 거절 메시지인지 확인
+                    # 거절 메시지인지 확인 (챗봇 자기소개는 거절로 간주하지 않음)
                     rejection_keywords = [
                         "죄송합니다. 저는 여행과 날씨에 관한 도움만",
                         "여행 계획이나 날씨 기반 추천이 필요하시면"
                     ]
                     
-                    is_rejection = any(keyword in ai_response for keyword in rejection_keywords)
+                    # 챗봇 관련 키워드가 있으면 거절로 판단하지 않음
+                    chatbot_keywords = [
+                        "챗봇", "Weather Flick", "AI 여행 도우미", "도와드리는",
+                        "제가", "저는", "기능", "사용법", "도움을 드릴"
+                    ]
+                    
+                    has_chatbot_content = any(keyword in ai_response for keyword in chatbot_keywords)
+                    is_rejection = any(keyword in ai_response for keyword in rejection_keywords) and not has_chatbot_content
                     
                     if is_rejection:
                         # 거절 메시지인 경우, 여행 관련 추천 질문만 제공
