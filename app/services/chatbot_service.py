@@ -49,8 +49,26 @@ class ChatbotService:
 
                 # 응답이 성공적으로 생성되었다면 사용
                 if ai_response and "오류" not in ai_response:
-                    intent = self._analyze_intent(message)
-                    suggestions = self._generate_smart_suggestions(intent, message, context)
+                    # 거절 메시지인지 확인
+                    rejection_keywords = [
+                        "죄송합니다. 저는 여행과 날씨에 관한 도움만",
+                        "여행 계획이나 날씨 기반 추천이 필요하시면"
+                    ]
+                    
+                    is_rejection = any(keyword in ai_response for keyword in rejection_keywords)
+                    
+                    if is_rejection:
+                        # 거절 메시지인 경우, 여행 관련 추천 질문만 제공
+                        suggestions = [
+                            "오늘 날씨 어때요?",
+                            "여행지 추천해주세요",
+                            "날씨 좋은 관광지 알려주세요"
+                        ]
+                        intent = "rejection"
+                    else:
+                        # 정상 응답인 경우
+                        intent = self._analyze_intent(message)
+                        suggestions = self._generate_smart_suggestions(intent, message, context)
 
                     user_info = f"사용자: {user_id}" if user_id else "익명 사용자"
                     logger.info(f"OpenAI 챗봇 응답 생성 완료 - {user_info}")
