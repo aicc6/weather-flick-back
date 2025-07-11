@@ -7,7 +7,7 @@ import logging
 from app.database import get_db
 from app.auth import get_current_user_optional, get_current_user
 from app.models import User, ChatMessage
-from app.schemas.chatbot import (
+from app.schema_models.chatbot import (
     ChatMessageRequest,
     ChatMessageResponse,
     ChatHistoryResponse,
