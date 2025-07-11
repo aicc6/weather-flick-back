@@ -6,7 +6,7 @@ pydantic
 python-jose[cryptography]
 passlib[bcrypt]
 requests
-httpx
+httpx==0.24.1
 python-multipart
 psycopg2-binary
 gunicorn
@@ -16,5 +16,5 @@ google-auth
 google-auth-oauthlib
 python-dotenv
 python-json-logger
-openai
+openai==1.35.0
 
