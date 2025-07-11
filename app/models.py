@@ -1760,3 +1760,15 @@ class ReviewLikeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class TravelCourseLike(Base):
+    __tablename__ = "travel_course_likes"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    subtitle = Column(String(255))
+    summary = Column(Text)
+    description = Column(Text)
+    region = Column(String(50))
+    itinerary = Column(JSONB)
+    # 필요시 user_id 등 추가 가능
