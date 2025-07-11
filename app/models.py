@@ -1765,6 +1765,7 @@ class ReviewLikeResponse(BaseModel):
 class TravelCourseLike(Base):
     __tablename__ = "travel_course_likes"
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     subtitle = Column(String(255))
     summary = Column(Text)

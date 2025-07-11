@@ -14,6 +14,7 @@ class DayItinerary(BaseModel):
     activities: List[Activity]
 
 class TravelCourseLikeCreate(BaseModel):
+    user_id: int
     title: str
     subtitle: Optional[str] = None
     summary: Optional[str] = None
