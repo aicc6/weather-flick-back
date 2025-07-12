@@ -46,18 +46,18 @@ class AIRecommendationService:
         prompt = self._create_itinerary_prompt(request, places, weather_data)
 
         try:
-            # OpenAI API 호출
+            # OpenAI API 호출 (최적화: 간결한 시스템 메시지, 적은 토큰)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-3.5-turbo",  # 더 빠른 모델 사용
                 messages=[
                     {
                         "role": "system",
-                        "content": "당신은 한국 여행 전문가입니다. 사용자의 취향과 상황에 맞는 최적의 여행 일정을 만들어주세요. 각 일차마다 관광지, 문화시설, 음식점, 쇼핑, 숙박시설 등 다양한 유형의 장소를 조합해주세요. 특히 점심 시간에는 반드시 음식점을, 저녁 이후에는 반드시 숙박시설을 포함시켜주세요.",
+                        "content": "한국 여행 전문가. JSON 형식으로만 답변. 각 일차: 관광지, 음식점(점심), 숙박시설(저녁) 필수 포함.",
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.7,
-                max_tokens=2000,
+                temperature=0.5,  # 더 결정적인 응답
+                max_tokens=1000,  # 토큰 수 감소
             )
 
             # AI 응답 파싱
@@ -93,10 +93,10 @@ class AIRecommendationService:
             "accommodation": [],
         }
 
-        # 먼저 상위 장소들을 타입별로 분류
-        for i, place in enumerate(places[:100]):  # 상위 100개에서 선택
+        # 먼저 상위 장소들을 타입별로 분류 (최적화: 상위 50개만 사용)
+        for i, place in enumerate(places[:50]):  # 상위 50개에서 선택
             place_type = place.get("type", "other")
-            if place_type in places_by_type and len(places_by_type[place_type]) < 15:
+            if place_type in places_by_type and len(places_by_type[place_type]) < 10:
                 places_by_type[place_type].append((i, place))
 
         # 각 타입이 충분하지 않으면 전체에서 추가로 가져오기
@@ -123,13 +123,8 @@ class AIRecommendationService:
 
             if type_places:
                 place_info.append(f"\n[{type_name}]")
-                for _, (i, place) in enumerate(type_places[:10]):
+                for _, (i, place) in enumerate(type_places[:8]):  # 8개로 줄임
                     info = f"{i+1}. {place['name']}"
-                    if place.get("tags"):
-                        info += f" - 태그: {', '.join(place['tags'][:3])}"
-                    if place.get("address"):
-                        addr_parts = place["address"].split()
-                        info += f" - 위치: {addr_parts[1] if len(addr_parts) > 1 else place['address']}"
                     place_info.append(info)
 
         # 날씨 정보 요약

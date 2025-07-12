@@ -1,6 +1,12 @@
 """맞춤 여행 추천 라우터"""
 
+import asyncio
+import hashlib
+import json
 import os
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -24,6 +30,28 @@ router = APIRouter(
     tags=["custom-travel"],
 )
 
+# 인메모리 캐시 (실제 프로덕션에서는 Redis 사용 권장)
+recommendation_cache: Dict[str, Dict[str, Any]] = {}
+CACHE_DURATION = timedelta(minutes=30)  # 30분 캐시
+
+
+def get_cache_key(request: CustomTravelRecommendationRequest) -> str:
+    """요청 데이터를 기반으로 캐시 키 생성"""
+    key_data = f"{request.region_code}:{request.days}:{request.who}:{','.join(sorted(request.styles))}:{request.schedule}"
+    return hashlib.md5(key_data.encode()).hexdigest()
+
+
+def clean_expired_cache():
+    """만료된 캐시 항목 제거"""
+    now = datetime.now()
+    expired_keys = [
+        key
+        for key, value in recommendation_cache.items()
+        if now - value["timestamp"] > CACHE_DURATION
+    ]
+    for key in expired_keys:
+        del recommendation_cache[key]
+
 
 @router.post("/recommendations", response_model=CustomTravelRecommendationResponse)
 async def get_custom_travel_recommendations(
@@ -37,6 +65,13 @@ async def get_custom_travel_recommendations(
     AI가 최적화된 여행 일정을 생성합니다.
     """
     try:
+        # 캐시 확인
+        clean_expired_cache()
+        cache_key = get_cache_key(request)
+
+        if cache_key in recommendation_cache:
+            cached_data = recommendation_cache[cache_key]
+            return CustomTravelRecommendationResponse(**cached_data["response"])
         # 동행자 유형별 태그 매핑
         who_tags = {
             "solo": ["혼자", "자유로운", "개인적인", "조용한"],
@@ -70,37 +105,61 @@ async def get_custom_travel_recommendations(
             if style in style_tags:
                 selected_tags.extend(style_tags[style])
 
-        # 여행지 검색을 위한 기본 쿼리
-        attractions = (
-            db.query(TouristAttraction)
-            .filter(TouristAttraction.region_code == request.region_code)
-            .all()
-        )
+        # 병렬 DB 쿼리를 위한 함수들
+        def get_attractions():
+            return (
+                db.query(TouristAttraction)
+                .filter(TouristAttraction.region_code == request.region_code)
+                .limit(500)  # 성능 개선을 위해 제한
+                .all()
+            )
 
-        cultural_facilities = (
-            db.query(CulturalFacility)
-            .filter(CulturalFacility.region_code == request.region_code)
-            .all()
-        )
+        def get_cultural_facilities():
+            return (
+                db.query(CulturalFacility)
+                .filter(CulturalFacility.region_code == request.region_code)
+                .limit(200)
+                .all()
+            )
 
-        restaurants = (
-            db.query(Restaurant)
-            .filter(Restaurant.region_code == request.region_code)
-            .limit(50)
-            .all()
-        )
+        def get_restaurants():
+            return (
+                db.query(Restaurant)
+                .filter(Restaurant.region_code == request.region_code)
+                .limit(100)
+                .all()
+            )
 
-        shopping_places = (
-            db.query(Shopping).filter(Shopping.region_code == request.region_code).all()
-        )
+        def get_shopping_places():
+            return (
+                db.query(Shopping)
+                .filter(Shopping.region_code == request.region_code)
+                .limit(300)
+                .all()
+            )
 
-        # 숙박시설 조회 추가
-        accommodations = (
-            db.query(Accommodation)
-            .filter(Accommodation.region_code == request.region_code)
-            .limit(30)
-            .all()
-        )
+        def get_accommodations():
+            return (
+                db.query(Accommodation)
+                .filter(Accommodation.region_code == request.region_code)
+                .limit(50)
+                .all()
+            )
+
+        # ThreadPoolExecutor를 사용한 병렬 쿼리 실행
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_attractions = executor.submit(get_attractions)
+            future_cultural = executor.submit(get_cultural_facilities)
+            future_restaurants = executor.submit(get_restaurants)
+            future_shopping = executor.submit(get_shopping_places)
+            future_accommodations = executor.submit(get_accommodations)
+
+            # 모든 쿼리 결과 수집
+            attractions = future_attractions.result()
+            cultural_facilities = future_cultural.result()
+            restaurants = future_restaurants.result()
+            shopping_places = future_shopping.result()
+            accommodations = future_accommodations.result()
 
         # 모든 장소를 하나의 리스트로 통합
         all_places = []
@@ -271,21 +330,28 @@ async def get_custom_travel_recommendations(
                 }
             )
 
-        # 태그 매칭 점수 계산
+        # 태그 매칭 점수 계산 (최적화)
+        selected_tags_set = set(tag.lower() for tag in selected_tags)
+
         for place in all_places:
             score = 0
             place_tags_lower = [tag.lower() for tag in place["tags"]]
+            place_tags_set = set(place_tags_lower)
 
-            for selected_tag in selected_tags:
-                for place_tag in place_tags_lower:
+            # 태그 매칭 최적화
+            for selected_tag in selected_tags_set:
+                for place_tag in place_tags_set:
                     if selected_tag in place_tag or place_tag in selected_tag:
                         score += 1
+                        break  # 중복 점수 방지
 
             # 이름이나 설명에 태그가 포함된 경우 추가 점수
-            name_desc = (place["name"] + place["description"]).lower()
-            for selected_tag in selected_tags:
-                if selected_tag in name_desc:
-                    score += 0.5
+            if place["description"]:  # 설명이 있는 경우만 체크
+                name_desc = (place["name"] + place["description"]).lower()
+                for selected_tag in selected_tags_set:
+                    if selected_tag in name_desc:
+                        score += 0.5
+                        break  # 첫 매칭에서 중단
 
             # 장소 타입별 보너스 점수 (다양성 확보)
             # 태그 매칭 점수가 0인 경우에도 최소한의 타입 보너스 부여
@@ -398,10 +464,18 @@ async def get_custom_travel_recommendations(
             recommendation_type="custom_ai" if use_ai else "custom_basic",
         )
 
+        # 응답을 캐시에 저장
+        recommendation_cache[cache_key] = {
+            "response": response.dict(),
+            "timestamp": datetime.now(),
+        }
+
         return response
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"추천 생성 중 오류 발생: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"추천 생성 중 오류 발생: {str(e)}"
+        ) from e
 
 
 def _generate_basic_itinerary(
@@ -513,12 +587,16 @@ def _generate_basic_itinerary(
         # 장소가 부족한 경우 추가 (숙박 제외)
         # 숙박시설을 제외한 day_places 수 계산
         non_accommodation_places = [p for p in day_places if p.time != "20:00-다음날"]
-        while len(non_accommodation_places) < places_per_day and len(used_places) < len(other_places):
+        while len(non_accommodation_places) < places_per_day and len(used_places) < len(
+            other_places
+        ):
             for place in other_places:
                 if place["id"] not in used_places:
                     # 숙박시설 시간대를 제외한 시간대 선택
                     time_slot_index = len(non_accommodation_places)
-                    if time_slot_index < len(time_slots) - 1:  # 마지막(숙박) 시간대 제외
+                    if (
+                        time_slot_index < len(time_slots) - 1
+                    ):  # 마지막(숙박) 시간대 제외
                         time_slot = time_slots[time_slot_index]
                     else:
                         time_slot = "19:00-21:00"
