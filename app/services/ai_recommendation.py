@@ -52,7 +52,7 @@ class AIRecommendationService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "여행일정.JSON만.A관광C문화R음식S쇼핑L숙박.점심R필수.저녁L필수",
+                        "content": "여행일정.JSON만.A관광C문화R음식S쇼핑L숙박.점심R필수.20:00은L필수",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -97,11 +97,18 @@ class AIRecommendationService:
             "accommodation": [],
         }
 
-        # 상위 30개만 사용 (토큰 절약)
-        for i, place in enumerate(places[:30]):
+        # 타입별로 균형있게 수집 (토큰 절약)
+        type_counts = {"attraction": 0, "cultural": 0, "restaurant": 0, "shopping": 0, "accommodation": 0}
+        
+        for i, place in enumerate(places):
             place_type = place.get("type", "other")
             if place_type in places_by_type and len(places_by_type[place_type]) < 6:
                 places_by_type[place_type].append((i, place))
+                type_counts[place_type] += 1
+                
+                # 모든 타입에서 충분한 장소를 수집했으면 중단
+                if all(count >= 5 for count in type_counts.values()):
+                    break
 
         # 날씨 정보 요약
         weather_info = []
@@ -121,9 +128,18 @@ class AIRecommendationService:
         place_map = {}  # 인덱스 매핑용
 
         # 장소를 타입별로 그룹화하여 간결하게 표현
+        type_prefix = {
+            "attraction": "A",    # 관광지
+            "cultural": "C",      # 문화
+            "restaurant": "R",    # 음식점
+            "shopping": "S",      # 쇼핑
+            "accommodation": "L", # 숙박 (Lodging)
+        }
+        
         for ptype, type_places in places_by_type.items():
             if type_places:
-                places_str += f"\n{ptype[0].upper()}:"  # A:관광지, C:문화, R:음식점, S:쇼핑, L:숙박
+                prefix = type_prefix.get(ptype, ptype[0].upper())
+                places_str += f"\n{prefix}:"  # A:관광지, C:문화, R:음식점, S:쇼핑, L:숙박
                 for _, (i, place) in enumerate(type_places[:5]):  # 5개로 줄임
                     places_str += f"{place_idx},"
                     place_map[place_idx] = i + 1  # 원본 인덱스 저장
@@ -142,6 +158,10 @@ class AIRecommendationService:
 하루{4 if request.schedule == 'packed' else 3}+숙박1
 JSON만:
 {{"d":[{{"n":1,"p":[{{"i":번호,"t":"시간"}},...]}}]}}"""
+        
+        logger.info(f"프롬프트 생성 완료: {prompt[:200]}...")
+        logger.info(f"장소 타입별 개수: {[(k, len(v)) for k, v in places_by_type.items() if v]}")
+        
         return prompt
 
     def _parse_ai_response(self, response: str) -> dict[str, Any]:

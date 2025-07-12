@@ -4,7 +4,6 @@ import asyncio
 import hashlib
 import json
 import os
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
@@ -104,62 +103,87 @@ async def get_custom_travel_recommendations(
         for style in request.styles:
             if style in style_tags:
                 selected_tags.extend(style_tags[style])
+        
+        # region_code 매핑 (프론트엔드 코드와 DB 코드 차이 해결)
+        region_code_mapping = {
+            "11": "1",    # 서울
+            "26": "6",    # 부산
+            "27": "4",    # 대구
+            "28": "2",    # 인천
+            "29": "5",    # 광주
+            "30": "3",    # 대전
+            "31": "7",    # 울산
+            "36": "8",    # 세종
+            "41": "31",   # 경기
+            "43": "33",   # 충북
+            "44": "34",   # 충남
+            "46": "36",   # 전남
+            "47": "35",   # 경북
+            "48": "38",   # 경남
+            "50": "39",   # 제주
+            "51": "32",   # 강원
+            "52": "37",   # 전북
+        }
+        
+        # 실제 DB에서 사용할 region_code
+        db_region_code = region_code_mapping.get(request.region_code, request.region_code)
 
-        # 병렬 DB 쿼리를 위한 함수들
-        def get_attractions():
-            return (
+        # 순차적 DB 쿼리 실행 (안정성 우선)
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            # 관광지 조회
+            attractions = (
                 db.query(TouristAttraction)
-                .filter(TouristAttraction.region_code == request.region_code)
+                .filter(TouristAttraction.region_code == db_region_code)
                 .limit(500)  # 성능 개선을 위해 제한
                 .all()
             )
-
-        def get_cultural_facilities():
-            return (
+            logger.info(f"Found {len(attractions)} attractions")
+            
+            # 문화시설 조회
+            cultural_facilities = (
                 db.query(CulturalFacility)
-                .filter(CulturalFacility.region_code == request.region_code)
+                .filter(CulturalFacility.region_code == db_region_code)
                 .limit(200)
                 .all()
             )
-
-        def get_restaurants():
-            return (
+            logger.info(f"Found {len(cultural_facilities)} cultural facilities")
+            
+            # 음식점 조회
+            restaurants = (
                 db.query(Restaurant)
-                .filter(Restaurant.region_code == request.region_code)
+                .filter(Restaurant.region_code == db_region_code)
                 .limit(100)
                 .all()
             )
-
-        def get_shopping_places():
-            return (
+            logger.info(f"Found {len(restaurants)} restaurants")
+            
+            # 쇼핑 장소 조회
+            shopping_places = (
                 db.query(Shopping)
-                .filter(Shopping.region_code == request.region_code)
+                .filter(Shopping.region_code == db_region_code)
                 .limit(300)
                 .all()
             )
-
-        def get_accommodations():
-            return (
+            logger.info(f"Found {len(shopping_places)} shopping places")
+            
+            # 숙박시설 조회
+            accommodations = (
                 db.query(Accommodation)
-                .filter(Accommodation.region_code == request.region_code)
+                .filter(Accommodation.region_code == db_region_code)
                 .limit(50)
                 .all()
             )
-
-        # ThreadPoolExecutor를 사용한 병렬 쿼리 실행
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            future_attractions = executor.submit(get_attractions)
-            future_cultural = executor.submit(get_cultural_facilities)
-            future_restaurants = executor.submit(get_restaurants)
-            future_shopping = executor.submit(get_shopping_places)
-            future_accommodations = executor.submit(get_accommodations)
-
-            # 모든 쿼리 결과 수집
-            attractions = future_attractions.result()
-            cultural_facilities = future_cultural.result()
-            restaurants = future_restaurants.result()
-            shopping_places = future_shopping.result()
-            accommodations = future_accommodations.result()
+            logger.info(f"Found {len(accommodations)} accommodations")
+            
+        except Exception as e:
+            logger.error(f"Database query error: {str(e)}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"데이터베이스 조회 중 오류 발생: {str(e)}"
+            )
 
         # 모든 장소를 하나의 리스트로 통합
         all_places = []
@@ -167,6 +191,7 @@ async def get_custom_travel_recommendations(
         # 디버그 정보를 파일에 기록
         with open("/tmp/custom_travel_debug.log", "a") as f:
             f.write("\n=== 새로운 요청 ===\n")
+            f.write(f"원본 region_code: {request.region_code}, 변환된 region_code: {db_region_code}\n")
             f.write(
                 f"DB 조회 결과: 관광지 {len(attractions)}개, 문화시설 {len(cultural_facilities)}개, 음식점 {len(restaurants)}개, 쇼핑 {len(shopping_places)}개, 숙박 {len(accommodations)}개\n"
             )
@@ -174,7 +199,7 @@ async def get_custom_travel_recommendations(
 
         # 관광지 추가
         for place in attractions:
-            tags = []
+            tags = ["관광지"]  # 기본 태그 추가
             if place.category_code:
                 tags.append(place.category_code)
             if hasattr(place, "tags") and place.tags:
@@ -359,8 +384,8 @@ async def get_custom_travel_recommendations(
                 "attraction": 1.0,  # 관광지 우선
                 "cultural": 0.8,  # 문화시설
                 "shopping": 0.6,  # 쇼핑
-                "restaurant": 0.3,  # 음식점 (점심시간에 자동 선택되므로 낮은 점수)
-                "accommodation": 0.4,  # 숙박시설 (매일 필요하므로 적당한 점수)
+                "restaurant": 0.5,  # 음식점
+                "accommodation": 0.7,  # 숙박시설 (적당한 우선순위)
             }
 
             # 최종 점수: 태그 매칭 점수 + 타입 보너스
@@ -380,6 +405,34 @@ async def get_custom_travel_recommendations(
 
         # 점수 기준으로 정렬
         all_places.sort(key=lambda x: x["score"], reverse=True)
+        
+        # 타입별로 최소한의 다양성을 보장하기 위해 재정렬
+        # 각 타입별로 상위 N개씩 추출
+        type_top_places = {
+            "attraction": [],
+            "cultural": [],
+            "restaurant": [],
+            "shopping": [],
+            "accommodation": [],
+        }
+        
+        for place in all_places:
+            place_type = place.get("type")
+            if place_type in type_top_places and len(type_top_places[place_type]) < 20:
+                type_top_places[place_type].append(place)
+        
+        # 라운드 로빈 방식으로 다양한 타입 보장
+        diversified_places = []
+        max_per_type = max(len(places) for places in type_top_places.values())
+        
+        for i in range(max_per_type):
+            for place_type in ["attraction", "cultural", "restaurant", "shopping", "accommodation"]:
+                if i < len(type_top_places[place_type]):
+                    diversified_places.append(type_top_places[place_type][i])
+        
+        # 나머지 장소들 추가
+        remaining_places = [p for p in all_places if p not in diversified_places]
+        all_places = diversified_places + remaining_places
 
         # 디버깅: 장소 타입별 개수 확인
         type_counts = {}
@@ -396,7 +449,7 @@ async def get_custom_travel_recommendations(
                 )
 
         # AI 추천 사용 여부 확인
-        use_ai = os.getenv("OPENAI_API_KEY") and len(all_places) > 0
+        use_ai = False  # 임시로 AI 비활성화 (폴백 로직 사용)
 
         if use_ai:
             try:
