@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+import os
 
 from app.database import get_db
 from app.models import (
@@ -14,6 +15,7 @@ from app.models import (
     Restaurant,
     Shopping,
 )
+from app.services.ai_recommendation import AIRecommendationService
 
 router = APIRouter(
     prefix="/custom-travel",
@@ -185,99 +187,21 @@ async def get_custom_travel_recommendations(
         # 점수 기준으로 정렬
         all_places.sort(key=lambda x: x['score'], reverse=True)
         
-        # 일정 유형에 따른 하루 장소 수 결정
-        places_per_day = 4 if request.schedule == "packed" else 3
+        # AI 추천 사용 여부 확인
+        use_ai = os.getenv("OPENAI_API_KEY") and len(all_places) > 0
         
-        # 일별 일정 생성
-        days = []
-        used_places = set()
-        
-        for day in range(1, request.days + 1):
-            day_places = []
-            place_count = 0
-            
-            # 시간대 설정
-            if request.schedule == "packed":
-                time_slots = ["09:00-11:00", "11:30-13:30", "14:00-16:00", "16:30-18:30"]
-            else:
-                time_slots = ["10:00-12:00", "14:00-16:00", "17:00-19:00"]
-            
-            # 아침/점심/저녁 시간대별로 적절한 장소 선택
-            for i, time_slot in enumerate(time_slots[:places_per_day]):
-                # 점심시간대에는 음식점 우선
-                if i == 1 or (i == 2 and request.schedule == "relaxed"):
-                    restaurant_found = False
-                    for place in all_places:
-                        if place['type'] == 'restaurant' and place['id'] not in used_places:
-                            place_rec = PlaceRecommendation(
-                                id=place['id'],
-                                name=place['name'],
-                                time=time_slot,
-                                tags=place['tags'][:3],
-                                description=place['description'],
-                                rating=place['rating'],
-                                image=place['image'],
-                                address=place['address'],
-                                latitude=place['latitude'],
-                                longitude=place['longitude']
-                            )
-                            day_places.append(place_rec)
-                            used_places.add(place['id'])
-                            restaurant_found = True
-                            break
-                    
-                    if restaurant_found:
-                        continue
-                
-                # 일반 장소 선택
-                for place in all_places:
-                    if place['id'] not in used_places and place['score'] > 0:
-                        place_rec = PlaceRecommendation(
-                            id=place['id'],
-                            name=place['name'],
-                            time=time_slot,
-                            tags=place['tags'][:3],
-                            description=place['description'],
-                            rating=place['rating'],
-                            image=place['image'],
-                            address=place['address'],
-                            latitude=place['latitude'],
-                            longitude=place['longitude']
-                        )
-                        day_places.append(place_rec)
-                        used_places.add(place['id'])
-                        break
-            
-            # 장소가 부족한 경우 점수 상관없이 추가
-            while len(day_places) < places_per_day and len(used_places) < len(all_places):
-                for place in all_places:
-                    if place['id'] not in used_places:
-                        time_slot = time_slots[len(day_places)] if len(day_places) < len(time_slots) else "19:00-21:00"
-                        place_rec = PlaceRecommendation(
-                            id=place['id'],
-                            name=place['name'],
-                            time=time_slot,
-                            tags=place['tags'][:3],
-                            description=place['description'],
-                            rating=place['rating'],
-                            image=place['image'],
-                            address=place['address'],
-                            latitude=place['latitude'],
-                            longitude=place['longitude']
-                        )
-                        day_places.append(place_rec)
-                        used_places.add(place['id'])
-                        break
-                
-                if len(day_places) >= places_per_day:
-                    break
-            
-            day_itinerary = DayItinerary(
-                day=day,
-                places=day_places,
-                weather={"status": "맑음", "temperature": "15-22°C"}  # 임시 날씨 정보
-            )
-            days.append(day_itinerary)
+        if use_ai:
+            try:
+                # AI 추천 서비스 사용
+                ai_service = AIRecommendationService(db)
+                days = ai_service.generate_travel_itinerary(request, all_places)
+            except Exception as e:
+                print(f"AI 추천 실패, 폴백 사용: {str(e)}")
+                # 폴백: 기존 로직 사용
+                days = _generate_basic_itinerary(request, all_places)
+        else:
+            # 기존 로직 사용
+            days = _generate_basic_itinerary(request, all_places)
         
         # 응답 생성
         total_places = sum(len(day.places) for day in days)
@@ -297,3 +221,100 @@ async def get_custom_travel_recommendations(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"추천 생성 중 오류 발생: {str(e)}")
+
+
+def _generate_basic_itinerary(
+    request: CustomTravelRecommendationRequest,
+    all_places: list
+) -> List[DayItinerary]:
+    """기본 태그 기반 일정 생성 (폴백용)"""
+    
+    places_per_day = 4 if request.schedule == "packed" else 3
+    days = []
+    used_places = set()
+    
+    for day in range(1, request.days + 1):
+        day_places = []
+        
+        # 시간대 설정
+        if request.schedule == "packed":
+            time_slots = ["09:00-11:00", "11:30-13:30", "14:00-16:00", "16:30-18:30"]
+        else:
+            time_slots = ["10:00-12:00", "14:00-16:00", "17:00-19:00"]
+        
+        # 시간대별로 장소 선택
+        for i, time_slot in enumerate(time_slots[:places_per_day]):
+            # 점심시간대에는 음식점 우선
+            if i == 1 or (i == 2 and request.schedule == "relaxed"):
+                for place in all_places:
+                    if place['type'] == 'restaurant' and place['id'] not in used_places:
+                        place_rec = PlaceRecommendation(
+                            id=place['id'],
+                            name=place['name'],
+                            time=time_slot,
+                            tags=place['tags'][:3],
+                            description=place['description'],
+                            rating=place['rating'],
+                            image=place['image'],
+                            address=place['address'],
+                            latitude=place['latitude'],
+                            longitude=place['longitude']
+                        )
+                        day_places.append(place_rec)
+                        used_places.add(place['id'])
+                        break
+                
+                if len(day_places) > i:
+                    continue
+            
+            # 일반 장소 선택
+            for place in all_places:
+                if place['id'] not in used_places and place['score'] > 0:
+                    place_rec = PlaceRecommendation(
+                        id=place['id'],
+                        name=place['name'],
+                        time=time_slot,
+                        tags=place['tags'][:3],
+                        description=place['description'],
+                        rating=place['rating'],
+                        image=place['image'],
+                        address=place['address'],
+                        latitude=place['latitude'],
+                        longitude=place['longitude']
+                    )
+                    day_places.append(place_rec)
+                    used_places.add(place['id'])
+                    break
+        
+        # 장소가 부족한 경우 추가
+        while len(day_places) < places_per_day and len(used_places) < len(all_places):
+            for place in all_places:
+                if place['id'] not in used_places:
+                    time_slot = time_slots[len(day_places)] if len(day_places) < len(time_slots) else "19:00-21:00"
+                    place_rec = PlaceRecommendation(
+                        id=place['id'],
+                        name=place['name'],
+                        time=time_slot,
+                        tags=place['tags'][:3],
+                        description=place['description'],
+                        rating=place['rating'],
+                        image=place['image'],
+                        address=place['address'],
+                        latitude=place['latitude'],
+                        longitude=place['longitude']
+                    )
+                    day_places.append(place_rec)
+                    used_places.add(place['id'])
+                    break
+            
+            if len(day_places) >= places_per_day:
+                break
+        
+        day_itinerary = DayItinerary(
+            day=day,
+            places=day_places,
+            weather={"status": "맑음", "temperature": "15-22°C"}
+        )
+        days.append(day_itinerary)
+    
+    return days
