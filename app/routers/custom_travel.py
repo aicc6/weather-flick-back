@@ -88,6 +88,14 @@ async def get_custom_travel_recommendations(
         # 모든 장소를 하나의 리스트로 통합
         all_places = []
         
+        import logging
+        logger = logging.getLogger(__name__)
+        # 디버그 정보를 파일에 기록
+        with open('/tmp/custom_travel_debug.log', 'a') as f:
+            f.write(f"\n=== 새로운 요청 ===\n")
+            f.write(f"DB 조회 결과: 관광지 {len(attractions)}개, 문화시설 {len(cultural_facilities)}개, 음식점 {len(restaurants)}개, 쇼핑 {len(shopping_places)}개\n")
+            f.write(f"요청 정보: {request.who}, {request.styles}\n")
+        
         # 관광지 추가
         for place in attractions:
             tags = []
@@ -181,11 +189,42 @@ async def get_custom_travel_recommendations(
             for selected_tag in selected_tags:
                 if selected_tag in name_desc:
                     score += 0.5
-                    
-            place['score'] = score
+            
+            # 장소 타입별 보너스 점수 (다양성 확보)
+            # 태그 매칭 점수가 0인 경우에도 최소한의 타입 보너스 부여
+            type_bonus = {
+                'attraction': 1.0,  # 관광지 우선
+                'cultural': 0.8,    # 문화시설
+                'shopping': 0.6,    # 쇼핑
+                'restaurant': 0.3   # 음식점 (점심시간에 자동 선택되므로 낮은 점수)
+            }
+            
+            # 최종 점수: 태그 매칭 점수 + 타입 보너스
+            # 태그 매칭이 없어도 타입 보너스로 포함될 수 있도록
+            place['score'] = score + type_bonus.get(place['type'], 0)
+            
+            # 특정 스타일에 대한 추가 보너스
+            if 'shopping' in request.styles and place['type'] == 'shopping':
+                place['score'] += 2.0
+            if 'culture' in request.styles and place['type'] == 'cultural':
+                place['score'] += 2.0
+            if 'landmark' in request.styles and place['type'] in ['attraction', 'cultural']:
+                place['score'] += 1.0
         
         # 점수 기준으로 정렬
         all_places.sort(key=lambda x: x['score'], reverse=True)
+        
+        # 디버깅: 장소 타입별 개수 확인
+        type_counts = {}
+        for place in all_places[:50]:  # 상위 50개만 확인
+            place_type = place.get('type', 'unknown')
+            type_counts[place_type] = type_counts.get(place_type, 0) + 1
+        with open('/tmp/custom_travel_debug.log', 'a') as f:
+            f.write(f"장소 타입별 개수 (상위 50개): {type_counts}\n")
+            f.write(f"전체 장소 수: {len(all_places)}\n")
+            f.write(f"상위 10개 장소:\n")
+            for i, place in enumerate(all_places[:10]):
+                f.write(f"  {i+1}. {place['name']} (타입: {place['type']}, 점수: {place['score']})\n")
         
         # AI 추천 사용 여부 확인
         use_ai = os.getenv("OPENAI_API_KEY") and len(all_places) > 0
@@ -194,7 +233,7 @@ async def get_custom_travel_recommendations(
             try:
                 # AI 추천 서비스 사용
                 ai_service = AIRecommendationService(db)
-                days = ai_service.generate_travel_itinerary(request, all_places)
+                days = await ai_service.generate_travel_itinerary(request, all_places)
             except Exception as e:
                 print(f"AI 추천 실패, 폴백 사용: {str(e)}")
                 # 폴백: 기존 로직 사용
@@ -203,18 +242,56 @@ async def get_custom_travel_recommendations(
             # 기존 로직 사용
             days = _generate_basic_itinerary(request, all_places)
         
+        # 날씨 정보 가져오기 (AI 서비스가 사용된 경우 이미 포함됨)
+        weather_summary = {
+            "forecast": "대체로 맑음",
+            "average_temperature": "15-22°C",
+            "recommendation": "야외 활동하기 좋은 날씨입니다."
+        }
+        
+        # AI 추천이 사용된 경우 날씨 정보 업데이트
+        if use_ai and days:
+            # 각 날짜의 날씨 정보를 집계
+            total_rain_prob = 0
+            min_temp = 100
+            max_temp = -100
+            rain_days = 0
+            
+            for day in days:
+                if day.weather and isinstance(day.weather, dict):
+                    rain_prob = day.weather.get('rain_probability', 0)
+                    if rain_prob > 60:
+                        rain_days += 1
+                    
+                    # 온도 범위 파싱
+                    temp_range = day.weather.get('temperature', '15-22°C')
+                    if '-' in temp_range:
+                        temps = temp_range.replace('°C', '').split('-')
+                        try:
+                            min_temp = min(min_temp, int(temps[0]))
+                            max_temp = max(max_temp, int(temps[1]))
+                        except:
+                            pass
+            
+            # 날씨 요약 업데이트
+            if rain_days > 0:
+                weather_summary["forecast"] = f"{rain_days}일간 비 예보"
+                weather_summary["recommendation"] = "우산을 준비하세요. 실내 활동도 계획하세요."
+            else:
+                weather_summary["forecast"] = "대체로 맑음"
+                weather_summary["recommendation"] = "야외 활동하기 좋은 날씨입니다."
+            
+            if min_temp < 100 and max_temp > -100:
+                weather_summary["average_temperature"] = f"{min_temp}-{max_temp}°C"
+        
         # 응답 생성
         total_places = sum(len(day.places) for day in days)
         
         response = CustomTravelRecommendationResponse(
             days=days,
-            weather_summary={
-                "forecast": "대체로 맑음",
-                "average_temperature": "15-22°C",
-                "recommendation": "야외 활동하기 좋은 날씨입니다."
-            },
+            weather_summary=weather_summary,
             total_places=total_places,
-            recommendation_type="custom_ai"
+            recommendation_type="custom_ai" if use_ai else "custom_basic"
         )
         
         return response
@@ -267,9 +344,15 @@ def _generate_basic_itinerary(
                 if len(day_places) > i:
                     continue
             
-            # 일반 장소 선택
+            # 일반 장소 선택 (타입 다양성 고려)
+            # 이미 선택된 타입 확인
+            selected_types = [p.tags[0] for p in day_places if p.tags]
+            
+            # 다른 타입 우선 선택
             for place in all_places:
-                if place['id'] not in used_places and place['score'] > 0:
+                if (place['id'] not in used_places and 
+                    place['score'] > 0 and
+                    place['type'] not in selected_types):
                     place_rec = PlaceRecommendation(
                         id=place['id'],
                         name=place['name'],
@@ -284,7 +367,28 @@ def _generate_basic_itinerary(
                     )
                     day_places.append(place_rec)
                     used_places.add(place['id'])
+                    selected_types.append(place['type'])
                     break
+            
+            # 다른 타입이 없으면 점수 순으로 선택
+            if len(day_places) <= i:
+                for place in all_places:
+                    if place['id'] not in used_places and place['score'] > 0:
+                        place_rec = PlaceRecommendation(
+                            id=place['id'],
+                            name=place['name'],
+                            time=time_slot,
+                            tags=place['tags'][:3],
+                            description=place['description'],
+                            rating=place['rating'],
+                            image=place['image'],
+                            address=place['address'],
+                            latitude=place['latitude'],
+                            longitude=place['longitude']
+                        )
+                        day_places.append(place_rec)
+                        used_places.add(place['id'])
+                        break
         
         # 장소가 부족한 경우 추가
         while len(day_places) < places_per_day and len(used_places) < len(all_places):

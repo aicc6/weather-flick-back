@@ -312,7 +312,7 @@ class KMAWeatherService:
 
             daily_forecast.append(daily_data)
 
-        return {"nx": nx, "ny": ny, "forecast": daily_forecast}
+        return {"nx": nx, "ny": ny, "forecast": items, "daily_forecast": daily_forecast}
 
     def _parse_mid_forecast_kma(
         self, data: dict[str, Any], regId: str
