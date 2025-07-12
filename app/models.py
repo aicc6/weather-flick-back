@@ -961,7 +961,7 @@ class CulturalFacility(Base):
     use_time = Column(String)
 
     # 설명 및 이미지
-    description = Column(Text)
+    # description = Column(Text)  # 실제 DB에 없음
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
@@ -1098,7 +1098,7 @@ class Shopping(Base):
     fair_day = Column(String)
 
     # 설명 및 이미지
-    description = Column(Text)
+    # description = Column(Text)  # 실제 DB에 없음
     overview = Column(Text)
     first_image = Column(String)
     first_image_small = Column(String)
@@ -1773,3 +1773,46 @@ class TravelCourseLike(Base):
     region = Column(String(50))
     itinerary = Column(JSONB)
     # 필요시 user_id 등 추가 가능
+
+
+# 맞춤 일정 추천 관련 모델들
+class CustomTravelRecommendationRequest(BaseModel):
+    """맞춤 일정 추천 요청 모델"""
+    region_code: str = Field(..., description="지역 코드")
+    region_name: str = Field(..., description="지역 이름")
+    period: str = Field(..., description="여행 기간 (당일치기, 1박2일 등)")
+    days: int = Field(..., ge=1, le=7, description="여행 일수")
+    who: str = Field(..., description="동행자 유형 (solo, couple, family, friends, colleagues, group)")
+    styles: List[str] = Field(..., description="여행 스타일 (activity, hotplace, nature, landmark, healing, culture, local, shopping, food, pet)")
+    schedule: str = Field(..., description="일정 유형 (packed, relaxed)")
+    
+
+class PlaceRecommendation(BaseModel):
+    """추천 장소 모델"""
+    id: str = Field(..., description="장소 ID")
+    name: str = Field(..., description="장소 이름")
+    time: str = Field(..., description="방문 시간 (예: 09:00-11:00)")
+    tags: List[str] = Field(..., description="장소 태그")
+    description: str = Field(..., description="장소 설명")
+    rating: float = Field(..., ge=0, le=5, description="평점")
+    image: Optional[str] = Field(None, description="이미지 URL")
+    address: Optional[str] = Field(None, description="주소")
+    latitude: Optional[float] = Field(None, description="위도")
+    longitude: Optional[float] = Field(None, description="경도")
+    
+
+class DayItinerary(BaseModel):
+    """일별 여행 일정"""
+    day: int = Field(..., description="일차")
+    date: Optional[str] = Field(None, description="날짜")
+    places: List[PlaceRecommendation] = Field(..., description="추천 장소 목록")
+    weather: Optional[dict] = Field(None, description="날씨 정보")
+    
+
+class CustomTravelRecommendationResponse(BaseModel):
+    """맞춤 일정 추천 응답 모델"""
+    days: List[DayItinerary] = Field(..., description="일별 여행 일정")
+    weather_summary: Optional[dict] = Field(None, description="전체 날씨 요약")
+    total_places: int = Field(..., description="총 추천 장소 수")
+    recommendation_type: str = Field(..., description="추천 유형")
+    created_at: datetime = Field(default_factory=lambda: datetime.now())

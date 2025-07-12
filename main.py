@@ -14,7 +14,7 @@ from app.routers import (
     location,
     naver_map,
     plan,
-    recommendations,
+    # recommendations,
     routes,
     travel_plans,
     weather,
@@ -22,7 +22,8 @@ from app.routers import (
     recommend_reviews,
     likes_recommend,
     review_likes,
-    travel_course_like
+    travel_course_like,
+    custom_travel
 )
 
 # 로깅 설정 초기화
@@ -53,7 +54,7 @@ app.include_router(kma_weather.router, prefix="/api")
 app.include_router(local_info.router, prefix="/api")
 app.include_router(naver_map.router, prefix="/api")
 app.include_router(travel_plans.router, prefix="/api")
-app.include_router(recommendations.router, prefix="/api")
+# app.include_router(recommendations.router, prefix="/api")
 app.include_router(recommend_reviews.router, prefix="/api")
 app.include_router(destinations.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
@@ -66,6 +67,7 @@ app.include_router(routes.router, prefix="/api")
 app.include_router(likes_recommend.router, prefix="/api")
 app.include_router(review_likes.router, prefix="/api")
 app.include_router(travel_course_like.router, prefix="/api")
+app.include_router(custom_travel.router, prefix="/api")
 
 @app.get("/")
 async def root():
