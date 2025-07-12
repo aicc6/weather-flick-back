@@ -46,23 +46,28 @@ class AIRecommendationService:
         prompt = self._create_itinerary_prompt(request, places, weather_data)
 
         try:
-            # OpenAI API 호출 (최적화: 간결한 시스템 메시지, 적은 토큰)
+            # OpenAI API 호출 (최적화: 최소 토큰 사용)
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",  # 더 빠른 모델 사용
                 messages=[
                     {
                         "role": "system",
-                        "content": "한국 여행 전문가. JSON 형식으로만 답변. 각 일차: 관광지, 음식점(점심), 숙박시설(저녁) 필수 포함.",
+                        "content": "여행일정.JSON만.A관광C문화R음식S쇼핑L숙박.점심R필수.저녁L필수",
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.5,  # 더 결정적인 응답
-                max_tokens=1000,  # 토큰 수 감소
+                temperature=0.3,  # 더 결정적인 응답
+                max_tokens=500,  # 토큰 수 대폭 감소
             )
 
             # AI 응답 파싱
             ai_response = response.choices[0].message.content
-            logger.info(f"AI 응답: {ai_response[:500]}...")  # 디버깅용
+            
+            # 토큰 사용량 로깅
+            usage = response.usage
+            logger.info(f"토큰 사용량 - 프롬프트: {usage.prompt_tokens}, 응답: {usage.completion_tokens}, 총: {usage.total_tokens}")
+            logger.info(f"AI 응답: {ai_response[:200]}...")  # 디버깅용
+            
             itinerary_data = self._parse_ai_response(ai_response)
 
             # DayItinerary 객체로 변환 (날씨 정보 포함)
@@ -83,8 +88,7 @@ class AIRecommendationService:
     ) -> str:
         """AI 프롬프트 생성"""
 
-        # 장소 정보 요약 (타입별로 분류)
-        place_info = []
+        # 장소 정보 요약 (타입별로 분류) - 토큰 최적화
         places_by_type = {
             "attraction": [],
             "cultural": [],
@@ -93,39 +97,11 @@ class AIRecommendationService:
             "accommodation": [],
         }
 
-        # 먼저 상위 장소들을 타입별로 분류 (최적화: 상위 50개만 사용)
-        for i, place in enumerate(places[:50]):  # 상위 50개에서 선택
+        # 상위 30개만 사용 (토큰 절약)
+        for i, place in enumerate(places[:30]):
             place_type = place.get("type", "other")
-            if place_type in places_by_type and len(places_by_type[place_type]) < 10:
+            if place_type in places_by_type and len(places_by_type[place_type]) < 6:
                 places_by_type[place_type].append((i, place))
-
-        # 각 타입이 충분하지 않으면 전체에서 추가로 가져오기
-        for place_type in places_by_type:
-            if len(places_by_type[place_type]) < 5:
-                for i, place in enumerate(places):
-                    if (
-                        place.get("type") == place_type
-                        and (i, place) not in places_by_type[place_type]
-                    ):
-                        places_by_type[place_type].append((i, place))
-                        if len(places_by_type[place_type]) >= 10:
-                            break
-
-        # 각 타입별로 장소 정보 추가
-        for place_type, type_places in places_by_type.items():
-            type_name = {
-                "attraction": "관광지",
-                "cultural": "문화시설",
-                "restaurant": "음식점",
-                "shopping": "쇼핑",
-                "accommodation": "숙박시설",
-            }.get(place_type, place_type)
-
-            if type_places:
-                place_info.append(f"\n[{type_name}]")
-                for _, (i, place) in enumerate(type_places[:8]):  # 8개로 줄임
-                    info = f"{i+1}. {place['name']}"
-                    place_info.append(info)
 
         # 날씨 정보 요약
         weather_info = []
@@ -139,72 +115,33 @@ class AIRecommendationService:
                     f"강수확률 {day_weather.get('rain_probability', 0)}%"
                 )
 
-        prompt = f"""
-다음 정보를 바탕으로 {request.days}일간의 여행 일정을 만들어주세요:
+        # 압축된 프롬프트 (토큰 절약)
+        places_str = ""
+        place_idx = 1
+        place_map = {}  # 인덱스 매핑용
 
-여행 정보:
-- 지역: {request.region_name}
-- 기간: {request.period} ({request.days}일)
-- 동행자: {request.who}
-- 선호 스타일: {', '.join(request.styles)}
-- 일정 스타일: {request.schedule} ({'빡빡한 일정' if request.schedule == 'packed' else '여유로운 일정'})
+        # 장소를 타입별로 그룹화하여 간결하게 표현
+        for ptype, type_places in places_by_type.items():
+            if type_places:
+                places_str += f"\n{ptype[0].upper()}:"  # A:관광지, C:문화, R:음식점, S:쇼핑, L:숙박
+                for _, (i, place) in enumerate(type_places[:5]):  # 5개로 줄임
+                    places_str += f"{place_idx},"
+                    place_map[place_idx] = i + 1  # 원본 인덱스 저장
+                    place_idx += 1
 
-날씨 예보:
-{chr(10).join(weather_info) if weather_info else '날씨 정보 없음'}
-- 전반적 예보: {weather_data.get('forecast', '대체로 맑음')}
-- 날씨 권장사항: {weather_data.get('recommendation', '야외 활동하기 좋은 날씨입니다')}
+        # 날씨 정보 간소화
+        weather_str = ""
+        if weather_data.get("daily_forecast"):
+            for i, dw in enumerate(weather_data["daily_forecast"][: request.days]):
+                if dw.get("rain_probability", 0) > 60:
+                    weather_str += f"D{i+1}:비,"
 
-사용 가능한 장소들:
-{chr(10).join(place_info)}
-
-요구사항:
-1. 하루에 {4 if request.schedule == 'packed' else 3}개의 일반 장소 + 1개의 숙박시설을 배치해주세요
-2. 점심시간(12:00-14:00)에는 반드시 음식점을 포함해주세요
-3. 매일 저녁(20:00 이후)에는 반드시 숙박시설을 포함해주세요
-4. 이동 동선을 고려하여 효율적으로 배치해주세요 (같은 구/지역 우선)
-5. 동행자 유형과 여행 스타일에 맞는 장소를 우선 선택해주세요
-6. 각 일차별로 테마가 있도록 구성해주세요
-7. 날씨를 고려하여 비 오는 날은 실내 활동 위주로 배치해주세요
-8. 장소 타입을 다양하게 섞어주세요 (관광지, 문화시설, 쇼핑 등)
-9. 오전에는 관광지나 문화시설, 오후에는 쇼핑이나 카페 등을 배치해주세요
-10. 숙박시설은 여행 일수 동안 동일한 곳을 사용할 수 있습니다
-
-응답 형식 (JSON):
-{{
-    "days": [
-        {{
-            "day": 1,
-            "theme": "첫날 테마",
-            "weather_consideration": "날씨를 고려한 설명",
-            "places": [
-                {{
-                    "place_index": 1,  // 위 목록에서 선택한 장소의 번호
-                    "time_slot": "09:00-11:00",
-                    "reason": "선택 이유"
-                }},
-                {{
-                    "place_index": 25,  // 음식점 선택 예시
-                    "time_slot": "12:00-14:00",
-                    "reason": "점심 식사"
-                }},
-                {{
-                    "place_index": 15,  // 오후 관광지
-                    "time_slot": "15:00-17:00",
-                    "reason": "오후 활동"
-                }},
-                {{
-                    "place_index": 45,  // 숙박시설
-                    "time_slot": "20:00-다음날",
-                    "reason": "숙박"
-                }}
-            ]
-        }}
-    ],
-    "tips": ["여행 팁 1", "여행 팁 2"]
-}}
-
-주의: 각 장소의 place_index는 위에 제공된 장소 목록의 실제 번호여야 합니다.
-"""
+        prompt = f"""{request.region_name},{request.days}일,{request.who},{'+'.join(request.styles[:2])},{request.schedule[0]}
+{weather_str}
+장소:{places_str}
+하루{4 if request.schedule == 'packed' else 3}+숙박1
+JSON만:
+{{"d":[{{"n":1,"p":[{{"i":번호,"t":"시간"}},...]}}]}}"""
         return prompt
 
     def _parse_ai_response(self, response: str) -> dict[str, Any]:
@@ -235,21 +172,47 @@ class AIRecommendationService:
         used_places = set()
         daily_forecast = weather_data.get("daily_forecast", [])
 
-        for day_data in itinerary_data.get("days", []):
+        # 시간 슬롯 정의
+        time_slots = {
+            "packed": [
+                "09:00-11:00",
+                "11:30-13:30",
+                "14:00-16:00",
+                "16:30-18:30",
+                "20:00-다음날",
+            ],
+            "relaxed": ["10:00-12:00", "14:00-16:00", "17:00-19:00", "20:00-다음날"],
+        }
+        slots = time_slots.get(request.schedule, time_slots["relaxed"])
+
+        # 간소화된 응답 처리
+        for day_data in itinerary_data.get("d", itinerary_data.get("days", [])):
             day_places = []
-            day_num = day_data.get("day", len(days) + 1)
+            day_num = day_data.get("n", day_data.get("day", len(days) + 1))
 
-            for place_data in day_data.get("places", []):
-                place_idx = place_data.get("place_index", 0) - 1
+            place_list = day_data.get("p", day_data.get("places", []))
+            for i, place_data in enumerate(place_list):
+                # 간소화된 형식과 기존 형식 모두 지원
+                place_idx = place_data.get("i", place_data.get("place_index", 0)) - 1
+                time_slot = place_data.get(
+                    "t",
+                    place_data.get(
+                        "time_slot", slots[i] if i < len(slots) else "19:00-21:00"
+                    ),
+                )
 
-                if 0 <= place_idx < len(places) and place_idx not in used_places:
+                if 0 <= place_idx < len(places):
                     place = places[place_idx]
-                    used_places.add(place_idx)
+                    # 숙박시설은 중복 사용 가능
+                    if place.get("type") != "accommodation":
+                        if place_idx in used_places:
+                            continue
+                        used_places.add(place_idx)
 
                     place_rec = PlaceRecommendation(
                         id=place["id"],
                         name=place["name"],
-                        time=place_data.get("time_slot", "10:00-12:00"),
+                        time=time_slot,
                         tags=place.get("tags", [])[:3],
                         description=place.get("description", ""),
                         rating=place.get("rating", 4.0),
