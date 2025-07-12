@@ -79,7 +79,6 @@ class User(Base):
 
     travel_plans = relationship("TravelPlan", back_populates="user")
     reviews = relationship("Review", back_populates="user")
-    activity_logs = relationship("UserActivityLog", back_populates="user")
 
 
 class Admin(Base):
@@ -93,29 +92,8 @@ class Admin(Base):
     last_login_at = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
 
-    roles = relationship("AdminRole", back_populates="admin")
 
 
-class Role(Base):
-    __tablename__ = "roles"
-    role_id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)
-    display_name = Column(String)
-    description = Column(Text)
-    is_active = Column(Boolean, default=True)
-
-    admins = relationship("AdminRole", back_populates="role")
-
-
-class AdminRole(Base):
-    __tablename__ = "admin_roles"
-    admin_id = Column(Integer, ForeignKey("admins.admin_id"), primary_key=True)
-    role_id = Column(Integer, ForeignKey("roles.role_id"), primary_key=True)
-    assigned_at = Column(DateTime, server_default=func.now())
-    is_active = Column(Boolean, default=True)
-
-    admin = relationship("Admin", back_populates="roles")
-    role = relationship("Role", back_populates="admins")
 
 
 class Destination(Base):
@@ -253,16 +231,6 @@ Index("idx_review_destination_date", Review.destination_id, Review.created_at)
 Index("idx_review_user_rating", Review.user_id, Review.rating)
 
 
-class UserActivityLog(Base):
-    __tablename__ = "user_activity_logs"
-    log_id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    activity_type = Column(String, nullable=False)
-    resource_type = Column(String)
-    details = Column(JSONB)
-    created_at = Column(DateTime, server_default=func.now())
-
-    user = relationship("User", back_populates="activity_logs")
 
 
 class ChatMessage(Base):
@@ -861,8 +829,6 @@ class ReviewResponse(BaseModel):
         from_attributes = True
 
 
-# 사용자 활동 로그 테이블 (이미 UserActivityLog가 있으므로 별칭으로 사용)
-UserActivity = UserActivityLog
 
 
 # ===========================================

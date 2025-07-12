@@ -823,24 +823,22 @@ class LocalInfoService:
             for r in regions
         ]
 
-    async def get_unified_regions_level1(self, db: Session):
+    async def get_regions(self, db: Session):
         """
-        unified_regions 테이블에서 region_level=1인 지역만 조회
+        regions 테이블에서 region_level=1인 지역만 조회
         """
-        from app.models import UnifiedRegion
-        query = db.query(UnifiedRegion).filter(UnifiedRegion.region_level == 1)
+        query = db.query(Region).filter(Region.region_level == 1)
         regions = query.all()
         return [
             {
-                "region_id": str(r.region_id),
                 "region_code": r.region_code,
                 "region_name": r.region_name,
-                "region_name_full": r.region_name_full,
-                "region_name_en": r.region_name_en,
-                "center_latitude": r.center_latitude,
-                "center_longitude": r.center_longitude,
-                "administrative_code": r.administrative_code,
-                "is_active": r.is_active,
+                "region_name_full": r.region_name_full if hasattr(r, 'region_name_full') else r.region_name,
+                "region_name_en": r.region_name_en if hasattr(r, 'region_name_en') else None,
+                "center_latitude": r.center_latitude if hasattr(r, 'center_latitude') else r.latitude,
+                "center_longitude": r.center_longitude if hasattr(r, 'center_longitude') else r.longitude,
+                "administrative_code": r.administrative_code if hasattr(r, 'administrative_code') else None,
+                "is_active": r.is_active if hasattr(r, 'is_active') else True,
             }
             for r in regions
         ]

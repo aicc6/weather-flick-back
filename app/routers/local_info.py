@@ -19,7 +19,7 @@ async def get_supported_cities(db: Any = Depends(get_db)):
     활성화된 지역 목록 조회 (unified_regions 테이블에서)
     프론트엔드 지도 컴포넌트용
     """
-    regions = await local_info_service.get_unified_regions_level1(db)
+    regions = await local_info_service.get_regions(db)
     return {"cities": regions}
 
 
@@ -585,14 +585,14 @@ async def get_nearby_places(
     return {"places": nearby_places, "total": len(nearby_places)}
 
 
-@router.get("/resions")
-async def get_unified_regions_level1(db: Session = Depends(get_db)):
-    """통합 지역정보 레벨1 조회"""
-    regions = await local_info_service.get_unified_regions_level1(db)
+@router.get("/regions")
+async def get_regions(db: Session = Depends(get_db)):
+    """지역 목록 조회"""
+    regions = await local_info_service.get_regions(db)
     return {"regions": regions}
 
 
-@router.get("/resions_point")
+@router.get("/regions_point")
 async def get_regions_point(db: Session = Depends(get_db)):
     """통합 지역정보 포인트 조회"""
     regions = await local_info_service.get_regions_point(db)
