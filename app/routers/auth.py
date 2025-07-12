@@ -12,6 +12,7 @@ from app.auth import (
     authenticate_user,
     check_password_strength,
     create_access_token,
+    create_refresh_token,
     generate_temporary_password,
     get_current_active_user,
     get_password_hash,
@@ -36,7 +37,6 @@ from app.models import (
     GoogleLoginResponse,
     PasswordChange,
     ResendVerificationRequest,
-    Token,
     User,
     UserCreate,
     UserResponse,
@@ -44,6 +44,7 @@ from app.models import (
     WithdrawRequest,
     WithdrawResponse,
 )
+from app.schemas import Token, RefreshTokenRequest, RefreshTokenResponse
 from app.services.email_service import email_service, email_verification_service
 from app.services.google_oauth_service import google_oauth_service
 
@@ -233,9 +234,15 @@ async def login(
         data={"sub": user.email, "role": user.role.value},
         expires_delta=access_token_expires,
     )
+    
+    # refresh token 생성
+    refresh_token = create_refresh_token(
+        data={"sub": user.email}
+    )
 
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "user_info": user,
@@ -260,6 +267,51 @@ async def logout(
         )
 
     return {"message": "Successfully logged out"}
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+async def refresh_token(
+    request: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    """Refresh token으로 새로운 access token 발급"""
+    from jose import JWTError, jwt
+    
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        # refresh token 검증
+        from app.auth import SECRET_KEY, ALGORITHM
+        payload = jwt.decode(request.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+        
+        if email is None or token_type != "refresh":
+            raise credentials_exception
+            
+        # 사용자 확인
+        user = db.query(User).filter(User.email == email).first()
+        if user is None or not user.is_active:
+            raise credentials_exception
+            
+        # 새로운 access token 발급
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email, "role": user.role.value},
+            expires_delta=access_token_expires,
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+        
+    except JWTError:
+        raise credentials_exception
 
 
 @router.get("/me", response_model=UserResponse)
@@ -395,12 +447,18 @@ async def google_login(
 
         # 액세스 토큰 생성
         access_token = google_oauth_service.create_access_token_for_user(user)
+        
+        # refresh token 생성
+        refresh_token = create_refresh_token(
+            data={"sub": user.email}
+        )
 
         # 새 사용자 여부 확인
         is_new_user = user.created_at == user.updated_at
 
         return GoogleLoginResponse(
             access_token=access_token,
+            refresh_token=refresh_token,
             token_type="bearer",
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user_info=user,
@@ -535,6 +593,11 @@ async def exchange_google_auth_code(
 
         # JWT 토큰 생성
         jwt_token = google_oauth_service.create_access_token_for_user(user)
+        
+        # refresh token 생성
+        refresh_token = create_refresh_token(
+            data={"sub": user.email}
+        )
 
         # 새 사용자 여부 확인
         is_new_user = user.created_at == user.updated_at
@@ -543,6 +606,7 @@ async def exchange_google_auth_code(
 
         return GoogleLoginResponse(
             access_token=jwt_token,
+            refresh_token=refresh_token,
             token_type="bearer",
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user_info=user,

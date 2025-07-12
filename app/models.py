@@ -600,6 +600,7 @@ class GoogleLoginRequest(BaseModel):
 
 class GoogleLoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     expires_in: int
     user_info: UserResponse
