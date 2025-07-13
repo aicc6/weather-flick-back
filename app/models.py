@@ -113,6 +113,7 @@ class TravelPlan(Base):
     transportation = Column(String, nullable=True)
     start_location = Column(String, nullable=True)  # 출발지
     weather_info = Column(JSONB, nullable=True)  # 날씨 정보
+    plan_type = Column(String(50), default="manual")  # 'manual' 또는 'custom'
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="travel_plans")
@@ -548,6 +549,9 @@ class TravelPlanCreate(BaseModel):
     transportation: str | None = None
     start_location: str | None = None  # 출발지 추가
     weather_info: Optional[dict[str, Any]] = None  # 날씨 정보 추가
+    theme: str | None = None  # 테마 추가
+    status: str | None = None  # 상태 추가
+    plan_type: str | None = None  # 여행 계획 타입 ('manual' 또는 'custom')
 
 
 class TravelPlanUpdate(BaseModel):
@@ -578,6 +582,7 @@ class TravelPlanResponse(BaseModel):
     transportation: str | None = None
     start_location: str | None = None
     weather_info: Optional[dict[str, Any]] = None
+    plan_type: str | None = None
     created_at: datetime
 
     class Config:
@@ -1119,6 +1124,19 @@ class UnifiedRegion(Base):
     boundary_data = Column(JSONB)
     administrative_code = Column(String)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class CategoryCode(Base):
+    """카테고리 코드 매핑 테이블"""
+    __tablename__ = "category_codes"
+    
+    category_code = Column(String, primary_key=True)
+    category_name = Column(String, nullable=False)
+    content_type_id = Column(String)
+    parent_category_code = Column(String)
+    category_level = Column(Integer)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

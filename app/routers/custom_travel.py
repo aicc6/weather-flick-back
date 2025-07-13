@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Accommodation,
+    CategoryCode,
     CulturalFacility,
     CustomTravelRecommendationRequest,
     CustomTravelRecommendationResponse,
@@ -32,6 +33,31 @@ router = APIRouter(
 # 인메모리 캐시 (실제 프로덕션에서는 Redis 사용 권장)
 recommendation_cache: Dict[str, Dict[str, Any]] = {}
 CACHE_DURATION = timedelta(minutes=30)  # 30분 캐시
+
+# 카테고리 코드 캐시 (데이터베이스 조회 최소화)
+category_code_cache = {}
+
+def get_category_name(code: str, db: Session) -> str:
+    """카테고리 코드를 한글 이름으로 변환 (데이터베이스 사용)"""
+    if not code:
+        return None
+    
+    # 캐시 확인
+    if code in category_code_cache:
+        return category_code_cache[code]
+    
+    # 데이터베이스에서 조회
+    category = db.query(CategoryCode).filter(CategoryCode.category_code == code).first()
+    
+    if category:
+        category_name = category.category_name
+        category_code_cache[code] = category_name
+        print(f"Category code {code} converted to: {category_name}")
+        return category_name
+    
+    print(f"Category code {code} not found in database")
+    # 데이터베이스에 없으면 코드 그대로 반환
+    return code  # None 대신 코드를 반환하여 태그에 포함되도록 함
 
 
 def get_cache_key(request: CustomTravelRecommendationRequest) -> str:
@@ -196,12 +222,19 @@ async def get_custom_travel_recommendations(
                 f"DB 조회 결과: 관광지 {len(attractions)}개, 문화시설 {len(cultural_facilities)}개, 음식점 {len(restaurants)}개, 쇼핑 {len(shopping_places)}개, 숙박 {len(accommodations)}개\n"
             )
             f.write(f"요청 정보: {request.who}, {request.styles}\n")
+            f.write(f"선택된 태그: {selected_tags}\n")
 
         # 관광지 추가
         for place in attractions:
             tags = ["관광지"]  # 기본 태그 추가
             if place.category_code:
-                tags.append(place.category_code)
+                category_name = get_category_name(place.category_code, db)
+                if category_name:
+                    tags.append(category_name)
+                else:
+                    # 카테고리 이름을 찾지 못한 경우 코드를 그대로 추가
+                    tags.append(place.category_code)
+                    print(f"Category code {place.category_code} not converted, using raw code")
             if hasattr(place, "tags") and place.tags:
                 tags.extend(place.tags)
 
@@ -230,7 +263,12 @@ async def get_custom_travel_recommendations(
         for place in cultural_facilities:
             tags = ["문화", "전시"]
             if place.category_code:
-                tags.append(place.category_code)
+                category_name = get_category_name(place.category_code, db)
+                if category_name:
+                    tags.append(category_name)
+                else:
+                    # 카테고리 이름을 찾지 못한 경우 코드를 그대로 추가
+                    tags.append(place.category_code)
 
             all_places.append(
                 {
@@ -284,7 +322,12 @@ async def get_custom_travel_recommendations(
         for place in shopping_places:
             tags = ["쇼핑"]
             if place.category_code:
-                tags.append(place.category_code)
+                category_name = get_category_name(place.category_code, db)
+                if category_name:
+                    tags.append(category_name)
+                else:
+                    # 카테고리 이름을 찾지 못한 경우 코드를 그대로 추가
+                    tags.append(place.category_code)
 
             all_places.append(
                 {
@@ -310,6 +353,13 @@ async def get_custom_travel_recommendations(
         # 숙박시설 추가
         for place in accommodations:
             tags = ["숙박"]
+            if place.category_code:
+                category_name = get_category_name(place.category_code, db)
+                if category_name:
+                    tags.append(category_name)
+                else:
+                    # 카테고리 이름을 찾지 못한 경우 코드를 그대로 추가
+                    tags.append(place.category_code)
             if hasattr(place, "accommodation_type") and place.accommodation_type:
                 # 숙박 타입에 따른 태그 추가
                 type_tags = {

@@ -48,7 +48,7 @@ class AIRecommendationService:
         try:
             # OpenAI API 호출 (최적화: 최소 토큰 사용)
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",  # 더 빠른 모델 사용
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -62,12 +62,12 @@ class AIRecommendationService:
 
             # AI 응답 파싱
             ai_response = response.choices[0].message.content
-            
+
             # 토큰 사용량 로깅
             usage = response.usage
             logger.info(f"토큰 사용량 - 프롬프트: {usage.prompt_tokens}, 응답: {usage.completion_tokens}, 총: {usage.total_tokens}")
             logger.info(f"AI 응답: {ai_response[:200]}...")  # 디버깅용
-            
+
             itinerary_data = self._parse_ai_response(ai_response)
 
             # DayItinerary 객체로 변환 (날씨 정보 포함)
@@ -99,13 +99,13 @@ class AIRecommendationService:
 
         # 타입별로 균형있게 수집 (토큰 절약)
         type_counts = {"attraction": 0, "cultural": 0, "restaurant": 0, "shopping": 0, "accommodation": 0}
-        
+
         for i, place in enumerate(places):
             place_type = place.get("type", "other")
             if place_type in places_by_type and len(places_by_type[place_type]) < 6:
                 places_by_type[place_type].append((i, place))
                 type_counts[place_type] += 1
-                
+
                 # 모든 타입에서 충분한 장소를 수집했으면 중단
                 if all(count >= 5 for count in type_counts.values()):
                     break
@@ -135,7 +135,7 @@ class AIRecommendationService:
             "shopping": "S",      # 쇼핑
             "accommodation": "L", # 숙박 (Lodging)
         }
-        
+
         for ptype, type_places in places_by_type.items():
             if type_places:
                 prefix = type_prefix.get(ptype, ptype[0].upper())
@@ -158,10 +158,10 @@ class AIRecommendationService:
 하루{4 if request.schedule == 'packed' else 3}+숙박1
 JSON만:
 {{"d":[{{"n":1,"p":[{{"i":번호,"t":"시간"}},...]}}]}}"""
-        
+
         logger.info(f"프롬프트 생성 완료: {prompt[:200]}...")
         logger.info(f"장소 타입별 개수: {[(k, len(v)) for k, v in places_by_type.items() if v]}")
-        
+
         return prompt
 
     def _parse_ai_response(self, response: str) -> dict[str, Any]:

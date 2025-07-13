@@ -11,6 +11,7 @@ from app.models import (
     TravelPlanResponse,
     TravelPlanUpdate,
     User,
+    CategoryCode,
 )
 from app.utils import (
     convert_uuids_to_strings,
@@ -26,6 +27,40 @@ router = APIRouter(
 )
 
 
+def convert_category_codes_in_itinerary(itinerary: dict, db: Session) -> dict:
+    """여행 일정 내의 카테고리 코드를 한글로 변환"""
+    if not itinerary or not isinstance(itinerary, dict):
+        return itinerary
+    
+    # 카테고리 코드 캐시
+    category_cache = {}
+    
+    for day_key, day_places in itinerary.items():
+        if isinstance(day_places, list):
+            for place in day_places:
+                if isinstance(place, dict) and 'tags' in place and isinstance(place['tags'], list):
+                    # 태그 중 카테고리 코드 형식(예: A02, A04)인 것을 변환
+                    converted_tags = []
+                    for tag in place['tags']:
+                        if isinstance(tag, str) and tag.startswith('A') and len(tag) == 3:
+                            # 캐시 확인
+                            if tag in category_cache:
+                                converted_tags.append(category_cache[tag])
+                            else:
+                                # DB에서 조회
+                                category = db.query(CategoryCode).filter(CategoryCode.category_code == tag).first()
+                                if category:
+                                    category_cache[tag] = category.category_name
+                                    converted_tags.append(category.category_name)
+                                else:
+                                    converted_tags.append(tag)
+                        else:
+                            converted_tags.append(tag)
+                    place['tags'] = converted_tags
+    
+    return itinerary
+
+
 @router.post("/", response_model=dict)
 async def create_travel_plan(
     plan_data: TravelPlanCreate,
@@ -33,8 +68,23 @@ async def create_travel_plan(
     db: Session = Depends(get_db),
 ):
     """여행 계획 생성"""
+    print(f"=== Travel Plan Creation Request ===")
+    print(f"User: {current_user.email if current_user else 'No user'}")
+    print(f"Plan data: {plan_data.dict()}")
+    print(f"=================================")
+    
     try:
         # 새 여행 계획 생성 (UUID는 자동 생성)
+        from app.models import TravelPlanStatus
+        
+        # status 처리
+        status = TravelPlanStatus.PLANNING  # 기본값
+        if plan_data.status:
+            try:
+                status = TravelPlanStatus(plan_data.status)
+            except ValueError:
+                status = TravelPlanStatus.PLANNING
+        
         db_plan = TravelPlan(
             user_id=current_user.id,
             title=plan_data.title,
@@ -47,6 +97,8 @@ async def create_travel_plan(
             transportation=plan_data.transportation,
             start_location=plan_data.start_location,
             weather_info=plan_data.weather_info,
+            status=status,
+            plan_type=plan_data.plan_type or "manual",  # 기본값은 'manual'
         )
 
         db.add(db_plan)
@@ -61,6 +113,10 @@ async def create_travel_plan(
 
     except Exception as e:
         db.rollback()
+        import traceback
+        print(f"Travel plan creation error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        print(f"Plan data: {plan_data}")
         return create_error_response(
             code="CREATION_ERROR",
             message="여행 계획 생성에 실패했습니다.",
@@ -94,6 +150,7 @@ async def get_travel_plans(
 
         # 응답 데이터 구성
         response_data = []
+        
         for plan in plans:
             # weather_info가 JSON 문자열인 경우 파싱
             if hasattr(plan, 'weather_info') and plan.weather_info and isinstance(plan.weather_info, str):
@@ -108,6 +165,9 @@ async def get_travel_plans(
                     plan.itinerary = json.loads(plan.itinerary)
                 except (json.JSONDecodeError, TypeError):
                     plan.itinerary = None
+            
+            # 카테고리 코드를 한글로 변환
+            plan.itinerary = convert_category_codes_in_itinerary(plan.itinerary, db)
             
             response_data.append(convert_uuids_to_strings(TravelPlanResponse.from_orm(plan)))
 
@@ -158,6 +218,9 @@ async def get_travel_plan(
                 plan.itinerary = json.loads(plan.itinerary)
             except (json.JSONDecodeError, TypeError):
                 plan.itinerary = None
+        
+        # 카테고리 코드를 한글로 변환
+        plan.itinerary = convert_category_codes_in_itinerary(plan.itinerary, db)
         
         response_data = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
 
