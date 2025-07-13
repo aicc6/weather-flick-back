@@ -96,29 +96,6 @@ class Admin(Base):
 
 
 
-class Destination(Base):
-    __tablename__ = "destinations"
-    destination_id = Column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
-    )
-    name = Column(String, nullable=False, index=True)
-    province = Column(String, nullable=False, index=True)  # 도/광역시
-    region = Column(String, index=True)  # 시/군/구
-    category = Column(String)
-    is_indoor = Column(Boolean, default=False)  # 실내/실외 여부
-    tags = Column(JSONB)  # 여행지 특성 태그
-    latitude = Column(Float)
-    longitude = Column(Float)
-    amenities = Column(JSONB)
-    image_url = Column(String)
-    rating = Column(Float)
-    recommendation_weight = Column(Float)
-    created_at = Column(DateTime, server_default=func.now())
-
-    weather_data = relationship("WeatherData", back_populates="destination")
-    reviews = relationship("Review", back_populates="destination")
-
-
 class TravelPlan(Base):
     __tablename__ = "travel_plans"
     plan_id = Column(
@@ -147,63 +124,6 @@ Index("idx_travel_plan_user_status", TravelPlan.user_id, TravelPlan.status)
 Index("idx_travel_plan_dates", TravelPlan.start_date, TravelPlan.end_date)
 
 
-class WeatherData(Base):
-    __tablename__ = "weather_data"
-    weather_id = Column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
-    )
-    destination_id = Column(
-        UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=True
-    )
-    # 기상청 격자 좌표
-    grid_x = Column(Integer)  # nx: 예보지점 X 좌표
-    grid_y = Column(Integer)  # ny: 예보지점 Y 좌표
-
-    # 예보 날짜와 시간
-    forecast_date = Column(Date, nullable=False)
-    forecast_time = Column(String)  # 예보시간 (HHMM 형식)
-    base_date = Column(Date)  # 발표일자
-    base_time = Column(String)  # 발표시각
-
-    # 기온 정보
-    temperature = Column(Float)  # TMP: 1시간 기온 (℃)
-    temperature_max = Column(Float)  # TMX: 일 최고기온 (℃)
-    temperature_min = Column(Float)  # TMN: 일 최저기온 (℃)
-
-    # 습도 및 강수 정보
-    humidity = Column(Float)  # REH: 습도 (%)
-    precipitation_probability = Column(Float)  # POP: 강수확률 (%)
-    precipitation_type = Column(String)  # PTY: 강수형태 (없음/비/비눈/눈)
-
-    # 하늘 상태
-    sky_condition = Column(String)  # SKY: 하늘상태 (맑음/구름많음/흐림)
-    weather_condition = Column(String)  # 종합 날씨 상태
-
-    # 지역 정보
-    region_name = Column(String)  # 지역명
-
-    # 원본 데이터
-    raw_data = Column(JSONB)  # 원본 API 응답 데이터
-
-    created_at = Column(DateTime, server_default=func.now())
-
-    destination = relationship("Destination", back_populates="weather_data")
-
-
-# WeatherData 성능 최적화 인덱스
-Index(
-    "idx_weather_forecast_location",
-    WeatherData.forecast_date,
-    WeatherData.grid_x,
-    WeatherData.grid_y,
-)
-Index(
-    "idx_weather_destination_date",
-    WeatherData.destination_id,
-    WeatherData.forecast_date,
-)
-
-
 class Review(Base):
     __tablename__ = "reviews"
     review_id = Column(
@@ -211,7 +131,7 @@ class Review(Base):
     )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     destination_id = Column(
-        UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=False
+        UUID(as_uuid=True), nullable=True
     )
     travel_plan_id = Column(
         UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=True
@@ -222,12 +142,10 @@ class Review(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="reviews")
-    destination = relationship("Destination", back_populates="reviews")
     travel_plan = relationship("TravelPlan", back_populates="reviews")
 
 
 # Review 성능 최적화 인덱스
-Index("idx_review_destination_date", Review.destination_id, Review.created_at)
 Index("idx_review_user_rating", Review.user_id, Review.rating)
 
 
@@ -452,18 +370,6 @@ class Accommodation(Base):
         return self.tel
 
 
-class CityInfo(Base):
-    __tablename__ = "city_info"
-    id = Column(Integer, primary_key=True, index=True)
-    city_name = Column(String, nullable=False, unique=True)
-    region = Column(String, nullable=False)
-    population = Column(Integer)
-    area = Column(Float)
-    description = Column(Text)
-    attractions = Column(JSONB)
-    weather_info = Column(JSONB)
-    created_at = Column(DateTime, server_default=func.now())
-
 
 # Pydantic 모델들
 class WeatherRequest(BaseModel):
@@ -618,38 +524,6 @@ class PaginationInfo(BaseModel):
     total_pages: int
 
 
-class DestinationCreate(BaseModel):
-    name: str
-    province: str
-    region: str | None = None
-    category: str | None = None
-    is_indoor: bool | None = False
-    tags: list[str | None] = []
-    latitude: float | None = None
-    longitude: float | None = None
-    amenities: dict[str, Any | None] = {}
-    image_url: str | None = None
-
-
-class DestinationResponse(BaseModel):
-    destination_id: uuid.UUID
-    name: str
-    province: str
-    region: str | None = None
-    category: str | None = None
-    is_indoor: bool | None = None
-    tags: list[str | None] = []
-    latitude: float | None = None
-    longitude: float | None = None
-    amenities: dict[str, Any | None] = {}
-    image_url: str | None = None
-    rating: float | None = None
-    recommendation_weight: float | None = None
-
-    class Config:
-        from_attributes = True
-
-
 class RecommendationRequest(BaseModel):
     destination_types: list[str | None] = []
     budget_range: dict[str, float | None] = {}
@@ -658,7 +532,7 @@ class RecommendationRequest(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    destinations: list[DestinationResponse]
+    destinations: list[dict]
     total_count: int
     recommendation_score: float
 
@@ -781,16 +655,6 @@ class TransportationResponse(BaseModel):
     schedule: dict[str, Any | None] = {}
     fare: str | None = None
     contact: str | None = None
-
-
-class CityInfoResponse(BaseModel):
-    city_name: str
-    region: str
-    population: int | None = None
-    area: float | None = None
-    description: str | None = None
-    attractions: list[str | None] = []
-    weather_info: dict[str, Any | None] = {}
 
 
 class FavoritePlaceResponse(BaseModel):

@@ -1,25 +1,223 @@
-from fastapi import APIRouter, Depends, Query
+"""관광지 정보 라우터"""
+
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from app.logging_config import get_logger
-from app.models import TouristAttraction
+from sqlalchemy import or_
+from typing import Optional
+
 from app.database import get_db
+from app.models import TouristAttraction
+from app.utils import create_standard_response, create_error_response
 
-# 로거 설정
-logger = get_logger()
+router = APIRouter(
+    prefix="/attractions",
+    tags=["attractions"],
+)
 
-router = APIRouter(prefix="/attractions", tags=["attractions"])
 
-@router.get("/by-region", response_model=list[str])
+@router.get("/search", response_model=dict)
+async def search_attractions(
+    query: str = Query(..., description="검색어"),
+    limit: int = Query(10, ge=1, le=50, description="결과 개수"),
+    db: Session = Depends(get_db),
+):
+    """
+    관광지 검색 (자동완성용)
+    
+    Args:
+        query: 검색어
+        limit: 반환할 최대 결과 수
+    
+    Returns:
+        검색된 관광지 목록
+    """
+    try:
+        # 검색어가 2글자 미만이면 빈 결과 반환
+        if len(query.strip()) < 2:
+            return create_standard_response(
+                success=True,
+                data={"suggestions": []}
+            )
+        
+        # 관광지명, 주소에서 검색
+        search_pattern = f"%{query}%"
+        attractions = (
+            db.query(TouristAttraction)
+            .filter(
+                or_(
+                    TouristAttraction.attraction_name.ilike(search_pattern),
+                    TouristAttraction.address.ilike(search_pattern)
+                )
+            )
+            .limit(limit)
+            .all()
+        )
+        
+        # 자동완성 형식으로 변환
+        suggestions = []
+        for attraction in attractions:
+            suggestions.append({
+                "description": attraction.attraction_name,
+                "place_id": attraction.content_id,
+                "structured_formatting": {
+                    "main_text": attraction.attraction_name,
+                    "secondary_text": attraction.address
+                }
+            })
+        
+        return create_standard_response(
+            success=True,
+            data={"suggestions": suggestions}
+        )
+        
+    except Exception as e:
+        return create_error_response(
+            code="SEARCH_ERROR",
+            message="관광지 검색에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}],
+        )
+
+
+@router.get("/by-region", response_model=dict)
 async def get_attractions_by_region(
     region_code: str = Query(..., description="지역 코드"),
-    db: Session = Depends(get_db)
+    limit: int = Query(100, ge=1, le=500, description="조회할 최대 개수"),
+    db: Session = Depends(get_db),
 ):
-    logger.info(region_code)
-    # region_code 컬럼에서 region_code 값이 일치하는 관광지 이름 조회
-    attractions = (
-        db.query(TouristAttraction.attraction_name)
-        .filter(TouristAttraction.region_code == region_code)
-        .all()
-    )
-    # [(name1,), (name2,), ...] → [name1, name2, ...]
-    return [a[0] for a in attractions]
+    """
+    지역별 관광지 조회
+    
+    Args:
+        region_code: 지역 코드 (예: 11=서울, 26=부산 등)
+        limit: 조회할 최대 개수
+    
+    Returns:
+        해당 지역의 관광지 목록
+    """
+    try:
+        # region_code 매핑 (프론트엔드 코드와 DB 코드 차이 해결)
+        region_code_mapping = {
+            "11": "1",    # 서울
+            "26": "6",    # 부산
+            "27": "4",    # 대구
+            "28": "2",    # 인천
+            "29": "5",    # 광주
+            "30": "3",    # 대전
+            "31": "7",    # 울산
+            "36": "8",    # 세종
+            "41": "31",   # 경기
+            "43": "33",   # 충북
+            "44": "34",   # 충남
+            "46": "36",   # 전남
+            "47": "35",   # 경북
+            "48": "38",   # 경남
+            "50": "39",   # 제주
+            "51": "32",   # 강원
+            "52": "37",   # 전북
+            # 긴 코드 형태 처리
+            "11000000": "1",  # 서울
+            "42000000": "31", # 경기도
+        }
+        
+        # 긴 형태의 region_code를 짧은 형태로 변환
+        if len(region_code) > 2:
+            short_code = region_code[:2]
+            db_region_code = region_code_mapping.get(short_code, region_code)
+        else:
+            db_region_code = region_code_mapping.get(region_code, region_code)
+        
+        # 관광지 조회
+        attractions = (
+            db.query(TouristAttraction)
+            .filter(TouristAttraction.region_code == db_region_code)
+            .limit(limit)
+            .all()
+        )
+        
+        # 응답 데이터 구성
+        attraction_list = []
+        for attraction in attractions:
+            attraction_list.append({
+                "content_id": attraction.content_id,
+                "name": attraction.attraction_name,
+                "category": attraction.category_name,
+                "address": attraction.address,
+                "latitude": float(attraction.latitude) if attraction.latitude else None,
+                "longitude": float(attraction.longitude) if attraction.longitude else None,
+                "description": attraction.description,
+                "image_url": attraction.image_url,
+                "created_at": attraction.created_at.isoformat() if attraction.created_at else None,
+            })
+        
+        return create_standard_response(
+            success=True,
+            data={
+                "attractions": attraction_list,
+                "total": len(attraction_list),
+                "region_code": region_code,
+                "db_region_code": db_region_code
+            }
+        )
+        
+    except Exception as e:
+        return create_error_response(
+            code="QUERY_ERROR",
+            message="관광지 조회에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}],
+        )
+
+
+@router.get("/{content_id}", response_model=dict)
+async def get_attraction_detail(
+    content_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    특정 관광지 상세 정보 조회
+    
+    Args:
+        content_id: 관광지 콘텐츠 ID
+    
+    Returns:
+        관광지 상세 정보
+    """
+    try:
+        attraction = (
+            db.query(TouristAttraction)
+            .filter(TouristAttraction.content_id == content_id)
+            .first()
+        )
+        
+        if not attraction:
+            return create_error_response(
+                code="NOT_FOUND",
+                message="관광지를 찾을 수 없습니다."
+            )
+        
+        # 응답 데이터 구성
+        attraction_data = {
+            "content_id": attraction.content_id,
+            "name": attraction.attraction_name,
+            "category": attraction.category_name,
+            "category_code": attraction.category_code,
+            "address": attraction.address,
+            "latitude": float(attraction.latitude) if attraction.latitude else None,
+            "longitude": float(attraction.longitude) if attraction.longitude else None,
+            "description": attraction.description,
+            "homepage": attraction.homepage,
+            "image_url": attraction.image_url,
+            "created_at": attraction.created_at.isoformat() if attraction.created_at else None,
+            "updated_at": attraction.updated_at.isoformat() if attraction.updated_at else None,
+        }
+        
+        return create_standard_response(
+            success=True,
+            data=attraction_data
+        )
+        
+    except Exception as e:
+        return create_error_response(
+            code="QUERY_ERROR",
+            message="관광지 상세 정보 조회에 실패했습니다.",
+            details=[{"field": "general", "message": str(e)}],
+        )

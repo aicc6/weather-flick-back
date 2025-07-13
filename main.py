@@ -7,7 +7,6 @@ from app.routers import (
     auth,
     chatbot,
     config,
-    destinations,
     events,
     kma_weather,
     local_info,
@@ -23,7 +22,10 @@ from app.routers import (
     likes_recommend,
     review_likes,
     travel_course_like,
-    custom_travel
+    custom_travel,
+    custom_travel_converter,
+    attractions,
+    destinations
 )
 
 # 로깅 설정 초기화
@@ -68,6 +70,8 @@ app.include_router(likes_recommend.router, prefix="/api")
 app.include_router(review_likes.router, prefix="/api")
 app.include_router(travel_course_like.router, prefix="/api")
 app.include_router(custom_travel.router, prefix="/api")
+app.include_router(custom_travel_converter.router, prefix="/api")
+app.include_router(attractions.router, prefix="/api")
 
 @app.get("/")
 async def root():

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import TokenData, User, UserActivity, UserRole
+from app.models import TokenData, User, UserRole
 
 # 비밀번호 해싱 설정
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -89,20 +89,9 @@ def log_user_activity(
     ip_address: str = None,
     user_agent: str = None,
 ):
-    """사용자 활동 로깅"""
-    details = {}
-    if description:
-        details["description"] = description
-    if ip_address:
-        details["ip_address"] = ip_address
-    if user_agent:
-        details["user_agent"] = user_agent
-
-    activity = UserActivity(
-        user_id=user_id, activity_type=activity_type, details=details
-    )
-    db.add(activity)
-    db.commit()
+    """사용자 활동 로깅 - UserActivity 테이블이 삭제되어 비활성화됨"""
+    # TODO: 필요시 다른 로깅 방식으로 대체
+    pass
 
 
 def get_client_ip(request: Request) -> str:
