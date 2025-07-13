@@ -47,19 +47,101 @@ class EmailService:
                 <meta charset="utf-8">
                 <title>Weather Flick 이메일 인증</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                    .verification-code {{ background: #fff; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; font-size: 24px; font-weight: bold; color: #667eea; border: 2px dashed #667eea; }}
-                    .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
-                    .button {{ display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }}
+                    body {{ 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        line-height: 1.6; 
+                        color: #333;
+                        margin: 0;
+                        padding: 0;
+                        background-color: #f4f6f9;
+                    }}
+                    .container {{ 
+                        max-width: 600px; 
+                        margin: 20px auto; 
+                        background: white;
+                        border-radius: 16px;
+                        overflow: hidden;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                    }}
+                    .header {{ 
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white; 
+                        padding: 40px 30px;
+                        text-align: center;
+                    }}
+                    .logo {{
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 12px;
+                        margin: 0 auto 20px;
+                        display: block;
+                        box-shadow: 0 4px 12px rgba(255,255,255,0.2);
+                    }}
+                    .header h1 {{
+                        margin: 0 0 10px 0;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }}
+                    .header p {{
+                        margin: 0;
+                        font-size: 16px;
+                        opacity: 0.9;
+                    }}
+                    .content {{ 
+                        padding: 40px 30px;
+                        background: white;
+                    }}
+                    .verification-code {{ 
+                        background: linear-gradient(135deg, #f8faff 0%, #e8f4fd 100%);
+                        border: 3px dashed #667eea;
+                        padding: 25px;
+                        text-align: center; 
+                        border-radius: 12px; 
+                        margin: 30px 0;
+                        font-size: 32px; 
+                        font-weight: 700;
+                        color: #667eea;
+                        letter-spacing: 4px;
+                        font-family: 'Courier New', monospace;
+                    }}
+                    .highlight {{
+                        background: linear-gradient(135deg, #fff5f5 0%, #fef2f2 100%);
+                        border-left: 4px solid #ef4444;
+                        padding: 20px;
+                        margin: 25px 0;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        color: #dc2626;
+                    }}
+                    .footer {{ 
+                        text-align: center; 
+                        padding: 30px;
+                        background: #f8fafc;
+                        color: #64748b;
+                        font-size: 14px;
+                        border-top: 1px solid #e2e8f0;
+                    }}
+                    .footer p {{
+                        margin: 8px 0;
+                    }}
+                    h2 {{ 
+                        color: #1e293b;
+                        font-size: 24px;
+                        margin: 0 0 20px 0;
+                        font-weight: 600;
+                    }}
+                    p {{ 
+                        margin: 16px 0;
+                        color: #475569;
+                        font-size: 16px;
+                    }}
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🌤️ Weather Flick</h1>
+                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" alt="Weather Flick Logo" class="logo">
+                        <h1>Weather Flick</h1>
                         <p>이메일 인증</p>
                     </div>
                     <div class="content">
@@ -70,7 +152,9 @@ class EmailService:
                             {code}
                         </div>
 
-                        <p><strong>인증 코드는 10분 후에 만료됩니다.</strong></p>
+                        <div class="highlight">
+                            <strong>⏰ 인증 코드는 10분 후에 만료됩니다.</strong>
+                        </div>
 
                         <p>이 인증 코드를 앱에 입력하여 이메일 인증을 완료해주세요.</p>
 
@@ -115,30 +199,116 @@ class EmailService:
                 <meta charset="utf-8">
                 <title>Weather Flick에 오신 것을 환영합니다!</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                    .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
+                    body {{ 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        line-height: 1.6; 
+                        color: #333;
+                        margin: 0;
+                        padding: 0;
+                        background-color: #f4f6f9;
+                    }}
+                    .container {{ 
+                        max-width: 600px; 
+                        margin: 20px auto; 
+                        background: white;
+                        border-radius: 16px;
+                        overflow: hidden;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                    }}
+                    .header {{ 
+                        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                        color: white; 
+                        padding: 40px 30px;
+                        text-align: center;
+                    }}
+                    .logo {{
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 12px;
+                        margin: 0 auto 20px;
+                        display: block;
+                        box-shadow: 0 4px 12px rgba(255,255,255,0.2);
+                    }}
+                    .header h1 {{
+                        margin: 0 0 10px 0;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }}
+                    .header p {{
+                        margin: 0;
+                        font-size: 16px;
+                        opacity: 0.9;
+                    }}
+                    .content {{ 
+                        padding: 40px 30px;
+                        background: white;
+                    }}
+                    .features {{
+                        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                        border-radius: 12px;
+                        padding: 25px;
+                        margin: 25px 0;
+                        border-left: 4px solid #10b981;
+                    }}
+                    .features ul {{
+                        margin: 15px 0;
+                        padding-left: 20px;
+                    }}
+                    .features li {{
+                        margin: 12px 0;
+                        font-size: 16px;
+                        color: #065f46;
+                    }}
+                    .footer {{ 
+                        text-align: center; 
+                        padding: 30px;
+                        background: #f8fafc;
+                        color: #64748b;
+                        font-size: 14px;
+                        border-top: 1px solid #e2e8f0;
+                    }}
+                    .footer p {{
+                        margin: 8px 0;
+                    }}
+                    h2 {{ 
+                        color: #1e293b;
+                        font-size: 24px;
+                        margin: 0 0 20px 0;
+                        font-weight: 600;
+                    }}
+                    p {{ 
+                        margin: 16px 0;
+                        color: #475569;
+                        font-size: 16px;
+                    }}
+                    .celebration {{
+                        font-size: 20px;
+                        color: #10b981;
+                        font-weight: 600;
+                    }}
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🌤️ Weather Flick</h1>
+                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" alt="Weather Flick Logo" class="logo">
+                        <h1>Weather Flick</h1>
                         <p>환영합니다!</p>
                     </div>
                     <div class="content">
                         <h2>안녕하세요, {nickname}님!</h2>
-                        <p>Weather Flick에 가입해주셔서 감사합니다! 🎉</p>
+                        <p class="celebration">Weather Flick에 가입해주셔서 감사합니다! 🎉</p>
 
-                        <p>이제 다음과 같은 서비스를 이용하실 수 있습니다:</p>
-                        <ul>
-                            <li>🌤️ 실시간 날씨 정보</li>
-                            <li>🌬️ 대기질 정보</li>
-                            <li>🗺️ 지역 정보 및 맛집 추천</li>
-                            <li>📱 개인화된 날씨 알림</li>
-                        </ul>
+                        <div class="features">
+                            <p><strong>이제 다음과 같은 서비스를 이용하실 수 있습니다:</strong></p>
+                            <ul>
+                                <li>🌤️ 실시간 날씨 정보</li>
+                                <li>🌬️ 대기질 정보</li>
+                                <li>🗺️ 지역 정보 및 맛집 추천</li>
+                                <li>📱 개인화된 날씨 알림</li>
+                                <li>🎯 날씨 기반 여행지 추천</li>
+                            </ul>
+                        </div>
 
                         <p>즐거운 Weather Flick 이용되세요!</p>
                     </div>
@@ -179,20 +349,133 @@ class EmailService:
                 <meta charset="utf-8">
                 <title>Weather Flick 임시 비밀번호</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                    .temp-password {{ background: #fff; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; font-size: 20px; font-weight: bold; color: #e74c3c; border: 2px solid #e74c3c; }}
-                    .warning {{ background: #fff5f5; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0; }}
-                    .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
-                    .security-notice {{ background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+                    body {{ 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        line-height: 1.6; 
+                        color: #333;
+                        margin: 0;
+                        padding: 0;
+                        background-color: #f4f6f9;
+                    }}
+                    .container {{ 
+                        max-width: 600px; 
+                        margin: 20px auto; 
+                        background: white;
+                        border-radius: 16px;
+                        overflow: hidden;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                    }}
+                    .header {{ 
+                        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                        color: white; 
+                        padding: 40px 30px;
+                        text-align: center;
+                    }}
+                    .logo {{
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 12px;
+                        margin: 0 auto 20px;
+                        display: block;
+                        box-shadow: 0 4px 12px rgba(255,255,255,0.2);
+                    }}
+                    .header h1 {{
+                        margin: 0 0 10px 0;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }}
+                    .header p {{
+                        margin: 0;
+                        font-size: 16px;
+                        opacity: 0.9;
+                    }}
+                    .content {{ 
+                        padding: 40px 30px;
+                        background: white;
+                    }}
+                    .temp-password {{ 
+                        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                        border: 3px solid #f59e0b;
+                        padding: 25px;
+                        text-align: center; 
+                        border-radius: 12px; 
+                        margin: 30px 0;
+                        font-size: 28px; 
+                        font-weight: 700;
+                        color: #92400e;
+                        letter-spacing: 2px;
+                        font-family: 'Courier New', monospace;
+                    }}
+                    .warning {{ 
+                        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+                        border-left: 4px solid #ef4444;
+                        padding: 25px;
+                        margin: 25px 0;
+                        border-radius: 8px;
+                    }}
+                    .warning h3 {{
+                        margin: 0 0 15px 0;
+                        color: #dc2626;
+                        font-size: 18px;
+                    }}
+                    .warning ul {{
+                        margin: 15px 0;
+                        padding-left: 20px;
+                    }}
+                    .warning li {{
+                        margin: 10px 0;
+                        color: #7f1d1d;
+                    }}
+                    .security-notice {{ 
+                        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                        border: 1px solid #cbd5e1;
+                        padding: 25px;
+                        border-radius: 12px;
+                        margin: 25px 0;
+                        border-left: 4px solid #3b82f6;
+                    }}
+                    .security-notice h4 {{
+                        margin: 0 0 15px 0;
+                        color: #1e40af;
+                        font-size: 16px;
+                    }}
+                    .security-notice ul {{
+                        margin: 15px 0;
+                        padding-left: 20px;
+                    }}
+                    .security-notice li {{
+                        margin: 8px 0;
+                        color: #334155;
+                    }}
+                    .footer {{ 
+                        text-align: center; 
+                        padding: 30px;
+                        background: #f8fafc;
+                        color: #64748b;
+                        font-size: 14px;
+                        border-top: 1px solid #e2e8f0;
+                    }}
+                    .footer p {{
+                        margin: 8px 0;
+                    }}
+                    h2 {{ 
+                        color: #1e293b;
+                        font-size: 24px;
+                        margin: 0 0 20px 0;
+                        font-weight: 600;
+                    }}
+                    p {{ 
+                        margin: 16px 0;
+                        color: #475569;
+                        font-size: 16px;
+                    }}
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🌤️ Weather Flick</h1>
+                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" alt="Weather Flick Logo" class="logo">
+                        <h1>Weather Flick</h1>
                         <p>임시 비밀번호 발급</p>
                     </div>
                     <div class="content">
