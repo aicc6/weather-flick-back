@@ -77,7 +77,7 @@ class EmailService:
                         <p>본인이 요청하지 않은 경우 이 이메일을 무시하셔도 됩니다.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 Weather Flick. All rights reserved.</p>
+                        <p>© 2025 Weather Flick. All rights reserved.</p>
                         <p>이 이메일은 자동으로 발송되었습니다.</p>
                     </div>
                 </div>
@@ -143,7 +143,7 @@ class EmailService:
                         <p>즐거운 Weather Flick 이용되세요!</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 Weather Flick. All rights reserved.</p>
+                        <p>© 2025 Weather Flick. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -226,7 +226,7 @@ class EmailService:
                         <p>Weather Flick을 안전하게 이용해주셔서 감사합니다.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2024 Weather Flick. All rights reserved.</p>
+                        <p>© 2025 Weather Flick. All rights reserved.</p>
                         <p>이 이메일은 자동으로 발송되었습니다.</p>
                         <p>문의사항이 있으시면 고객센터로 연락주세요.</p>
                     </div>

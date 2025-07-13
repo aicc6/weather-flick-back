@@ -25,7 +25,8 @@ from app.routers import (
     custom_travel,
     custom_travel_converter,
     attractions,
-    destinations
+    destinations,
+    system
 )
 
 # 로깅 설정 초기화
@@ -72,6 +73,7 @@ app.include_router(travel_course_like.router, prefix="/api")
 app.include_router(custom_travel.router, prefix="/api")
 app.include_router(custom_travel_converter.router, prefix="/api")
 app.include_router(attractions.router, prefix="/api")
+app.include_router(system.router, prefix="/api")
 
 @app.get("/")
 async def root():
