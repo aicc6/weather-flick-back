@@ -27,7 +27,8 @@ from app.routers import (
     custom_travel_converter,
     attractions,
     destinations,
-    system
+    system,
+    contact
 )
 
 # 로깅 설정 초기화
@@ -52,6 +53,7 @@ app.add_middleware(
 )
 
 # 라우터 포함 - 모든 라우터에 /api prefix 추가
+app.include_router(contact.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(weather.router, prefix="/api")
 app.include_router(kma_weather.router, prefix="/api")
@@ -80,7 +82,7 @@ app.include_router(system.router, prefix="/api")
 async def startup_event():
     """애플리케이션 시작 시 실행되는 이벤트"""
     logger.info("Starting Weather Flick API...")
-    
+
     # Redis 연결 테스트
     redis_connected = test_redis_connection()
     if redis_connected:

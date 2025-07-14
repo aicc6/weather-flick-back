@@ -24,8 +24,19 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
+
 Base = declarative_base()
 
+
+class Contact(Base):
+    __tablename__ = "contact"
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(50), nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    name = Column(String(50), nullable=False)
+    email = Column(String(100), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class AdminStatus(enum.Enum):
     ACTIVE = "ACTIVE"
@@ -1131,7 +1142,7 @@ class UnifiedRegion(Base):
 class CategoryCode(Base):
     """카테고리 코드 매핑 테이블"""
     __tablename__ = "category_codes"
-    
+
     category_code = Column(String, primary_key=True)
     category_name = Column(String, nullable=False)
     content_type_id = Column(String)
@@ -1634,7 +1645,7 @@ class CustomTravelRecommendationRequest(BaseModel):
     who: str = Field(..., description="동행자 유형 (solo, couple, family, friends, colleagues, group)")
     styles: List[str] = Field(..., description="여행 스타일 (activity, hotplace, nature, landmark, healing, culture, local, shopping, food, pet)")
     schedule: str = Field(..., description="일정 유형 (packed, relaxed)")
-    
+
 
 class PlaceRecommendation(BaseModel):
     """추천 장소 모델"""
@@ -1648,7 +1659,7 @@ class PlaceRecommendation(BaseModel):
     address: Optional[str] = Field(None, description="주소")
     latitude: Optional[float] = Field(None, description="위도")
     longitude: Optional[float] = Field(None, description="경도")
-    
+
 
 class DayItinerary(BaseModel):
     """일별 여행 일정"""
@@ -1656,7 +1667,7 @@ class DayItinerary(BaseModel):
     date: Optional[str] = Field(None, description="날짜")
     places: List[PlaceRecommendation] = Field(..., description="추천 장소 목록")
     weather: Optional[dict] = Field(None, description="날씨 정보")
-    
+
 
 class CustomTravelRecommendationResponse(BaseModel):
     """맞춤 일정 추천 응답 모델"""
