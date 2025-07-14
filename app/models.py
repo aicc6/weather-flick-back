@@ -296,9 +296,9 @@ class Accommodation(Base):
     longitude = Column(Float)
     created_at = Column(DateTime, server_default=func.now())
 
-    # 새로운 상세 필드들 추가 (실제 DB에 존재하지 않을 수 있음)
-    # category_code = Column(String(10))
-    # sub_category_code = Column(String(10))
+    # 새로운 상세 필드들 추가
+    category_code = Column(String(10))
+    sub_category_code = Column(String(10))
     # detail_address = Column(String)
     # zipcode = Column(String(10))
     # homepage = Column(Text)
