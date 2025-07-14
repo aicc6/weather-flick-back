@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
+from app.utils.redis_client import test_redis_connection
 from app.routers import (
     auth,
     chatbot,
@@ -74,6 +75,19 @@ app.include_router(custom_travel.router, prefix="/api")
 app.include_router(custom_travel_converter.router, prefix="/api")
 app.include_router(attractions.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
+
+@app.on_event("startup")
+async def startup_event():
+    """애플리케이션 시작 시 실행되는 이벤트"""
+    logger.info("Starting Weather Flick API...")
+    
+    # Redis 연결 테스트
+    redis_connected = test_redis_connection()
+    if redis_connected:
+        logger.info("Redis 캐시 서버 연결 성공")
+    else:
+        logger.warning("Redis 캐시 서버 연결 실패 - 캐시 없이 실행됩니다")
+
 
 @app.get("/")
 async def root():

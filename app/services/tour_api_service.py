@@ -8,6 +8,7 @@ from urllib.parse import unquote
 import httpx
 
 from app.config import settings
+from app.utils.cache_decorator import cache_result
 
 
 def get_mock_festivals() -> list[dict[str, Any]]:
@@ -50,6 +51,7 @@ def get_mock_festivals() -> list[dict[str, Any]]:
     )
 
 
+@cache_result(prefix="tour:festivals", expire=3600)  # 1시간 캐싱
 async def get_festivals_from_tour_api(
     area_code: str, event_start_date: str
 ) -> list[dict[str, Any]]:

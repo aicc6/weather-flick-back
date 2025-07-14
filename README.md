@@ -13,7 +13,8 @@
 ## 주요 기술 스택
 
 - **Backend**: FastAPI, Python 3.11
-- **Database**: SQLAlchemy (ORM), Alembic (Migration), SQLite (기본)
+- **Database**: SQLAlchemy (ORM), Alembic (Migration), PostgreSQL
+- **Cache**: Redis (응답 시간 단축을 위한 캐싱)
 - **Containerization**: Docker, Docker Compose
 - **Authentication**: JWT (JSON Web Tokens)
 - **Schema Validation**: Pydantic
@@ -33,6 +34,12 @@
 ```env
 # 한국관광공사 TourAPI 일반 인증키 (URL 인코딩된 키)
 TOUR_API_KEY="여기에_발급받은_API_키를_입력하세요"
+
+# Redis 캐싱 설정 (선택사항)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 ```
 
 > **API 키 발급 방법:**
@@ -142,3 +149,37 @@ weather-flick-back/
     └── versions/
         └── ...           # 실제 데이터베이스 변경 내용이 담긴 버전별 파이썬 파일들
 ```
+
+## Redis 캐싱 기능
+
+Weather Flick API는 Redis를 활용한 캐싱 기능을 지원합니다. 이를 통해 API 응답 속도를 크게 향상시킬 수 있습니다.
+
+### 캐싱이 적용된 서비스
+
+- **날씨 정보**: 현재 날씨(10분), 날씨 예보(30분)
+- **관광 정보**: 축제 및 이벤트 정보(1시간)
+- **기타**: 자주 변경되지 않는 데이터에 대해 적절한 캐시 시간 설정
+
+### Redis 설치 및 실행
+
+#### 방법 1: Docker 사용 (권장)
+```bash
+docker run -d --name redis -p 6379:6379 redis:alpine
+```
+
+#### 방법 2: 로컬 설치
+- macOS: `brew install redis && brew services start redis`
+- Ubuntu/Debian: `sudo apt-get install redis-server`
+- Windows: [Redis for Windows](https://github.com/microsoftarchive/redis/releases) 다운로드
+
+### 캐시 모니터링
+
+Redis가 정상적으로 연결되면 애플리케이션 시작 시 다음과 같은 메시지가 표시됩니다:
+```
+✅ Redis 연결 성공!
+Redis 버전: 7.0.0
+사용 메모리: 1.5M
+연결된 클라이언트: 1
+```
+
+Redis 연결에 실패하더라도 애플리케이션은 정상 작동하며, 캐시 기능 없이 실행됩니다.

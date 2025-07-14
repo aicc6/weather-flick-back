@@ -4,6 +4,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.config import settings
+from app.utils.cache_decorator import cache_result, invalidate_cache
 
 
 class WeatherService:
@@ -11,6 +12,7 @@ class WeatherService:
         self.api_key = settings.weather_api_key
         self.base_url = settings.weather_api_url
 
+    @cache_result(prefix="weather:current", expire=600)  # 10분 캐싱
     async def get_current_weather(
         self, city: str, country: str | None = None
     ) -> dict[str, Any]:
@@ -45,6 +47,7 @@ class WeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="Weather API unavailable")
 
+    @cache_result(prefix="weather:forecast", expire=1800)  # 30분 캐싱
     async def get_forecast(
         self, city: str, days: int = 3, country: str | None = None
     ) -> dict[str, Any]:
