@@ -1,7 +1,11 @@
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
+from app.auth import get_current_active_user
+from app.models import User
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -65,3 +69,64 @@ async def search_destination(query: str = Query(...)):
                 "category": category,
             })
     return {"suggestions": suggestions}
+
+
+@router.get("/recommend")
+async def get_destination_recommendations(
+    theme: str = Query(..., description="추천 테마 (예: popular, nature, culture)"),
+    weather_conditions: str = Query("", description="날씨 조건 (쉼표로 구분)"),
+    city: str = Query("서울", description="도시명"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    테마와 날씨 조건을 기반으로 여행지를 추천합니다.
+    """
+    try:
+        # 간단한 Mock 데이터로 응답 (실제 구현은 추후 확장)
+        mock_recommendations = [
+            {
+                "id": 1,
+                "name": "경복궁",
+                "description": "조선 왕조의 대표적인 궁궐",
+                "province": "서울",
+                "tags": ["#문화", "#역사", "#궁궐"],
+                "is_indoor": False,
+                "recommendation_score": 95
+            },
+            {
+                "id": 2,
+                "name": "한강공원",
+                "description": "서울 시민들의 휴식 공간",
+                "province": "서울",
+                "tags": ["#자연", "#야외", "#공원"],
+                "is_indoor": False,
+                "recommendation_score": 90
+            },
+            {
+                "id": 3,
+                "name": "국립중앙박물관",
+                "description": "한국의 역사와 문화를 한눈에",
+                "province": "서울",
+                "tags": ["#문화", "#실내", "#박물관"],
+                "is_indoor": True,
+                "recommendation_score": 85
+            }
+        ]
+        
+        return {
+            "recommendations": mock_recommendations,
+            "theme": theme,
+            "weather_conditions": weather_conditions,
+            "city": city
+        }
+        
+    except Exception as e:
+        # 에러가 발생해도 빈 결과를 반환하여 프론트엔드가 계속 작동하도록 함
+        return {
+            "recommendations": [],
+            "theme": theme,
+            "weather_conditions": weather_conditions,
+            "city": city,
+            "error": str(e)
+        }
