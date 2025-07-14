@@ -47,25 +47,25 @@ class EmailService:
                 <meta charset="utf-8">
                 <title>Weather Flick 이메일 인증</title>
                 <style>
-                    body {{ 
+                    body {{
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        line-height: 1.6; 
+                        line-height: 1.6;
                         color: #333;
                         margin: 0;
                         padding: 0;
                         background-color: #f4f6f9;
                     }}
-                    .container {{ 
-                        max-width: 600px; 
-                        margin: 20px auto; 
+                    .container {{
+                        max-width: 600px;
+                        margin: 20px auto;
                         background: white;
                         border-radius: 16px;
                         overflow: hidden;
                         box-shadow: 0 10px 30px rgba(0,0,0,0.1);
                     }}
-                    .header {{ 
+                    .header {{
                         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white; 
+                        color: white;
                         padding: 40px 30px;
                         text-align: center;
                     }}
@@ -87,18 +87,18 @@ class EmailService:
                         font-size: 16px;
                         opacity: 0.9;
                     }}
-                    .content {{ 
+                    .content {{
                         padding: 40px 30px;
                         background: white;
                     }}
-                    .verification-code {{ 
+                    .verification-code {{
                         background: linear-gradient(135deg, #f8faff 0%, #e8f4fd 100%);
                         border: 3px dashed #667eea;
                         padding: 25px;
-                        text-align: center; 
-                        border-radius: 12px; 
+                        text-align: center;
+                        border-radius: 12px;
                         margin: 30px 0;
-                        font-size: 32px; 
+                        font-size: 32px;
                         font-weight: 700;
                         color: #667eea;
                         letter-spacing: 4px;
@@ -113,8 +113,8 @@ class EmailService:
                         font-weight: 600;
                         color: #dc2626;
                     }}
-                    .footer {{ 
-                        text-align: center; 
+                    .footer {{
+                        text-align: center;
                         padding: 30px;
                         background: #f8fafc;
                         color: #64748b;
@@ -124,13 +124,13 @@ class EmailService:
                     .footer p {{
                         margin: 8px 0;
                     }}
-                    h2 {{ 
+                    h2 {{
                         color: #1e293b;
                         font-size: 24px;
                         margin: 0 0 20px 0;
                         font-weight: 600;
                     }}
-                    p {{ 
+                    p {{
                         margin: 16px 0;
                         color: #475569;
                         font-size: 16px;
@@ -140,7 +140,7 @@ class EmailService:
             <body>
                 <div class="container">
                     <div class="header">
-                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" alt="Weather Flick Logo" class="logo">
+                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" height="200" width="200" alt="Weather Flick Logo" class="logo">
                         <h1>Weather Flick</h1>
                         <p>이메일 인증</p>
                     </div>
@@ -199,25 +199,25 @@ class EmailService:
                 <meta charset="utf-8">
                 <title>Weather Flick에 오신 것을 환영합니다!</title>
                 <style>
-                    body {{ 
+                    body {{
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        line-height: 1.6; 
+                        line-height: 1.6;
                         color: #333;
                         margin: 0;
                         padding: 0;
                         background-color: #f4f6f9;
                     }}
-                    .container {{ 
-                        max-width: 600px; 
-                        margin: 20px auto; 
+                    .container {{
+                        max-width: 600px;
+                        margin: 20px auto;
                         background: white;
                         border-radius: 16px;
                         overflow: hidden;
                         box-shadow: 0 10px 30px rgba(0,0,0,0.1);
                     }}
-                    .header {{ 
+                    .header {{
                         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                        color: white; 
+                        color: white;
                         padding: 40px 30px;
                         text-align: center;
                     }}
@@ -239,7 +239,7 @@ class EmailService:
                         font-size: 16px;
                         opacity: 0.9;
                     }}
-                    .content {{ 
+                    .content {{
                         padding: 40px 30px;
                         background: white;
                     }}
@@ -259,8 +259,8 @@ class EmailService:
                         font-size: 16px;
                         color: #065f46;
                     }}
-                    .footer {{ 
-                        text-align: center; 
+                    .footer {{
+                        text-align: center;
                         padding: 30px;
                         background: #f8fafc;
                         color: #64748b;
@@ -270,13 +270,13 @@ class EmailService:
                     .footer p {{
                         margin: 8px 0;
                     }}
-                    h2 {{ 
+                    h2 {{
                         color: #1e293b;
                         font-size: 24px;
                         margin: 0 0 20px 0;
                         font-weight: 600;
                     }}
-                    p {{ 
+                    p {{
                         margin: 16px 0;
                         color: #475569;
                         font-size: 16px;
@@ -291,7 +291,7 @@ class EmailService:
             <body>
                 <div class="container">
                     <div class="header">
-                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" alt="Weather Flick Logo" class="logo">
+                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" height="200" width="200" alt="Weather Flick Logo" class="logo">
                         <h1>Weather Flick</h1>
                         <p>환영합니다!</p>
                     </div>
@@ -349,25 +349,25 @@ class EmailService:
                 <meta charset="utf-8">
                 <title>Weather Flick 임시 비밀번호</title>
                 <style>
-                    body {{ 
+                    body {{
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        line-height: 1.6; 
+                        line-height: 1.6;
                         color: #333;
                         margin: 0;
                         padding: 0;
                         background-color: #f4f6f9;
                     }}
-                    .container {{ 
-                        max-width: 600px; 
-                        margin: 20px auto; 
+                    .container {{
+                        max-width: 600px;
+                        margin: 20px auto;
                         background: white;
                         border-radius: 16px;
                         overflow: hidden;
                         box-shadow: 0 10px 30px rgba(0,0,0,0.1);
                     }}
-                    .header {{ 
+                    .header {{
                         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-                        color: white; 
+                        color: white;
                         padding: 40px 30px;
                         text-align: center;
                     }}
@@ -389,24 +389,24 @@ class EmailService:
                         font-size: 16px;
                         opacity: 0.9;
                     }}
-                    .content {{ 
+                    .content {{
                         padding: 40px 30px;
                         background: white;
                     }}
-                    .temp-password {{ 
+                    .temp-password {{
                         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
                         border: 3px solid #f59e0b;
                         padding: 25px;
-                        text-align: center; 
-                        border-radius: 12px; 
+                        text-align: center;
+                        border-radius: 12px;
                         margin: 30px 0;
-                        font-size: 28px; 
+                        font-size: 28px;
                         font-weight: 700;
                         color: #92400e;
                         letter-spacing: 2px;
                         font-family: 'Courier New', monospace;
                     }}
-                    .warning {{ 
+                    .warning {{
                         background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
                         border-left: 4px solid #ef4444;
                         padding: 25px;
@@ -426,7 +426,7 @@ class EmailService:
                         margin: 10px 0;
                         color: #7f1d1d;
                     }}
-                    .security-notice {{ 
+                    .security-notice {{
                         background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
                         border: 1px solid #cbd5e1;
                         padding: 25px;
@@ -447,8 +447,8 @@ class EmailService:
                         margin: 8px 0;
                         color: #334155;
                     }}
-                    .footer {{ 
-                        text-align: center; 
+                    .footer {{
+                        text-align: center;
                         padding: 30px;
                         background: #f8fafc;
                         color: #64748b;
@@ -458,13 +458,13 @@ class EmailService:
                     .footer p {{
                         margin: 8px 0;
                     }}
-                    h2 {{ 
+                    h2 {{
                         color: #1e293b;
                         font-size: 24px;
                         margin: 0 0 20px 0;
                         font-weight: 600;
                     }}
-                    p {{ 
+                    p {{
                         margin: 16px 0;
                         color: #475569;
                         font-size: 16px;
@@ -474,7 +474,7 @@ class EmailService:
             <body>
                 <div class="container">
                     <div class="header">
-                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" alt="Weather Flick Logo" class="logo">
+                        <img src="https://wf-dev.seongjunlee.dev/newicon.jpg" height="200" width="200" alt="Weather Flick Logo" class="logo">
                         <h1>Weather Flick</h1>
                         <p>임시 비밀번호 발급</p>
                     </div>
