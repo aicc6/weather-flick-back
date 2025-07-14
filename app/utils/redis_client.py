@@ -218,11 +218,11 @@ def test_redis_connection() -> bool:
         redis_client = client.get_client()
 
         if not redis_client:
-            print("⚠️ Redis 연결을 사용할 수 없지만 시스템은 정상 작동합니다")
+            print("WARNING: Redis 연결을 사용할 수 없지만 시스템은 정상 작동합니다")
             return False
 
         redis_client.ping()
-        print("✅ Redis 연결 성공!")
+        print("SUCCESS: Redis 연결 성공!")
 
         # 기본 정보 출력
         info = client.get_info()
@@ -233,8 +233,8 @@ def test_redis_connection() -> bool:
 
         return True
     except Exception as e:
-        print(f"❌ Redis 연결 실패: {e}")
-        print("⚠️ 캐시 기능 없이 시스템이 계속 실행됩니다")
+        print(f"ERROR: Redis 연결 실패: {e}")
+        print("WARNING: 캐시 기능 없이 시스템이 계속 실행됩니다")
         return False
 
 

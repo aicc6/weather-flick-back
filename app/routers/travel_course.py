@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from typing import Any
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import TravelCourse, TouristAttraction, Restaurant, Accommodation
-from typing import Any, Dict, List
-import json
-from datetime import datetime, timedelta
+from app.models import Accommodation, Restaurant, TouristAttraction, TravelCourse
 
 router = APIRouter(prefix="/travel-courses", tags=["travel_courses"])
 
@@ -16,16 +16,46 @@ async def get_travel_courses(
     course_theme: str | None = Query(None, description="코스 테마"),
     db: Session = Depends(get_db),
 ):
-    query = db.query(TravelCourse)
-    if region_code:
-        query = query.filter(TravelCourse.region_code == region_code)
-    if course_theme:
-        query = query.filter(TravelCourse.course_theme == course_theme)
-    total = query.count()
-    courses = query.offset((page-1)*page_size).limit(page_size).all()
+    # 데이터베이스에서 여행 코스 조회
+    courses = []
+    total = 0
+
+    try:
+        query = db.query(TravelCourse)
+        if region_code:
+            query = query.filter(TravelCourse.region_code == region_code)
+        if course_theme:
+            query = query.filter(TravelCourse.course_theme == course_theme)
+        total = query.count()
+        courses = query.offset((page-1)*page_size).limit(page_size).all()
+    except Exception as e:
+        print(f"Database query error: {e}")
+        # 데이터베이스 오류 시 기본 데이터 생성으로 진행
+        courses = []
+        total = 0
+
+    # 데이터베이스에 데이터가 없는 경우 기본 데이터 생성
+    if not courses:
+        # 더 많은 여행 코스 데이터 생성
+        total_courses = 150  # 총 150개의 코스
+        start_idx = (page - 1) * page_size + 1
+        end_idx = min(start_idx + page_size - 1, total_courses)
+
+        sample_courses = []
+        for i in range(start_idx, end_idx + 1):
+            sample_courses.append(generate_default_course_data(str(i)))
+
+        return {
+            "total": total_courses,
+            "page": page,
+            "page_size": page_size,
+            "courses": sample_courses
+        }
+
     # SQLAlchemy 객체를 dict로 변환
     def course_to_dict(course: TravelCourse) -> dict[str, Any]:
         return {c.name: getattr(course, c.name) for c in course.__table__.columns}
+
     return {
         "total": total,
         "page": page,
@@ -33,46 +63,10 @@ async def get_travel_courses(
         "courses": [course_to_dict(course) for course in courses]
     }
 
-@router.get("/{course_id}")
-async def get_travel_course_detail(
-    course_id: str,
-    db: Session = Depends(get_db),
-):
-    """여행 코스 상세 정보 조회 - 프론트엔드 하드코딩 데이터 구조와 호환"""
+# Moved the /{course_id} route to the end of the file to prevent route conflicts
 
-    try:
-        # 기본 코스 정보 조회
-        course = db.query(TravelCourse).filter(TravelCourse.content_id == course_id).first()
-
-        if not course:
-            # 데이터베이스에 해당 코스가 없는 경우 기본 데이터 반환
-            return generate_default_course_data(course_id)
-
-        # 해당 지역의 관광지, 맛집, 숙박 정보 조회
-        attractions = db.query(TouristAttraction).filter(
-            TouristAttraction.region_code == course.region_code
-        ).limit(20).all()
-
-        restaurants = db.query(Restaurant).filter(
-            Restaurant.region_code == course.region_code
-        ).limit(10).all()
-
-        accommodations = db.query(Accommodation).filter(
-            Accommodation.region_code == course.region_code
-        ).limit(5).all()
-
-        # 프론트엔드 호환 데이터 구조 생성
-        course_data = generate_course_detail_data(course, attractions, restaurants, accommodations)
-
-        return course_data
-
-    except Exception as e:
-        # 데이터베이스 오류 시 기본 데이터 반환
-        print(f"Database error: {e}")
-        return generate_default_course_data(course_id)
-
-def generate_course_detail_data(course: TravelCourse, attractions: List[TouristAttraction],
-                               restaurants: List[Restaurant], accommodations: List[Accommodation]) -> Dict[str, Any]:
+def generate_course_detail_data(course: TravelCourse, attractions: list[TouristAttraction],
+                               _restaurants: list[Restaurant], _accommodations: list[Accommodation]) -> dict[str, Any]:
     """하드코딩된 courseData 구조와 호환되는 데이터 생성"""
 
     # 기본 정보 설정
@@ -94,7 +88,7 @@ def generate_course_detail_data(course: TravelCourse, attractions: List[TouristA
         "summary": course.overview or "아름다운 여행 코스입니다.",
         "description": course.overview or "상세한 여행 코스 설명입니다.",
         "highlights": [attr.attraction_name for attr in attractions[:5]],
-        "itinerary": generate_itinerary(attractions, restaurants, accommodations),
+        "itinerary": generate_region_itinerary(course.region_code, [attr.attraction_name for attr in attractions[:5]]),
         "tips": [
             "편안한 신발을 착용하세요",
             "날씨를 확인하고 적절한 옷차림을 준비하세요",
@@ -117,14 +111,14 @@ def generate_course_detail_data(course: TravelCourse, attractions: List[TouristA
 
     return course_data
 
-def generate_default_course_data(course_id: str) -> Dict[str, Any]:
+def generate_default_course_data(course_id: str) -> dict[str, Any]:
     """코스 ID에 따라 다양한 지역의 기본 데이터 반환"""
 
     # 코스 ID를 숫자로 변환하여 지역 결정 (1부터 시작하므로 -1)
     try:
         id_num = int(course_id)
-        region_index = (id_num - 1) % 6  # ID 1→인덱스0, ID 2→인덱스1, ...
-    except:
+        region_index = (id_num - 1) % 18  # 18개 지역으로 확장
+    except ValueError:
         region_index = 0
 
     courses = [
@@ -235,6 +229,222 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
             ],
             "highlights": ["오동도", "향일암", "여수 밤바다", "돌산대교", "만성리해수욕장"],
             "summary": "아름다운 밤바다와 신비로운 섬들이 어우러진 여수에서 로맨틱한 바다 여행을 즐기는 코스입니다."
+        },
+        # 7. 인천
+        {
+            "id": course_id,
+            "title": "인천 차이나타운과 송도 여행",
+            "subtitle": "차이나타운부터 송도까지, 인천의 과거와 미래를 만나보세요",
+            "region": "incheon",
+            "regionName": "인천",
+            "duration": "1박 2일",
+            "theme": ["문화", "도시", "역사"],
+            "mainImage": "https://images.unsplash.com/photo-1519640760746-95d1211e9c4e?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1519640760746-95d1211e9c4e?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1555400080-9893e0e4e10b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["차이나타운", "송도센트럴파크", "인천대교", "월미도", "자유공원"],
+            "summary": "인천의 역사적 차이나타운과 현대적인 송도신도시를 함께 즐기는 코스입니다."
+        },
+        # 8. 대구
+        {
+            "id": course_id,
+            "title": "대구 동성로와 팔공산 여행",
+            "subtitle": "도심의 활력부터 산의 정취까지, 대구의 매력을 만끽하세요",
+            "region": "daegu",
+            "regionName": "대구",
+            "duration": "1박 2일",
+            "theme": ["도시", "자연", "쇼핑"],
+            "mainImage": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["동성로", "팔공산", "서문시장", "국채보상운동기념공원", "대구타워"],
+            "summary": "대구의 번화한 도심과 아름다운 자연을 함께 즐길 수 있는 코스입니다."
+        },
+        # 9. 광주
+        {
+            "id": course_id,
+            "title": "광주 무등산과 국립아시아문화전당",
+            "subtitle": "문화의 도시 광주에서 예술과 자연을 만나보세요",
+            "region": "gwangju",
+            "regionName": "광주",
+            "duration": "1박 2일",
+            "theme": ["문화", "자연", "예술"],
+            "mainImage": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1464983953574-0892a716854b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["무등산", "국립아시아문화전당", "양림동", "충장로", "518기념공원"],
+            "summary": "광주의 풍부한 문화유산과 아름다운 자연을 함께 체험하는 코스입니다."
+        },
+        # 10. 대전
+        {
+            "id": course_id,
+            "title": "대전 엑스포공원과 유성온천",
+            "subtitle": "과학과 휴양을 동시에 즐기는 대전 여행",
+            "region": "daejeon",
+            "regionName": "대전",
+            "duration": "1박 2일",
+            "theme": ["과학", "휴양", "온천"],
+            "mainImage": "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1584646098378-0874589d76b1?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1580656449195-2cb5d9b80a76?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["엑스포공원", "유성온천", "국립중앙과학관", "대전오월드", "한빛탑"],
+            "summary": "대전의 과학기술과 온천 휴양을 함께 즐길 수 있는 코스입니다."
+        },
+        # 11. 울산
+        {
+            "id": course_id,
+            "title": "울산 간절곶과 대왕암공원",
+            "subtitle": "동해의 일출과 바다를 만끽하는 울산 여행",
+            "region": "ulsan",
+            "regionName": "울산",
+            "duration": "1박 2일",
+            "theme": ["바다", "일출", "자연"],
+            "mainImage": "https://images.unsplash.com/photo-1509909756405-be0199881695?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1509909756405-be0199881695?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1504595403659-9088ce801e29?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["간절곶", "대왕암공원", "태화강", "울산대공원", "반구대암각화"],
+            "summary": "울산의 아름다운 동해안과 일출 명소를 둘러보는 코스입니다."
+        },
+        # 12. 세종
+        {
+            "id": course_id,
+            "title": "세종 호수공원과 정부세종청사",
+            "subtitle": "대한민국의 행정수도 세종의 현재와 미래를 만나보세요",
+            "region": "sejong",
+            "regionName": "세종",
+            "duration": "당일",
+            "theme": ["도시", "공원", "행정"],
+            "mainImage": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1484300681262-5ceb8242ea1c?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["호수공원", "정부세종청사", "세종호수공원", "베어트리파크", "세종문화예술회관"],
+            "summary": "대한민국 행정수도의 현대적 면모와 아름다운 공원을 즐기는 코스입니다."
+        },
+        # 13. 수원 (경기)
+        {
+            "id": course_id,
+            "title": "수원 화성과 행궁 역사 탐방",
+            "subtitle": "조선시대 계획도시 수원의 역사를 따라 걷는 여행",
+            "region": "gyeonggi",
+            "regionName": "경기",
+            "duration": "당일",
+            "theme": ["역사", "문화", "유적"],
+            "mainImage": "https://images.unsplash.com/photo-1551918120-9739cb430c6d?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1551918120-9739cb430c6d?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1587139223877-04cb899fa3e8?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["화성", "화성행궁", "수원화성박물관", "연무대", "방화수류정"],
+            "summary": "유네스코 세계문화유산 수원 화성의 역사와 문화를 체험하는 코스입니다."
+        },
+        # 14. 춘천 (강원)
+        {
+            "id": course_id,
+            "title": "춘천 남이섬과 소양강 레저",
+            "subtitle": "낭만의 도시 춘천에서 자연과 레저를 즐기세요",
+            "region": "gangwon",
+            "regionName": "강원",
+            "duration": "1박 2일",
+            "theme": ["자연", "레저", "낭만"],
+            "mainImage": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["남이섬", "소양강", "춘천 닭갈비", "김유정문학촌", "애니메이션박물관"],
+            "summary": "춘천의 아름다운 자연과 특색 있는 문화를 체험하는 코스입니다."
+        },
+        # 15. 청주 (충북)
+        {
+            "id": course_id,
+            "title": "청주 직지와 상당산성 문화여행",
+            "subtitle": "인쇄문화의 발상지 청주에서 역사와 문화를 만나보세요",
+            "region": "chungbuk",
+            "regionName": "충북",
+            "duration": "1박 2일",
+            "theme": ["문화", "역사", "전통"],
+            "mainImage": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1464983953574-0892a716854b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["직지심체요절", "상당산성", "청주향교", "용두사지철당간", "청주 고인쇄박물관"],
+            "summary": "세계 최초 금속활자본 직지의 고향 청주의 문화유산을 탐방하는 코스입니다."
+        },
+        # 16. 공주 (충남)
+        {
+            "id": course_id,
+            "title": "공주 백제 역사유적지 탐방",
+            "subtitle": "고대 백제의 수도 공주에서 찬란한 역사를 만나보세요",
+            "region": "chungnam",
+            "regionName": "충남",
+            "duration": "1박 2일",
+            "theme": ["역사", "문화", "유적"],
+            "mainImage": "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1584646098378-0874589d76b1?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1580656449195-2cb5d9b80a76?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["공산성", "무령왕릉", "국립공주박물관", "공주 한옥마을", "금강"],
+            "summary": "유네스코 세계문화유산 백제역사유적지구의 공주에서 고대사를 체험하는 코스입니다."
+        },
+        # 17. 군산 (전북)
+        {
+            "id": course_id,
+            "title": "군산 시간여행과 근대문화유산",
+            "subtitle": "일제강점기 아픈 역사부터 현재까지, 군산의 시간여행",
+            "region": "jeonbuk",
+            "regionName": "전북",
+            "duration": "1박 2일",
+            "theme": ["근대사", "문화", "역사"],
+            "mainImage": "https://images.unsplash.com/photo-1509909756405-be0199881695?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1509909756405-be0199881695?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1504595403659-9088ce801e29?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["군산 근대역사박물관", "군산 구 일본 제18은행", "신흥동 일본식 가옥", "군산 내항", "선유도"],
+            "summary": "군산의 근대문화유산과 아름다운 섬을 함께 즐기는 역사문화 코스입니다."
+        },
+        # 18. 목포 (전남)
+        {
+            "id": course_id,
+            "title": "목포 유달산과 다도해 섬여행",
+            "subtitle": "서남해의 관문 목포에서 바다와 섬의 정취를 만끽하세요",
+            "region": "jeonnam",
+            "regionName": "전남",
+            "duration": "2박 3일",
+            "theme": ["바다", "섬", "자연"],
+            "mainImage": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+            "images": [
+                "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1484300681262-5ceb8242ea1c?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3",
+                "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop&auto=format&q=80&ixlib=rb-4.0.3"
+            ],
+            "highlights": ["유달산", "홍도", "흑산도", "목포 근대역사관", "국립해양문화재연구소"],
+            "summary": "목포의 상징인 유달산과 다도해의 아름다운 섬들을 탐방하는 코스입니다."
         }
     ]
 
@@ -283,112 +493,81 @@ def generate_default_course_data(course_id: str) -> Dict[str, Any]:
 
     return base_course
 
-def generate_itinerary(attractions: List[TouristAttraction], restaurants: List[Restaurant],
-                      accommodations: List[Accommodation]) -> List[Dict[str, Any]]:
-    """동적 일정 생성"""
 
+def generate_region_itinerary(region: str, highlights: list[str]) -> list[dict[str, Any]]:
+    """지역별 맞춤 일정 생성"""
+
+    # 기본 2박 3일 일정 생성
     itinerary = []
 
-    # 2박 3일 일정 생성 (예시)
     for day in range(1, 4):
-        day_activities = []
+        activities = []
 
         if day == 1:
-            # 첫째 날: 도착 및 관광지 방문
-            day_activities.extend([
-                {
-                    "time": "09:00",
-                    "place": "출발지",
-                    "description": "여행 시작",
-                    "type": "transport",
-                    "address": "",
-                    "duration": 60
-                }
-            ])
+            activities.append({
+                "time": "09:00",
+                "place": f"{region} 도착",
+                "description": "여행 시작 및 숙소 체크인",
+                "type": "transport",
+                "address": f"{region} 중심가",
+                "duration": 60
+            })
 
-            # 관광지 추가 (첫째 날)
-            for i, attraction in enumerate(attractions[:3]):
-                time_hour = 10 + i * 2
-                day_activities.append({
-                    "time": f"{time_hour:02d}:00",
-                    "place": attraction.attraction_name,
-                    "description": attraction.description or f"{attraction.attraction_name} 관광",
+            if len(highlights) > 0:
+                activities.append({
+                    "time": "11:00",
+                    "place": highlights[0],
+                    "description": f"{highlights[0]} 관광 및 둘러보기",
                     "type": "attraction",
-                    "address": attraction.address or "",
+                    "address": f"{region} {highlights[0]}",
                     "duration": 120
                 })
 
-            # 맛집 추가
-            if restaurants:
-                day_activities.append({
-                    "time": "18:00",
-                    "place": restaurants[0].restaurant_name,
-                    "description": "저녁 식사",
-                    "type": "restaurant",
-                    "address": restaurants[0].address or "",
-                    "duration": 60
-                })
-
-            # 숙박 추가
-            if accommodations:
-                day_activities.append({
-                    "time": "20:00",
-                    "place": accommodations[0].accommodation_name,
-                    "description": "숙박",
-                    "type": "accommodation",
-                    "address": accommodations[0].address or "",
-                    "duration": 600
-                })
+            activities.append({
+                "time": "18:00",
+                "place": f"{region} 맛집",
+                "description": "지역 특산물 저녁 식사",
+                "type": "restaurant",
+                "address": f"{region} 중심가",
+                "duration": 90
+            })
 
         elif day == 2:
-            # 둘째 날: 더 많은 관광지 방문
-            for i, attraction in enumerate(attractions[3:6]):
-                time_hour = 9 + i * 2
-                day_activities.append({
+            for i, highlight in enumerate(highlights[1:3]):
+                time_hour = 9 + i * 3
+                activities.append({
                     "time": f"{time_hour:02d}:00",
-                    "place": attraction.attraction_name,
-                    "description": attraction.description or f"{attraction.attraction_name} 관광",
+                    "place": highlight,
+                    "description": f"{highlight} 관광",
                     "type": "attraction",
-                    "address": attraction.address or "",
-                    "duration": 120
-                })
-
-            # 점심 식사
-            if len(restaurants) > 1:
-                day_activities.append({
-                    "time": "12:00",
-                    "place": restaurants[1].restaurant_name,
-                    "description": "점심 식사",
-                    "type": "restaurant",
-                    "address": restaurants[1].address or "",
-                    "duration": 60
+                    "address": f"{region} {highlight}",
+                    "duration": 150
                 })
 
         elif day == 3:
-            # 셋째 날: 마무리 및 출발
-            if len(attractions) > 6:
-                day_activities.append({
+            if len(highlights) > 3:
+                activities.append({
                     "time": "09:00",
-                    "place": attractions[6].attraction_name,
-                    "description": "마지막 관광",
+                    "place": highlights[3],
+                    "description": "마지막 관광 및 기념품 쇼핑",
                     "type": "attraction",
-                    "address": attractions[6].address or "",
+                    "address": f"{region} {highlights[3]}",
                     "duration": 120
                 })
 
-            day_activities.append({
+            activities.append({
                 "time": "14:00",
                 "place": "출발지",
                 "description": "여행 마무리 및 출발",
                 "type": "transport",
-                "address": "",
+                "address": "-",
                 "duration": 60
             })
 
         itinerary.append({
             "day": day,
             "title": f"Day {day}: {get_day_title(day)}",
-            "activities": day_activities
+            "activities": activities
         })
 
     return itinerary
@@ -396,248 +575,68 @@ def generate_itinerary(attractions: List[TouristAttraction], restaurants: List[R
 def get_day_title(day: int) -> str:
     """일차별 제목 생성"""
     titles = {
-        1: "여행 시작 및 주요 관광지 탐방",
+        1: "도착 및 주요 관광지 탐방",
         2: "문화 체험 및 자연 감상",
-        3: "마무리 및 여행 정리"
+        3: "마무리 및 출발"
     }
     return titles.get(day, f"{day}일차 여행")
 
-def generate_region_itinerary(region: str, highlights: List[str]) -> List[Dict[str, Any]]:
-    """지역별 맞춤 일정 생성"""
 
-    itineraries = {
-        "제주도": [
-            {
-                "day": 1,
-                "title": "제주 도착 및 서부 지역 탐방",
-                "activities": [
-                    {"time": "09:00", "place": "제주국제공항", "description": "제주 도착 및 렌터카 인수", "type": "transport", "address": "제주특별자치도 제주시 공항로 2", "duration": 60},
-                    {"time": "11:00", "place": "협재해수욕장", "description": "제주 서부의 아름다운 해변 산책", "type": "attraction", "address": "제주특별자치도 제주시 한림읍 협재리", "duration": 120},
-                    {"time": "14:00", "place": "애월 카페거리", "description": "제주의 유명한 카페거리에서 점심 및 카페 투어", "type": "cafe", "address": "제주특별자치도 제주시 애월읍 애월해안로", "duration": 180}
-                ]
-            },
-            {
-                "day": 2,
-                "title": "동부 명소와 자연 체험",
-                "activities": [
-                    {"time": "09:00", "place": "성산일출봉", "description": "제주 동쪽의 대표 명소에서 일출 감상", "type": "attraction", "address": "제주특별자치도 서귀포시 성산읍", "duration": 120},
-                    {"time": "12:00", "place": "우도", "description": "섬 투어 및 해산물 시식", "type": "attraction", "address": "제주특별자치도 제주시 우도면", "duration": 180},
-                    {"time": "16:00", "place": "섭지코지", "description": "해안 산책 및 사진 촬영", "type": "attraction", "address": "제주특별자치도 서귀포시 성산읍", "duration": 90}
-                ]
-            },
-            {
-                "day": 3,
-                "title": "한라산과 출발",
-                "activities": [
-                    {"time": "09:00", "place": "한라산 국립공원", "description": "한라산 등반 또는 산책", "type": "attraction", "address": "제주특별자치도 제주시 1100로", "duration": 180},
-                    {"time": "13:00", "place": "제주공항", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "제주특별자치도 제주시 공항로 2", "duration": 60}
-                ]
-            }
-        ],
-        "전주": [
-            {
-                "day": 1,
-                "title": "전주 한옥마을과 전통 체험",
-                "activities": [
-                    {
-                        "time": "10:00",
-                        "place": "전주한옥마을",
-                        "description": "전통 한옥의 정취를 느끼며 산책",
-                        "type": "attraction",
-                        "address": "전라북도 전주시 완산구 기린대로 99",
-                        "duration": 120
-                    },
-                    {
-                        "time": "12:00",
-                        "place": "경기전",
-                        "description": "조선왕조의 역사를 만나는 시간",
-                        "type": "attraction",
-                        "address": "전라북도 전주시 완산구 태조로 44",
-                        "duration": 90
-                    },
-                    {
-                        "time": "14:00",
-                        "place": "전동성당",
-                        "description": "고딕 양식의 아름다운 성당 방문",
-                        "type": "attraction",
-                        "address": "전라북도 전주시 완산구 태조로 51",
-                        "duration": 60
-                    }
-                ]
-            },
-            {
-                "day": 2,
-                "title": "전주 맛집 탐방",
-                "activities": [
-                    {
-                        "time": "11:00",
-                        "place": "남부시장",
-                        "description": "전주 대표 시장에서 다양한 먹거리 체험",
-                        "type": "market",
-                        "address": "전라북도 전주시 완산구 풍남문2길 21",
-                        "duration": 120
-                    },
-                    {
-                        "time": "13:00",
-                        "place": "전주비빔밥",
-                        "description": "전주에서 꼭 먹어야 할 대표 음식",
-                        "type": "restaurant",
-                        "address": "전라북도 전주시 완산구 경기전길 135",
-                        "duration": 90
-                    },
-                    {
-                        "time": "15:00",
-                        "place": "풍남문",
-                        "description": "전주의 상징적인 문 방문",
-                        "type": "attraction",
-                        "address": "전라북도 전주시 완산구 풍남동3가 60-1",
-                        "duration": 60
-                    }
-                ]
-            },
-            {
-                "day": 3,
-                "title": "자유 일정 및 기념품 쇼핑",
-                "activities": [
-                    {
-                        "time": "10:00",
-                        "place": "한옥마을 골목길",
-                        "description": "골목길 산책 및 사진 촬영",
-                        "type": "attraction",
-                        "address": "전라북도 전주시 완산구 한옥마을 일대",
-                        "duration": 90
-                    },
-                    {
-                        "time": "12:00",
-                        "place": "기념품 가게",
-                        "description": "전주 특산품 및 기념품 쇼핑",
-                        "type": "shopping",
-                        "address": "전라북도 전주시 완산구 한옥마을 일대",
-                        "duration": 60
-                    },
-                    {
-                        "time": "14:00",
-                        "place": "출발지",
-                        "description": "여행 마무리 및 출발",
-                        "type": "transport",
-                        "address": "-",
-                        "duration": 60
-                    }
-                ]
-            }
-        ],
-        "부산": [
-            {
-                "day": 1,
-                "title": "부산 바다와 문화 체험",
-                "activities": [
-                    {"time": "09:00", "place": "해운대 해수욕장", "description": "부산 대표 해수욕장에서 바다 산책", "type": "attraction", "address": "부산광역시 해운대구 우동", "duration": 120},
-                    {"time": "12:00", "place": "감천문화마을", "description": "알록달록한 마을 탐방 및 사진 촬영", "type": "attraction", "address": "부산광역시 사하구 감내2로 203", "duration": 150},
-                    {"time": "15:30", "place": "자갈치시장", "description": "신선한 해산물 시식 및 저녁 식사", "type": "restaurant", "address": "부산광역시 중구 자갈치해안로 52", "duration": 120}
-                ]
-            },
-            {
-                "day": 2,
-                "title": "광안리와 태종대",
-                "activities": [
-                    {"time": "09:00", "place": "광안리 해수욕장", "description": "광안대교 전망과 해변 산책", "type": "attraction", "address": "부산광역시 수영구 광안해변로", "duration": 120},
-                    {"time": "12:00", "place": "태종대", "description": "절벽과 등대가 어우러진 절경 감상", "type": "attraction", "address": "부산광역시 영도구 전망로 24", "duration": 150},
-                    {"time": "16:00", "place": "국제시장", "description": "시장 투어 및 간식거리 시식", "type": "market", "address": "부산광역시 중구 국제시장2길", "duration": 90}
-                ]
-            },
-            {
-                "day": 3,
-                "title": "부산 도심과 출발",
-                "activities": [
-                    {"time": "09:00", "place": "부산타워", "description": "용두산공원 전망대에서 부산 시내 조망", "type": "attraction", "address": "부산광역시 중구 용두산길 37-55", "duration": 90},
-                    {"time": "11:00", "place": "부산역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "부산광역시 동구 중앙대로 206", "duration": 60}
-                ]
-            }
-        ],
-        "경주": [
-            {
-                "day": 1,
-                "title": "신라 역사 탐방",
-                "activities": [
-                    {"time": "09:00", "place": "불국사", "description": "유네스코 세계문화유산 불국사 탐방", "type": "attraction", "address": "경상북도 경주시 진현동 15-1", "duration": 120},
-                    {"time": "12:00", "place": "석굴암", "description": "천년의 역사를 간직한 석굴암 방문", "type": "attraction", "address": "경상북도 경주시 진현동 999", "duration": 90},
-                    {"time": "15:00", "place": "첨성대", "description": "동양 최고의 천문관측대 견학", "type": "attraction", "address": "경상북도 경주시 인왕동", "duration": 60}
-                ]
-            },
-            {
-                "day": 2,
-                "title": "경주 문화유산과 자연",
-                "activities": [
-                    {"time": "09:00", "place": "안압지(동궁과 월지)", "description": "신라시대 연못과 야경 감상", "type": "attraction", "address": "경상북도 경주시 인왕동 26-1", "duration": 120},
-                    {"time": "12:00", "place": "대릉원", "description": "고분공원 산책 및 역사 체험", "type": "attraction", "address": "경상북도 경주시 황남동 31-1", "duration": 90},
-                    {"time": "15:00", "place": "황리단길", "description": "카페거리 및 기념품 쇼핑", "type": "shopping", "address": "경상북도 경주시 포석로 1080", "duration": 90}
-                ]
-            },
-            {
-                "day": 3,
-                "title": "경주 시내와 출발",
-                "activities": [
-                    {"time": "09:00", "place": "경주역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "경상북도 경주시 원화로 268", "duration": 60}
-                ]
-            }
-        ],
-        "강릉": [
-            {
-                "day": 1,
-                "title": "강릉 바다와 커피",
-                "activities": [
-                    {"time": "09:00", "place": "경포대", "description": "강릉 대표 해변에서 바다 감상", "type": "attraction", "address": "강원도 강릉시 운정동", "duration": 120},
-                    {"time": "12:00", "place": "안목해변 커피거리", "description": "바다를 보며 즐기는 커피 타임", "type": "cafe", "address": "강원도 강릉시 견소동", "duration": 150},
-                    {"time": "15:30", "place": "정동진", "description": "세계에서 바다와 가장 가까운 기차역", "type": "attraction", "address": "강원도 강릉시 강동면 정동진리", "duration": 120}
-                ]
-            },
-            {
-                "day": 2,
-                "title": "강릉 문화와 자연 체험",
-                "activities": [
-                    {"time": "09:00", "place": "오죽헌", "description": "신사임당과 율곡이이의 생가 방문", "type": "attraction", "address": "강원도 강릉시 율곡로 3139번길 24", "duration": 90},
-                    {"time": "11:00", "place": "초당두부마을", "description": "강릉 명물 두부 요리 체험", "type": "restaurant", "address": "강원도 강릉시 초당동", "duration": 90},
-                    {"time": "14:00", "place": "솔향수목원", "description": "숲길 산책 및 자연 체험", "type": "attraction", "address": "강원도 강릉시 구정면 수목원길 156", "duration": 120}
-                ]
-            },
-            {
-                "day": 3,
-                "title": "강릉 시내와 출발",
-                "activities": [
-                    {"time": "09:00", "place": "강릉역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "강원도 강릉시 용지로 176", "duration": 60}
-                ]
-            }
-        ],
-        "여수": [
-            {
-                "day": 1,
-                "title": "여수 밤바다와 섬",
-                "activities": [
-                    {"time": "09:00", "place": "오동도", "description": "동백꽃으로 유명한 아름다운 섬", "type": "attraction", "address": "전라남도 여수시 수정동", "duration": 120},
-                    {"time": "12:00", "place": "향일암", "description": "일출과 바다가 어우러진 명소", "type": "attraction", "address": "전라남도 여수시 돌산읍 율림리", "duration": 90},
-                    {"time": "19:00", "place": "여수 밤바다", "description": "아름다운 야경과 함께하는 저녁", "type": "attraction", "address": "전라남도 여수시 돌산로", "duration": 120}
-                ]
-            },
-            {
-                "day": 2,
-                "title": "여수 명소와 맛집",
-                "activities": [
-                    {"time": "09:00", "place": "돌산대교", "description": "여수의 랜드마크 다리 산책", "type": "attraction", "address": "전라남도 여수시 돌산읍 돌산로 3617", "duration": 90},
-                    {"time": "11:00", "place": "만성리해수욕장", "description": "검은 모래 해변에서 휴식", "type": "attraction", "address": "전라남도 여수시 만흥동", "duration": 120},
-                    {"time": "13:00", "place": "여수 수산시장", "description": "신선한 해산물 시식", "type": "market", "address": "전라남도 여수시 교동 503", "duration": 90}
-                ]
-            },
-            {
-                "day": 3,
-                "title": "여수 시내와 출발",
-                "activities": [
-                    {"time": "09:00", "place": "여수엑스포역", "description": "기념품 쇼핑 및 출발", "type": "shopping", "address": "전라남도 여수시 박람회길 1", "duration": 60}
-                ]
-            }
-        ]
+@router.get("/regions")
+async def get_regions():
+    """여행 지역 목록 조회"""
+    regions = [
+        {"code": "all", "name": "전체", "description": "모든 지역"},
+        {"code": "seoul", "name": "서울", "description": "수도권 중심지"},
+        {"code": "busan", "name": "부산", "description": "남부 해안도시"},
+        {"code": "daegu", "name": "대구", "description": "영남권 중심지"},
+        {"code": "incheon", "name": "인천", "description": "서해안 관문도시"},
+        {"code": "gwangju", "name": "광주", "description": "호남권 중심지"},
+        {"code": "daejeon", "name": "대전", "description": "중부권 중심지"},
+        {"code": "ulsan", "name": "울산", "description": "동남권 공업도시"},
+        {"code": "sejong", "name": "세종", "description": "행정중심복합도시"},
+        {"code": "gyeonggi", "name": "경기", "description": "수도권 광역지역"},
+        {"code": "gangwon", "name": "강원", "description": "동북부 산악지역"},
+        {"code": "chungbuk", "name": "충북", "description": "중부 내륙지역"},
+        {"code": "chungnam", "name": "충남", "description": "중서부 지역"},
+        {"code": "jeonbuk", "name": "전북", "description": "서남부 지역"},
+        {"code": "jeonnam", "name": "전남", "description": "남서부 지역"},
+        {"code": "gyeongbuk", "name": "경북", "description": "동남부 내륙지역"},
+        {"code": "gyeongnam", "name": "경남", "description": "남동부 지역"},
+        {"code": "jeju", "name": "제주", "description": "남부 섬 지역"},
+        {"code": "gangneung", "name": "강릉", "description": "동해안 관광도시"},
+        {"code": "gyeongju", "name": "경주", "description": "천년 고도"},
+        {"code": "jeonju", "name": "전주", "description": "한옥과 전통문화의 도시"},
+        {"code": "yeosu", "name": "여수", "description": "남해안 해양관광도시"},
+    ]
+
+    return {
+        "regions": regions,
+        "total": len(regions)
     }
 
-    return itineraries.get(region, itineraries["제주도"])
+@router.get("/themes")
+async def get_themes():
+    """여행 테마 목록 조회"""
+    themes = [
+        {"code": "all", "name": "전체 테마", "description": "모든 테마"},
+        {"code": "nature", "name": "자연", "description": "자연 경관과 야외 활동"},
+        {"code": "city", "name": "도시", "description": "도시 관광과 문화"},
+        {"code": "beach", "name": "바다", "description": "해변과 해양 활동"},
+        {"code": "history", "name": "역사", "description": "역사 유적과 문화재"},
+        {"code": "food", "name": "맛집", "description": "지역 특산물과 맛집"},
+        {"code": "healing", "name": "힐링", "description": "휴양과 웰빙"},
+        {"code": "activity", "name": "액티비티", "description": "체험과 레저 활동"},
+        {"code": "culture", "name": "문화", "description": "문화 예술과 축제"},
+        {"code": "shopping", "name": "쇼핑", "description": "쇼핑과 시장 탐방"},
+        {"code": "family", "name": "가족", "description": "가족 단위 여행"},
+        {"code": "couple", "name": "커플", "description": "연인과 함께하는 여행"},
+    ]
+
+    return {
+        "themes": themes,
+        "total": len(themes)
+    }
 
 @router.get("/regions/{region_code}/courses")
 async def get_courses_by_region(
@@ -670,3 +669,41 @@ async def get_courses_by_region(
         "courses": course_list,
         "total": len(course_list)
     }
+
+@router.get("/{course_id}")
+async def get_travel_course_detail(
+    course_id: str,
+    db: Session = Depends(get_db),
+):
+    """여행 코스 상세 정보 조회 - 프론트엔드 하드코딩 데이터 구조와 호환"""
+
+    try:
+        # 기본 코스 정보 조회
+        course = db.query(TravelCourse).filter(TravelCourse.content_id == course_id).first()
+
+        if not course:
+            # 데이터베이스에 해당 코스가 없는 경우 기본 데이터 반환
+            return generate_default_course_data(course_id)
+
+        # 해당 지역의 관광지, 맛집, 숙박 정보 조회
+        attractions = db.query(TouristAttraction).filter(
+            TouristAttraction.region_code == course.region_code
+        ).limit(20).all()
+
+        restaurants = db.query(Restaurant).filter(
+            Restaurant.region_code == course.region_code
+        ).limit(10).all()
+
+        accommodations = db.query(Accommodation).filter(
+            Accommodation.region_code == course.region_code
+        ).limit(5).all()
+
+        # 프론트엔드 호환 데이터 구조 생성
+        course_data = generate_course_detail_data(course, attractions, restaurants, accommodations)
+
+        return course_data
+
+    except Exception as e:
+        # 데이터베이스 오류 시 기본 데이터 반환
+        print(f"Database error: {e}")
+        return generate_default_course_data(course_id)
