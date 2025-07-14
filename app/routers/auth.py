@@ -163,16 +163,21 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
                 ],
             )
 
-        # 이메일 인증 확인
-        if not email_verification_service.is_email_verified(db, user.email):
-            logger.warning(f"이메일 미인증 상태로 회원가입 시도: {user.email}")
-            raise ValidationError(
-                message="이메일 인증이 필요합니다.",
-                code="EMAIL_NOT_VERIFIED",
-                details=[
-                    {"field": "email", "message": "먼저 이메일 인증을 완료해주세요."}
-                ],
-            )
+        # 이메일 인증 확인 (환경 설정에 따라)
+        from app.config_email_verification import EMAIL_VERIFICATION_ENABLED
+        
+        if EMAIL_VERIFICATION_ENABLED:
+            if not email_verification_service.is_email_verified(db, user.email):
+                logger.warning(f"이메일 미인증 상태로 회원가입 시도: {user.email}")
+                raise ValidationError(
+                    message="이메일 인증이 필요합니다.",
+                    code="EMAIL_NOT_VERIFIED",
+                    details=[
+                        {"field": "email", "message": "먼저 이메일 인증을 완료해주세요."}
+                    ],
+                )
+        else:
+            logger.info(f"이메일 인증이 비활성화되어 있어 건너뜁니다: {user.email}")
 
         # 새 사용자 생성
         hashed_password = get_password_hash(user.password)
