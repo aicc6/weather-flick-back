@@ -11,9 +11,10 @@ router = APIRouter(prefix="/travel-courses", tags=["travel_courses"])
 @router.get("/")
 async def get_travel_courses(
     page: int = Query(1, ge=1, description="페이지 번호"),
-    page_size: int = Query(20, ge=1, le=100, description="페이지당 항목 수"),
+    page_size: int = Query(5, ge=1, le=50, description="페이지당 항목 수"),
     region_code: str | None = Query(None, description="지역 코드"),
     course_theme: str | None = Query(None, description="코스 테마"),
+    group_by: str | None = Query(None, description="그룹화 기준 (region, theme)"),
     db: Session = Depends(get_db),
 ):
     # 데이터베이스에서 여행 코스 조회
@@ -45,11 +46,20 @@ async def get_travel_courses(
         for i in range(start_idx, end_idx + 1):
             sample_courses.append(generate_default_course_data(str(i)))
 
+        # 지역별 그룹화
+        if group_by == "region":
+            return group_courses_by_region(sample_courses, total_courses, page, page_size)
+
+        # 테마별 그룹화
+        elif group_by == "theme":
+            return group_courses_by_theme(sample_courses, total_courses, page, page_size)
+
         return {
             "total": total_courses,
             "page": page,
             "page_size": page_size,
-            "courses": sample_courses
+            "courses": sample_courses,
+            "has_more": end_idx < total_courses
         }
 
     # SQLAlchemy 객체를 dict로 변환
@@ -60,7 +70,8 @@ async def get_travel_courses(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "courses": [course_to_dict(course) for course in courses]
+        "courses": [course_to_dict(course) for course in courses],
+        "has_more": (page * page_size) < total
     }
 
 # Moved the /{course_id} route to the end of the file to prevent route conflicts
@@ -580,6 +591,72 @@ def get_day_title(day: int) -> str:
         3: "마무리 및 출발"
     }
     return titles.get(day, f"{day}일차 여행")
+
+
+def group_courses_by_region(courses: list[dict[str, Any]], total_courses: int, page: int, page_size: int) -> dict[str, Any]:
+    """지역별로 여행 코스를 그룹화"""
+    region_groups = {}
+
+    for course in courses:
+        region = course.get("regionName", "기타")
+        if region not in region_groups:
+            region_groups[region] = []
+        region_groups[region].append(course)
+
+    # 지역별 그룹 정렬
+    sorted_regions = sorted(region_groups.keys())
+
+    grouped_data = []
+    for region in sorted_regions:
+        grouped_data.append({
+            "region": region,
+            "courses": region_groups[region],
+            "count": len(region_groups[region])
+        })
+
+    return {
+        "total": total_courses,
+        "page": page,
+        "page_size": page_size,
+        "group_by": "region",
+        "groups": grouped_data,
+        "has_more": (page * page_size) < total_courses
+    }
+
+
+def group_courses_by_theme(courses: list[dict[str, Any]], total_courses: int, page: int, page_size: int) -> dict[str, Any]:
+    """테마별로 여행 코스를 그룹화"""
+    theme_groups = {}
+
+    for course in courses:
+        themes = course.get("theme", ["기타"])
+        if not isinstance(themes, list):
+            themes = [themes]
+
+        for theme in themes:
+            if theme not in theme_groups:
+                theme_groups[theme] = []
+            theme_groups[theme].append(course)
+
+    # 테마별 그룹 정렬
+    sorted_themes = sorted(theme_groups.keys())
+
+    grouped_data = []
+    for theme in sorted_themes:
+        grouped_data.append({
+            "theme": theme,
+            "courses": theme_groups[theme],
+            "count": len(theme_groups[theme])
+        })
+
+    return {
+        "total": total_courses,
+        "page": page,
+        "page_size": page_size,
+        "group_by": "theme",
+        "groups": grouped_data,
+        "has_more": (page * page_size) < total_courses
+    }
 
 
 @router.get("/regions")
