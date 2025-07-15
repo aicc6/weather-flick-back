@@ -30,6 +30,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Enum as SqlEnum,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import declarative_base, relationship
@@ -1170,6 +1171,7 @@ class Contact(Base):
     email = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     is_public = Column(Boolean, default=False, nullable=False)
+    approval_status = Column(SqlEnum('PENDING', 'PROCESSING', 'COMPLETE', name='approval_status'), default='PENDING', nullable=False)
 
 
 class ChatMessage(Base):

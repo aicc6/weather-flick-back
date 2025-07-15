@@ -14,6 +14,7 @@ class ContactCreate(BaseModel):
 class ContactResponse(ContactCreate):
     id: int
     created_at: datetime
+    approval_status: str
 
     class Config:
         from_attributes = True
