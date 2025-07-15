@@ -30,6 +30,16 @@ def get_contacts(db: Session, skip: int = 0, limit: int = 100):
 
 def verify_contact_password(db: Session, contact_id: int, password: str) -> bool:
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact or not contact.password_hash:
+    if not contact or not bool(contact.password_hash):
         return False
     return bcrypt.checkpw(password.encode('utf-8'), contact.password_hash.encode('utf-8'))
+
+def increment_contact_views(db: Session, contact_id: int) -> int:
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise ValueError("문의글을 찾을 수 없습니다.")
+    current_views = int(getattr(contact, "views", 0) or 0)
+    contact.__dict__["views"] = current_views + 1
+    db.commit()
+    db.refresh(contact)
+    return int(contact.__dict__["views"])

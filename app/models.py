@@ -1173,6 +1173,7 @@ class Contact(Base):
     is_public = Column(Boolean, default=False, nullable=False)
     approval_status = Column(SqlEnum('PENDING', 'PROCESSING', 'COMPLETE', name='approval_status'), default='PENDING', nullable=False)
     password_hash = Column(String(128), nullable=True)
+    views = Column(Integer, default=0, nullable=False)
 
 
 class ChatMessage(Base):

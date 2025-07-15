@@ -16,6 +16,7 @@ class ContactResponse(ContactCreate):
     id: int
     created_at: datetime
     approval_status: str
+    views: int
     password: str | None = None  # 응답에는 보통 포함하지 않지만, 일관성 위해 추가(실제 응답에선 제외 가능)
 
     class Config:
