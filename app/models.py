@@ -37,6 +37,7 @@ class Contact(Base):
     name = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    is_public = Column(Boolean, default=False, nullable=False)
 
 class AdminStatus(enum.Enum):
     ACTIVE = "ACTIVE"
