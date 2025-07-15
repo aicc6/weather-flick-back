@@ -4,8 +4,9 @@ Revises:
 Create Date: 2024-06-10
 
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '20240610_add_travel_course_likes'

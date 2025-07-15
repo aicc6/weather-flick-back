@@ -1,8 +1,9 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import select, desc
-from typing import List, Dict, Any, Optional
 import logging
 import re
+from typing import Any
+
+from sqlalchemy import desc, select
+from sqlalchemy.orm import Session
 
 from app.models import ChatMessage
 from app.services.openai_service import openai_service
@@ -17,10 +18,10 @@ class ChatbotService:
 
     async def generate_response(
         self,
-        user_id: Optional[int],
+        user_id: int | None,
         message: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         사용자 메시지에 대한 챗봇 응답을 생성합니다.
         OpenAI를 우선 사용하고, 실패 시 규칙 기반 응답으로 fallback
@@ -54,16 +55,16 @@ class ChatbotService:
                         "죄송합니다. 저는 여행과 날씨에 관한 도움만",
                         "여행 계획이나 날씨 기반 추천이 필요하시면"
                     ]
-                    
+
                     # 챗봇 관련 키워드가 있으면 거절로 판단하지 않음
                     chatbot_keywords = [
                         "챗봇", "Weather Flick", "AI 여행 도우미", "도와드리는",
                         "제가", "저는", "기능", "사용법", "도움을 드릴"
                     ]
-                    
+
                     has_chatbot_content = any(keyword in ai_response for keyword in chatbot_keywords)
                     is_rejection = any(keyword in ai_response for keyword in rejection_keywords) and not has_chatbot_content
-                    
+
                     if is_rejection:
                         # 거절 메시지인 경우, 여행 관련 추천 질문만 제공
                         suggestions = [
@@ -95,7 +96,7 @@ class ChatbotService:
             logger.error(f"챗봇 응답 생성 실패: {e}, {user_info}")
             return await self._generate_fallback_response()
 
-    async def _get_conversation_history(self, user_id: int, limit: int = 5) -> List[Dict[str, str]]:
+    async def _get_conversation_history(self, user_id: int, limit: int = 5) -> list[dict[str, str]]:
         """최근 대화 기록을 OpenAI 형식으로 변환"""
         try:
             stmt = (
@@ -126,10 +127,10 @@ class ChatbotService:
 
     async def _generate_rule_based_response(
         self,
-        user_id: Optional[int],
+        user_id: int | None,
         message: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """규칙 기반 응답 생성 (기존 로직)"""
         try:
             # 메시지 전처리
@@ -158,7 +159,7 @@ class ChatbotService:
             logger.error(f"규칙 기반 응답 생성 실패: {e}")
             return await self._generate_fallback_response()
 
-    async def _generate_fallback_response(self) -> Dict[str, Any]:
+    async def _generate_fallback_response(self) -> dict[str, Any]:
         """최종 fallback 응답"""
         return {
             "response": "죄송합니다. 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
@@ -171,8 +172,8 @@ class ChatbotService:
         self,
         intent: str,
         message: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        context: dict[str, Any] | None = None
+    ) -> list[str]:
         """컨텍스트를 고려한 스마트 추천 질문 생성"""
 
         # 기본 추천에서 시작
@@ -252,7 +253,7 @@ class ChatbotService:
         self,
         intent: str,
         message: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> str:
         """의도에 따른 응답 생성 (개선된 버전)"""
 
@@ -332,7 +333,7 @@ class ChatbotService:
                 "• '도움말'이라고 말씀해주시면 더 자세히 안내해드릴게요! 😊"
             )
 
-    def _generate_suggestions(self, intent: str, context: Optional[Dict[str, Any]] = None) -> List[str]:
+    def _generate_suggestions(self, intent: str, context: dict[str, Any] | None = None) -> list[str]:
         """의도에 따른 추천 질문 생성 (개선된 버전)"""
 
         if intent == "weather":
@@ -377,7 +378,7 @@ class ChatbotService:
                 "도움말을 보여주세요"
             ]
 
-    async def get_chat_history(self, user_id: int, limit: int = 50) -> List[ChatMessage]:
+    async def get_chat_history(self, user_id: int, limit: int = 50) -> list[ChatMessage]:
         """
         사용자의 챗봇 대화 히스토리를 조회합니다.
 
@@ -408,7 +409,7 @@ class ChatbotService:
             logger.error(f"챗봇 히스토리 조회 실패: {e}, 사용자: {user_id}")
             return []
 
-    async def get_initial_message(self) -> Dict[str, Any]:
+    async def get_initial_message(self) -> dict[str, Any]:
         """챗봇 초기 메시지를 반환합니다."""
         return {
             "message": (
@@ -423,7 +424,7 @@ class ChatbotService:
             ]
         }
 
-    async def get_config(self) -> Dict[str, Any]:
+    async def get_config(self) -> dict[str, Any]:
         """챗봇 설정을 반환합니다."""
         return {
             "welcome_delay": 1000,  # 1초

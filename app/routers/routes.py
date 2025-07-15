@@ -3,23 +3,30 @@
 여행 계획의 경로 정보 관리 및 교통 정보 제공
 """
 
+import logging
+import uuid
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
-import uuid
-import logging
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models import (
-    TravelRoute, TransportationDetail, TravelPlan,
-    TravelRouteCreate, TravelRouteUpdate, TravelRouteResponse,
-    TransportationDetailCreate, TransportationDetailResponse,
-    RouteCalculationRequest, RouteCalculationResponse,
-    User
+    RouteCalculationRequest,
+    RouteCalculationResponse,
+    TransportationDetail,
+    TransportationDetailCreate,
+    TransportationDetailResponse,
+    TravelPlan,
+    TravelRoute,
+    TravelRouteCreate,
+    TravelRouteResponse,
+    TravelRouteUpdate,
+    User,
 )
-from app.auth import get_current_user
-from app.services.route_service import route_service
 from app.services.google_places_service import google_places_service
+from app.services.route_service import route_service
 from app.services.tmap_service import tmap_service
 
 router = APIRouter(prefix="/routes", tags=["routes"])
@@ -41,7 +48,7 @@ async def calculate_route(
             request.destination_lng,
             request.transport_type
         )
-        
+
         return RouteCalculationResponse(
             success=result.get("success", False),
             duration=result.get("duration"),
@@ -51,7 +58,7 @@ async def calculate_route(
             transport_type=result.get("transport_type", request.transport_type),
             message=result.get("message")
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -72,9 +79,9 @@ async def calculate_multiple_routes(
             request.destination_lat,
             request.destination_lng
         )
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -85,7 +92,7 @@ async def calculate_multiple_routes(
 @router.post("/recommend")
 async def get_recommended_route(
     request: RouteCalculationRequest,
-    preferences: Optional[Dict[str, Any]] = None,
+    preferences: dict[str, Any] | None = None,
     current_user: User = Depends(get_current_user)
 ):
     """상황에 맞는 최적 경로 추천"""
@@ -97,9 +104,9 @@ async def get_recommended_route(
             request.destination_lng,
             preferences
         )
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -120,25 +127,25 @@ async def create_travel_route(
             TravelPlan.plan_id == route_data.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="여행 계획을 찾을 수 없거나 접근 권한이 없습니다."
             )
-        
+
         # 새 경로 생성
         new_route = TravelRoute(
             route_id=uuid.uuid4(),
             **route_data.dict()
         )
-        
+
         db.add(new_route)
         db.commit()
         db.refresh(new_route)
-        
+
         return new_route
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -149,7 +156,7 @@ async def create_travel_route(
         )
 
 
-@router.get("/plan/{plan_id}", response_model=List[TravelRouteResponse])
+@router.get("/plan/{plan_id}", response_model=list[TravelRouteResponse])
 async def get_travel_plan_routes(
     plan_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -162,20 +169,20 @@ async def get_travel_plan_routes(
             TravelPlan.plan_id == plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="여행 계획을 찾을 수 없거나 접근 권한이 없습니다."
             )
-        
+
         # 경로 조회 (일차 및 순서별 정렬)
         routes = db.query(TravelRoute).filter(
             TravelRoute.plan_id == plan_id
         ).order_by(TravelRoute.day, TravelRoute.sequence).all()
-        
+
         return routes
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -196,27 +203,27 @@ async def get_travel_route(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         # 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로에 접근할 권한이 없습니다."
             )
-        
+
         return route
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -238,35 +245,35 @@ async def update_travel_route(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         # 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로를 수정할 권한이 없습니다."
             )
-        
+
         # 경로 정보 업데이트
         update_data = route_data.dict(exclude_unset=True)
         for field, value in update_data.items():
             setattr(route, field, value)
-        
+
         db.commit()
         db.refresh(route)
-        
+
         return route
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -288,36 +295,36 @@ async def delete_travel_route(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         # 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로를 삭제할 권한이 없습니다."
             )
-        
+
         # 관련된 교통수단 상세 정보도 함께 삭제
         db.query(TransportationDetail).filter(
             TransportationDetail.route_id == route_id
         ).delete()
-        
+
         # 경로 삭제
         db.delete(route)
         db.commit()
-        
+
         return {"message": "경로가 성공적으로 삭제되었습니다."}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -341,40 +348,40 @@ async def auto_generate_routes(
             TravelPlan.plan_id == plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="여행 계획을 찾을 수 없거나 접근 권한이 없습니다."
             )
-        
+
         if not travel_plan.itinerary:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="여행 일정이 없어 경로를 생성할 수 없습니다."
             )
-        
+
         # 기존 경로들을 먼저 삭제 (중복 방지)
         existing_routes = db.query(TravelRoute).filter(
             TravelRoute.plan_id == plan_id
         ).all()
-        
+
         if existing_routes:
             # 관련된 교통수단 상세 정보도 함께 삭제
             for route in existing_routes:
                 db.query(TransportationDetail).filter(
                     TransportationDetail.route_id == route.route_id
                 ).delete()
-            
+
             # 기존 경로 삭제
             db.query(TravelRoute).filter(
                 TravelRoute.plan_id == plan_id
             ).delete()
-            
+
             db.commit()
-        
+
         generated_routes = []
-        
+
         # Itinerary JSON 파싱
         import json
         try:
@@ -384,36 +391,36 @@ async def auto_generate_routes(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"여행 일정 데이터 파싱 오류: {str(e)}"
             )
-        
+
         # 먼저 모든 Place ID를 수집
         all_place_ids = set()
         for day_str, places in itinerary.items():
             for place in places:
                 if place.get('place_id'):
                     all_place_ids.add(place['place_id'])
-        
+
         # Google Places API로 좌표 정보 일괄 조회
         place_details = {}
         if all_place_ids:
             place_details = await google_places_service.get_multiple_place_details(list(all_place_ids))
-        
+
         # 일차별로 정렬된 리스트 생성
         sorted_days = sorted(itinerary.items(), key=lambda x: int(x[0].replace('Day ', '').replace('day', '')))
-        
+
         # 각 일차별로 경로 생성
         for day_str, places in sorted_days:
             if not places:
                 continue
-                
+
             try:
                 day = int(day_str.replace('Day ', '').replace('day', ''))
-            except:
+            except (ValueError, AttributeError):
                 continue
-            
+
             # 첫 번째 일차인 경우, 출발지에서 첫 번째 목적지로의 경로 생성
             if day == 1 and travel_plan.start_location and len(places) >= 1:
                 first_place = places[0]
-                
+
                 # 출발지 좌표 정보 (Google Places API로 검색)
                 start_coords = None
                 if travel_plan.start_location:
@@ -428,7 +435,7 @@ async def auto_generate_routes(
                             }
                     except Exception as e:
                         logger.warning(f"출발지 좌표 조회 실패: {str(e)}")
-                
+
                 # 첫 번째 목적지 좌표 정보
                 first_coords = None
                 if first_place.get('latitude') and first_place.get('longitude'):
@@ -445,7 +452,7 @@ async def auto_generate_routes(
                             'longitude': detail['longitude'],
                             'name': detail.get('name', first_place.get('description', '첫 번째 목적지'))
                         }
-                
+
                 # 출발지에서 첫 번째 목적지로의 경로 생성
                 if start_coords and first_coords:
                     try:
@@ -455,10 +462,10 @@ async def auto_generate_routes(
                             first_coords['latitude'],
                             first_coords['longitude']
                         )
-                        
+
                         if route_result.get('success') and route_result.get('recommended'):
                             recommended = route_result['recommended']
-                            
+
                             # 출발지 → 첫 번째 목적지 경로 저장 (sequence = 0)
                             start_route = TravelRoute(
                                 route_id=uuid.uuid4(),
@@ -477,23 +484,23 @@ async def auto_generate_routes(
                                 distance=recommended.get('distance'),
                                 cost=recommended.get('cost')
                             )
-                            
+
                             db.add(start_route)
                             generated_routes.append(start_route)
-                            
+
                     except Exception as route_error:
                         logger.warning(f"출발지 경로 계산 중 오류: {str(route_error)}")
-            
+
             # 일차 내 연속된 장소 간 경로 생성
             if len(places) >= 2:
                 for i in range(len(places) - 1):
                     current_place = places[i]
                     next_place = places[i + 1]
-                    
+
                     # 좌표 정보 확인 및 가져오기
                     current_coords = None
                     next_coords = None
-                    
+
                     # 기존 좌표 정보가 있으면 사용
                     if current_place.get('latitude') and current_place.get('longitude'):
                         current_coords = {
@@ -510,7 +517,7 @@ async def auto_generate_routes(
                                 'longitude': detail['longitude'],
                                 'name': detail.get('name', current_place.get('description', '출발지'))
                             }
-                    
+
                     # 다음 장소 좌표 확인
                     if next_place.get('latitude') and next_place.get('longitude'):
                         next_coords = {
@@ -526,7 +533,7 @@ async def auto_generate_routes(
                                 'longitude': detail['longitude'],
                                 'name': detail.get('name', next_place.get('description', '도착지'))
                             }
-                    
+
                     # 두 장소 모두 좌표가 있는 경우만 경로 생성
                     if current_coords and next_coords:
                         try:
@@ -537,10 +544,10 @@ async def auto_generate_routes(
                                 next_coords['latitude'],
                                 next_coords['longitude']
                             )
-                            
+
                             if route_result.get('success') and route_result.get('recommended'):
                                 recommended = route_result['recommended']
-                                
+
                                 # 경로 정보 저장
                                 new_route = TravelRoute(
                                     route_id=uuid.uuid4(),
@@ -559,37 +566,37 @@ async def auto_generate_routes(
                                     distance=recommended.get('distance'),
                                     cost=recommended.get('cost')
                                 )
-                                
+
                                 db.add(new_route)
                                 generated_routes.append(new_route)
-                                
+
                         except Exception as route_error:
                             print(f"경로 계산 중 오류: {str(route_error)}")
                             continue
-        
+
         # 일차 간 경로 생성 (1일차 마지막 → 2일차 첫 번째, 2일차 마지막 → 3일차 첫 번째 등)
         for i in range(len(sorted_days) - 1):
             current_day_str, current_places = sorted_days[i]
             next_day_str, next_places = sorted_days[i + 1]
-            
+
             if not current_places or not next_places:
                 continue
-                
+
             try:
                 current_day = int(current_day_str.replace('Day ', '').replace('day', ''))
                 next_day = int(next_day_str.replace('Day ', '').replace('day', ''))
-            except:
+            except (ValueError, AttributeError):
                 continue
-            
+
             # 현재 일차 마지막 장소
             last_place = current_places[-1]
             # 다음 일차 첫 번째 장소
             first_place = next_places[0]
-            
+
             # 좌표 정보 확인 및 가져오기
             last_coords = None
             first_coords = None
-            
+
             # 마지막 장소 좌표 확인
             if last_place.get('latitude') and last_place.get('longitude'):
                 last_coords = {
@@ -605,7 +612,7 @@ async def auto_generate_routes(
                         'longitude': detail['longitude'],
                         'name': detail.get('name', last_place.get('description', '출발지'))
                     }
-            
+
             # 첫 번째 장소 좌표 확인
             if first_place.get('latitude') and first_place.get('longitude'):
                 first_coords = {
@@ -621,7 +628,7 @@ async def auto_generate_routes(
                         'longitude': detail['longitude'],
                         'name': detail.get('name', first_place.get('description', '도착지'))
                     }
-            
+
             # 두 장소 모두 좌표가 있는 경우만 일차 간 경로 생성
             if last_coords and first_coords:
                 try:
@@ -632,10 +639,10 @@ async def auto_generate_routes(
                         first_coords['latitude'],
                         first_coords['longitude']
                     )
-                    
+
                     if route_result.get('success') and route_result.get('recommended'):
                         recommended = route_result['recommended']
-                        
+
                         # 일차 간 경로 정보 저장 (다음 일차에 속하도록 설정)
                         new_route = TravelRoute(
                             route_id=uuid.uuid4(),
@@ -654,26 +661,26 @@ async def auto_generate_routes(
                             distance=recommended.get('distance'),
                             cost=recommended.get('cost')
                         )
-                        
+
                         db.add(new_route)
                         generated_routes.append(new_route)
-                        
+
                 except Exception as route_error:
                     print(f"일차 간 경로 계산 중 오류: {str(route_error)}")
                     continue
-        
+
         if generated_routes:
             db.commit()
-            
+
             # 생성된 경로들을 새로고침
             for route in generated_routes:
                 db.refresh(route)
-        
+
         return {
             "message": f"{len(generated_routes)}개의 경로가 자동 생성되었습니다.",
             "routes": generated_routes
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -697,36 +704,36 @@ async def create_transportation_detail(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == detail_data.route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로에 접근할 권한이 없습니다."
             )
-        
+
         # 교통수단 상세 정보 생성
         new_detail = TransportationDetail(
             detail_id=uuid.uuid4(),
             **detail_data.dict()
         )
-        
+
         db.add(new_detail)
         db.commit()
         db.refresh(new_detail)
-        
+
         return new_detail
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -737,7 +744,7 @@ async def create_transportation_detail(
         )
 
 
-@router.get("/{route_id}/transportation", response_model=List[TransportationDetailResponse])
+@router.get("/{route_id}/transportation", response_model=list[TransportationDetailResponse])
 async def get_transportation_details(
     route_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -749,31 +756,31 @@ async def get_transportation_details(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로에 접근할 권한이 없습니다."
             )
-        
+
         # 교통수단 상세 정보 조회
         details = db.query(TransportationDetail).filter(
             TransportationDetail.route_id == route_id
         ).all()
-        
+
         return details
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -797,24 +804,24 @@ async def get_detailed_route_info(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로에 접근할 권한이 없습니다."
             )
-        
+
         # 기본 경로 정보
         route_info = {
             "route_id": str(route.route_id),
@@ -836,10 +843,10 @@ async def get_detailed_route_info(
                 "stored_route_data": route.route_data
             }
         }
-        
+
         # 실시간 상세 정보 가져오기
         detailed_info = {}
-        
+
         if route.transport_type == "car":
             # TMAP API로 실시간 자동차 경로 정보
             car_result = await tmap_service.get_car_route(
@@ -849,14 +856,14 @@ async def get_detailed_route_info(
                 route.destination_lat,
                 "trafast"  # 빠른길 우선
             )
-            
+
             if car_result.get("success"):
                 detailed_info["real_time_route"] = car_result
-                
+
                 # 대안 경로도 요청한 경우
                 if include_alternatives:
                     alternative_routes = []
-                    
+
                     # 편한길 옵션
                     comfort_result = await tmap_service.get_car_route(
                         route.departure_lng,
@@ -870,7 +877,7 @@ async def get_detailed_route_info(
                             "type": "편한길",
                             "route_data": comfort_result
                         })
-                    
+
                     # 최적 경로 옵션
                     optimal_result = await tmap_service.get_car_route(
                         route.departure_lng,
@@ -884,9 +891,9 @@ async def get_detailed_route_info(
                             "type": "최적 경로",
                             "route_data": optimal_result
                         })
-                    
+
                     detailed_info["alternative_routes"] = alternative_routes
-            
+
             # 주변 POI 정보 (주차장, 주유소 등)
             if include_pois:
                 # 출발지 주변 주차장
@@ -896,7 +903,7 @@ async def get_detailed_route_info(
                     1000,
                     "parking"
                 )
-                
+
                 # 도착지 주변 주차장
                 destination_parking = await tmap_service.get_poi_around(
                     route.destination_lng,
@@ -904,7 +911,7 @@ async def get_detailed_route_info(
                     1000,
                     "parking"
                 )
-                
+
                 # 경로 상 주유소 (중간 지점 기준)
                 mid_lng = (route.departure_lng + route.destination_lng) / 2
                 mid_lat = (route.departure_lat + route.destination_lat) / 2
@@ -914,13 +921,13 @@ async def get_detailed_route_info(
                     2000,
                     "gasstation"
                 )
-                
+
                 detailed_info["pois"] = {
                     "departure_parking": departure_parking,
                     "destination_parking": destination_parking,
                     "nearby_gas_stations": gas_stations
                 }
-        
+
         elif route.transport_type == "walk":
             # TMAP API로 실시간 도보 경로 정보
             walk_result = await tmap_service.get_walk_route(
@@ -929,14 +936,14 @@ async def get_detailed_route_info(
                 route.destination_lng,
                 route.destination_lat
             )
-            
+
             if walk_result.get("success"):
                 detailed_info["real_time_route"] = walk_result
-        
+
         # 경로별 상세 안내 정보 추출
         if detailed_info.get("real_time_route"):
             real_time_data = detailed_info["real_time_route"]
-            
+
             # 더 상세한 안내 정보 구성
             enhanced_guide = {
                 "summary": {
@@ -949,11 +956,11 @@ async def get_detailed_route_info(
                 "detailed_instructions": [],
                 "route_geometry": real_time_data.get("route_data", {}).get("geometry", [])
             }
-            
+
             # 상세 안내점 정보
             guide_points = real_time_data.get("route_data", {}).get("guide_points", [])
             detailed_guides = real_time_data.get("route_data", {}).get("detailed_guides", [])
-            
+
             # 주요 안내점만 선별하여 제공
             major_instructions = []
             for guide in detailed_guides:
@@ -965,7 +972,7 @@ async def get_detailed_route_info(
                     "turn_type": guide.get("instruction"),
                     "is_major": True
                 })
-            
+
             # 모든 안내점 포함 (선택사항)
             all_instructions = []
             for guide in guide_points:
@@ -980,20 +987,20 @@ async def get_detailed_route_info(
                     "speed_limit": guide.get("speed_limit"),
                     "is_major": guide.get("distance", 0) >= 500
                 })
-            
+
             enhanced_guide["major_instructions"] = major_instructions
             enhanced_guide["all_instructions"] = all_instructions
-            
+
             detailed_info["enhanced_guide"] = enhanced_guide
-        
+
         # 실시간 교통 정보 및 예상 도착 시간
         current_time = {
             "requested_at": "현재 시각",
             "estimated_arrival": f"약 {detailed_info.get('real_time_route', {}).get('duration', route.duration)}분 후 도착 예정"
         }
-        
+
         detailed_info["timing_info"] = current_time
-        
+
         return {
             "success": True,
             "route_info": route_info,
@@ -1004,7 +1011,7 @@ async def get_detailed_route_info(
                 "alternative_routes": "TMAP API" if include_alternatives else None
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1018,7 +1025,7 @@ async def get_detailed_route_info(
 @router.get("/{route_id}/timemachine")
 async def get_timemachine_route_info(
     route_id: uuid.UUID,
-    departure_time: Optional[str] = None,
+    departure_time: str | None = None,
     include_comparison: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1029,24 +1036,24 @@ async def get_timemachine_route_info(
         route = db.query(TravelRoute).filter(
             TravelRoute.route_id == route_id
         ).first()
-        
+
         if not route:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="경로를 찾을 수 없습니다."
             )
-        
+
         travel_plan = db.query(TravelPlan).filter(
             TravelPlan.plan_id == route.plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
-        
+
         if not travel_plan:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="해당 경로에 접근할 권한이 없습니다."
             )
-        
+
         # 출발 시간 설정 (파라미터로 받거나 여행 계획의 시작일 사용)
         if not departure_time:
             # 여행 계획의 시작일과 해당 일차를 기준으로 출발 시간 추정
@@ -1063,7 +1070,7 @@ async def get_timemachine_route_info(
             else:
                 # 여행 계획에 시작일이 없으면 현재 시간 사용
                 departure_time = datetime.datetime.now().isoformat()
-        
+
         # 기본 경로 정보
         route_info = {
             "route_id": str(route.route_id),
@@ -1086,10 +1093,10 @@ async def get_timemachine_route_info(
                 "cost": route.cost
             }
         }
-        
+
         # 타임머신 경로 정보
         timemachine_info = {}
-        
+
         if route.transport_type == "car":
             # TMAP API 호출 시도
             try:
@@ -1223,7 +1230,7 @@ async def get_timemachine_route_info(
                 "distance": route.distance,
                 "cost": route.cost
             }
-        
+
         # 예측 정확도 정보
         prediction_info = {
             "departure_time": departure_time,
@@ -1231,7 +1238,7 @@ async def get_timemachine_route_info(
             "accuracy_note": "TMAP 타임머신 API 기반 예측으로 실제 교통상황과 다를 수 있습니다." if route.transport_type == "car" else "저장된 기본 데이터입니다.",
             "supports_timemachine": route.transport_type == "car"
         }
-        
+
         return {
             "success": True,
             "route_info": route_info,
@@ -1242,7 +1249,7 @@ async def get_timemachine_route_info(
                 "comparison_data": "TMAP API (Multiple Routes)" if include_comparison and route.transport_type == "car" else None
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1259,7 +1266,7 @@ async def get_timemachine_route_info(
 async def get_enhanced_multi_route(
     request: RouteCalculationRequest,
     include_timemachine: bool = True,
-    departure_time: Optional[str] = None,
+    departure_time: str | None = None,
     current_user: User = Depends(get_current_user)
 ):
     """프론트엔드 EnhancedTransportCard를 위한 다중 경로 정보"""
@@ -1271,15 +1278,15 @@ async def get_enhanced_multi_route(
             request.destination_lat,
             request.destination_lng
         )
-        
+
         if not multi_routes_result.get("success"):
             return multi_routes_result
-        
+
         routes = multi_routes_result["routes"]
-        
+
         # 각 경로별 세부 정보 추가
         enhanced_routes = {}
-        
+
         # 도보 경로 개선
         if routes.get("walk", {}).get("success"):
             walk_data = routes["walk"]
@@ -1295,7 +1302,7 @@ async def get_enhanced_multi_route(
                     "difficulty_level": "쉬움" if walk_data.get("distance", 0) < 2 else "보통"
                 }
             }
-        
+
         # 대중교통 경로 개선
         if routes.get("transit", {}).get("success"):
             transit_data = routes["transit"]
@@ -1316,7 +1323,7 @@ async def get_enhanced_multi_route(
                 "card_payment": True,
                 "mobile_payment": True
             }
-            
+
             # ODsay 데이터에서 상세 정보 추출
             route_data = transit_data.get("route_data", {})
             if route_data.get("sub_paths"):
@@ -1331,7 +1338,7 @@ async def get_enhanced_multi_route(
                         "line_info": step.get("lane", {})
                     }
                     enhanced_routes["transit"]["detailed_steps"].append(step_info)
-        
+
         # 자동차 경로 개선
         if routes.get("car", {}).get("success"):
             car_data = routes["car"]
@@ -1350,7 +1357,7 @@ async def get_enhanced_multi_route(
                 },
                 "real_time_traffic": True
             }
-            
+
             # 타임머신 기능 추가
             if include_timemachine and departure_time:
                 try:
@@ -1361,11 +1368,11 @@ async def get_enhanced_multi_route(
                         request.destination_lat,
                         departure_time
                     )
-                    
+
                     if timemachine_result.get("success"):
                         enhanced_routes["car"]["timemachine_data"] = timemachine_result
                         enhanced_routes["car"]["departure_time"] = departure_time
-                        
+
                         # 추천 경로로 메인 데이터 업데이트
                         if timemachine_result.get("recommended"):
                             recommended = timemachine_result["recommended"]
@@ -1373,24 +1380,24 @@ async def get_enhanced_multi_route(
                             enhanced_routes["car"]["distance"] = recommended["distance"]
                             enhanced_routes["car"]["cost"] = recommended["cost"]
                             enhanced_routes["car"]["predicted_traffic"] = "실시간 예측 적용"
-                
+
                 except Exception as e:
                     logger.warning(f"타임머신 데이터 조회 실패: {e}")
                     enhanced_routes["car"]["timemachine_data"] = None
-        
+
         # 추천 로직 개선
         distance = route_service._calculate_distance(
             request.departure_lat, request.departure_lng,
             request.destination_lat, request.destination_lng
         )
-        
+
         # 상황별 추천
         recommendations = {
             "primary": None,
             "alternatives": [],
             "context": {}
         }
-        
+
         # 거리별 추천
         if distance <= 1.0:
             if enhanced_routes.get("walk"):
@@ -1407,21 +1414,21 @@ async def get_enhanced_multi_route(
                 recommendations["primary"] = {"type": "car", "reason": "장거리 이동으로 자동차가 효율적"}
                 if enhanced_routes.get("transit"):
                     recommendations["alternatives"].append({"type": "transit", "reason": "경제성"})
-        
+
         # 시간대별 추천 (출발 시간이 있는 경우)
         if departure_time:
             try:
                 from datetime import datetime
                 dt = datetime.fromisoformat(departure_time.replace('Z', '+00:00'))
                 hour = dt.hour
-                
+
                 if 7 <= hour <= 9 or 17 <= hour <= 19:  # 출퇴근 시간
                     recommendations["context"]["rush_hour"] = True
                     recommendations["context"]["traffic_warning"] = "출퇴근 시간대로 교통 체증 예상"
                     # 대중교통을 우선 추천
                     if enhanced_routes.get("transit") and recommendations["primary"]["type"] != "walk":
                         recommendations["primary"] = {"type": "transit", "reason": "출퇴근 시간대 교통체증 회피"}
-                
+
                 elif 23 <= hour or hour <= 5:  # 심야 시간
                     recommendations["context"]["late_night"] = True
                     recommendations["context"]["transit_warning"] = "심야 시간대로 대중교통 운행 제한"
@@ -1432,7 +1439,7 @@ async def get_enhanced_multi_route(
                         recommendations["primary"] = {"type": "walk", "reason": "심야 도보 (안전 주의)"}
             except:
                 pass
-        
+
         # 날씨 정보 추가 (모의 데이터)
         weather_info = {
             "condition": "맑음",
@@ -1441,12 +1448,12 @@ async def get_enhanced_multi_route(
             "wind_speed": "2m/s",
             "outdoor_activity_suitable": True
         }
-        
+
         # 날씨에 따른 추천 조정
         if weather_info["precipitation"] != "0%":
             recommendations["context"]["weather_warning"] = "강수 예보로 대중교통 이용 권장"
             weather_info["outdoor_activity_suitable"] = False
-        
+
         return {
             "success": True,
             "routes": enhanced_routes,
@@ -1466,7 +1473,7 @@ async def get_enhanced_multi_route(
                 "last_updated": "방금 전"
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Enhanced multi-route 조회 실패: {e}")
         raise HTTPException(
@@ -1478,7 +1485,7 @@ async def get_enhanced_multi_route(
 @router.post("/timemachine-comparison")
 async def get_timemachine_comparison(
     request: RouteCalculationRequest,
-    departure_times: List[str],
+    departure_times: list[str],
     current_user: User = Depends(get_current_user)
 ):
     """여러 출발 시간대별 경로 비교 (타임머신)"""
@@ -1488,9 +1495,9 @@ async def get_timemachine_comparison(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="출발 시간을 최소 1개 이상 제공해야 합니다."
             )
-        
+
         time_comparisons = []
-        
+
         for departure_time in departure_times:
             try:
                 # 각 시간대별로 자동차 경로 비교
@@ -1501,7 +1508,7 @@ async def get_timemachine_comparison(
                     request.destination_lat,
                     departure_time
                 )
-                
+
                 if comparison_result.get("success"):
                     # 시간 정보 파싱
                     from datetime import datetime
@@ -1512,18 +1519,18 @@ async def get_timemachine_comparison(
                     except:
                         time_label = departure_time
                         date_label = "날짜 불명"
-                    
+
                     # 교통 상황 예측
                     recommended = comparison_result.get("recommended", {})
                     duration = recommended.get("duration", 0)
-                    
+
                     # 교통량 예측
                     traffic_level = "원활"
                     if duration > 60:
                         traffic_level = "혼잡"
                     elif duration > 45:
                         traffic_level = "보통"
-                    
+
                     time_comparison = {
                         "departure_time": departure_time,
                         "time_label": time_label,
@@ -1542,9 +1549,9 @@ async def get_timemachine_comparison(
                             "total_cost": recommended.get("cost", 0) + recommended.get("toll_fee", 0)
                         }
                     }
-                    
+
                     time_comparisons.append(time_comparison)
-                    
+
             except Exception as e:
                 logger.warning(f"시간대 {departure_time} 처리 실패: {e}")
                 # 실패한 시간대는 모의 데이터로 대체
@@ -1555,33 +1562,33 @@ async def get_timemachine_comparison(
                     "error": True,
                     "message": "해당 시간대 데이터를 가져올 수 없습니다."
                 })
-        
+
         # 최적 시간대 추천
         successful_comparisons = [tc for tc in time_comparisons if not tc.get("error")]
         optimal_time = None
-        
+
         if successful_comparisons:
-            optimal_time = min(successful_comparisons, 
+            optimal_time = min(successful_comparisons,
                              key=lambda x: x.get("recommended_route", {}).get("duration", 999))
-        
+
         # 통계 정보
         statistics = {
             "total_times_compared": len(departure_times),
             "successful_predictions": len(successful_comparisons),
             "time_range": {
-                "fastest": min([tc.get("recommended_route", {}).get("duration", 999) 
+                "fastest": min([tc.get("recommended_route", {}).get("duration", 999)
                              for tc in successful_comparisons]) if successful_comparisons else None,
-                "slowest": max([tc.get("recommended_route", {}).get("duration", 0) 
+                "slowest": max([tc.get("recommended_route", {}).get("duration", 0)
                              for tc in successful_comparisons]) if successful_comparisons else None
             },
             "cost_range": {
-                "cheapest": min([tc.get("cost_analysis", {}).get("total_cost", 999999) 
+                "cheapest": min([tc.get("cost_analysis", {}).get("total_cost", 999999)
                                for tc in successful_comparisons]) if successful_comparisons else None,
-                "most_expensive": max([tc.get("cost_analysis", {}).get("total_cost", 0) 
+                "most_expensive": max([tc.get("cost_analysis", {}).get("total_cost", 0)
                                      for tc in successful_comparisons]) if successful_comparisons else None
             }
         }
-        
+
         return {
             "success": True,
             "departure_times": departure_times,
@@ -1601,7 +1608,7 @@ async def get_timemachine_comparison(
             "data_source": "TMAP 타임머신 API",
             "last_updated": "방금 전"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

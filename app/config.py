@@ -88,29 +88,29 @@ class Settings(BaseSettings):
     # 교통정보 API 설정
     odsay_api_key: str = os.getenv("ODsay_API_KEY", "")
     odsay_api_url: str = "https://api.odsay.com/v1/api"
-    
+
     tmap_api_key: str = os.getenv("TMAP_API_KEY", "")
     tmap_api_url: str = "https://apis.openapi.sk.com/tmap"
 
     # 프론트엔드 설정
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    
+
     # 헬스체크를 위한 API URL들
     @property
     def KMA_API_URL(self) -> str:
         """기상청 API 기본 URL"""
         return f"{self.kma_forecast_url}/getVilageFcst"
-    
+
     @property
     def TOUR_API_BASE_URL(self) -> str:
         """한국관광공사 API 기본 URL"""
         return self.korea_tourism_api_url
-        
+
     @property
     def GOOGLE_PLACES_API_URL(self) -> str:
         """Google Places API 기본 URL"""
         return f"{self.google_places_url}/nearbysearch/json"
-        
+
     @property
     def NAVER_MAP_API_URL(self) -> str:
         """네이버 지도 API 기본 URL"""

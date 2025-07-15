@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class SenderType(str, Enum):
     """메시지 발신자 타입"""
@@ -12,17 +14,17 @@ class ChatMessageRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     message: str = Field(..., min_length=1, max_length=1000, description="사용자 메시지")
-    context: Optional[Dict[str, Any]] = Field(None, description="대화 컨텍스트")
+    context: dict[str, Any] | None = Field(None, description="대화 컨텍스트")
 
 class ChatMessageResponse(BaseModel):
     """챗봇 메시지 응답 스키마"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: Optional[int] = Field(None, description="메시지 ID (익명 사용자는 None)")
+    id: int | None = Field(None, description="메시지 ID (익명 사용자는 None)")
     text: str = Field(..., description="메시지 내용")
     sender: SenderType = Field(..., description="발신자 타입")
     timestamp: str = Field(..., description="메시지 시간")
-    suggestions: Optional[List[str]] = Field(None, description="추천 질문 목록")
+    suggestions: list[str] | None = Field(None, description="추천 질문 목록")
 
 class ChatHistoryResponse(BaseModel):
     """챗봇 대화 히스토리 응답 스키마"""
@@ -32,14 +34,14 @@ class ChatHistoryResponse(BaseModel):
     text: str = Field(..., description="메시지 내용")
     sender: SenderType = Field(..., description="발신자 타입")
     timestamp: str = Field(..., description="메시지 시간")
-    suggestions: Optional[List[str]] = Field(None, description="추천 질문 목록")
+    suggestions: list[str] | None = Field(None, description="추천 질문 목록")
 
 class InitialMessageResponse(BaseModel):
     """챗봇 초기 메시지 응답 스키마"""
     model_config = ConfigDict(from_attributes=True)
 
     message: str = Field(..., description="초기 메시지")
-    suggestions: List[str] = Field(default_factory=list, description="추천 질문 목록")
+    suggestions: list[str] = Field(default_factory=list, description="추천 질문 목록")
 
 class ChatbotConfigResponse(BaseModel):
     """챗봇 설정 응답 스키마"""

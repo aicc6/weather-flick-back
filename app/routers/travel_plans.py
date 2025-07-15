@@ -6,12 +6,12 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import (
+    CategoryCode,
     TravelPlan,
     TravelPlanCreate,
     TravelPlanResponse,
     TravelPlanUpdate,
     User,
-    CategoryCode,
 )
 from app.utils import (
     convert_uuids_to_strings,
@@ -31,10 +31,10 @@ def convert_category_codes_in_itinerary(itinerary: dict, db: Session) -> dict:
     """여행 일정 내의 카테고리 코드를 한글로 변환"""
     if not itinerary or not isinstance(itinerary, dict):
         return itinerary
-    
+
     # 카테고리 코드 캐시
     category_cache = {}
-    
+
     for day_key, day_places in itinerary.items():
         if isinstance(day_places, list):
             for place in day_places:
@@ -57,7 +57,7 @@ def convert_category_codes_in_itinerary(itinerary: dict, db: Session) -> dict:
                         else:
                             converted_tags.append(tag)
                     place['tags'] = converted_tags
-    
+
     return itinerary
 
 
@@ -68,15 +68,15 @@ async def create_travel_plan(
     db: Session = Depends(get_db),
 ):
     """여행 계획 생성"""
-    print(f"=== Travel Plan Creation Request ===")
+    print("=== Travel Plan Creation Request ===")
     print(f"User: {current_user.email if current_user else 'No user'}")
     print(f"Plan data: {plan_data.dict()}")
-    print(f"=================================")
-    
+    print("=================================")
+
     try:
         # 새 여행 계획 생성 (UUID는 자동 생성)
         from app.models import TravelPlanStatus
-        
+
         # status 처리
         status = TravelPlanStatus.PLANNING  # 기본값
         if plan_data.status:
@@ -84,7 +84,7 @@ async def create_travel_plan(
                 status = TravelPlanStatus(plan_data.status)
             except ValueError:
                 status = TravelPlanStatus.PLANNING
-        
+
         db_plan = TravelPlan(
             user_id=current_user.id,
             title=plan_data.title,
@@ -150,7 +150,7 @@ async def get_travel_plans(
 
         # 응답 데이터 구성
         response_data = []
-        
+
         for plan in plans:
             # weather_info가 JSON 문자열인 경우 파싱
             if hasattr(plan, 'weather_info') and plan.weather_info and isinstance(plan.weather_info, str):
@@ -158,17 +158,17 @@ async def get_travel_plans(
                     plan.weather_info = json.loads(plan.weather_info)
                 except (json.JSONDecodeError, TypeError):
                     plan.weather_info = None
-            
+
             # itinerary가 JSON 문자열인 경우 파싱
             if hasattr(plan, 'itinerary') and plan.itinerary and isinstance(plan.itinerary, str):
                 try:
                     plan.itinerary = json.loads(plan.itinerary)
                 except (json.JSONDecodeError, TypeError):
                     plan.itinerary = None
-            
+
             # 카테고리 코드를 한글로 변환
             plan.itinerary = convert_category_codes_in_itinerary(plan.itinerary, db)
-            
+
             response_data.append(convert_uuids_to_strings(TravelPlanResponse.from_orm(plan)))
 
         # 페이지네이션 정보
@@ -211,17 +211,17 @@ async def get_travel_plan(
                 plan.weather_info = json.loads(plan.weather_info)
             except (json.JSONDecodeError, TypeError):
                 plan.weather_info = None
-        
+
         # itinerary가 JSON 문자열인 경우 파싱
         if hasattr(plan, 'itinerary') and plan.itinerary and isinstance(plan.itinerary, str):
             try:
                 plan.itinerary = json.loads(plan.itinerary)
             except (json.JSONDecodeError, TypeError):
                 plan.itinerary = None
-        
+
         # 카테고리 코드를 한글로 변환
         plan.itinerary = convert_category_codes_in_itinerary(plan.itinerary, db)
-        
+
         response_data = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
 
         return create_standard_response(success=True, data=response_data)
@@ -262,7 +262,7 @@ async def update_travel_plan(
             update_data["itinerary"] = json.dumps(
                 update_data["itinerary"], ensure_ascii=False
             )
-        
+
         # weather_info가 dict인 경우 JSON 문자열로 변환
         if "weather_info" in update_data and update_data["weather_info"]:
             update_data["weather_info"] = json.dumps(
@@ -310,7 +310,7 @@ async def delete_travel_plan(
         # 관련 경로 데이터 먼저 삭제
         from app.models import TravelRoute
         db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).delete()
-        
+
         # 여행 계획 삭제
         db.delete(plan)
         db.commit()

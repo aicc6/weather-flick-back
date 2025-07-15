@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer
@@ -119,7 +118,7 @@ def get_current_user(token=Depends(bearer_scheme), db: Session = Depends(get_db)
 def get_current_user_optional(
     token=Depends(optional_bearer_scheme),
     db: Session = Depends(get_db)
-) -> Optional[User]:
+) -> User | None:
     """
     현재 사용자 조회 (선택적)
     토큰이 없거나 유효하지 않으면 None을 반환합니다.

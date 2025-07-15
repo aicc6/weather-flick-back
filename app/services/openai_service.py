@@ -1,8 +1,8 @@
 """OpenAI integration service for Weather Flick."""
 
 import logging
-from typing import Dict, List, Optional, Any
-import openai
+from typing import Any
+
 from openai import OpenAI
 
 from app.config import settings
@@ -23,9 +23,9 @@ class OpenAIService:
 
     async def generate_travel_recommendation(
         self,
-        user_preferences: Dict[str, Any],
-        weather_data: Dict[str, Any],
-        destination_info: Dict[str, Any]
+        user_preferences: dict[str, Any],
+        weather_data: dict[str, Any],
+        destination_info: dict[str, Any]
     ) -> str:
         """
         사용자 선호도와 날씨 정보를 기반으로 여행 추천 생성
@@ -73,8 +73,8 @@ class OpenAIService:
         self,
         destination: str,
         duration: int,
-        interests: List[str],
-        weather_forecast: List[Dict[str, Any]]
+        interests: list[str],
+        weather_forecast: list[dict[str, Any]]
     ) -> str:
         """
         여행 일정 생성
@@ -121,7 +121,7 @@ class OpenAIService:
     async def generate_chatbot_response(
         self,
         user_message: str,
-        conversation_history: List[Dict[str, str]] = None
+        conversation_history: list[dict[str, str]] = None
     ) -> str:
         """
         챗봇 응답 생성
@@ -204,9 +204,9 @@ class OpenAIService:
 
     def _build_recommendation_prompt(
         self,
-        user_preferences: Dict[str, Any],
-        weather_data: Dict[str, Any],
-        destination_info: Dict[str, Any]
+        user_preferences: dict[str, Any],
+        weather_data: dict[str, Any],
+        destination_info: dict[str, Any]
     ) -> str:
         """여행 추천 프롬프트 구성"""
 
@@ -244,8 +244,8 @@ class OpenAIService:
         self,
         destination: str,
         duration: int,
-        interests: List[str],
-        weather_forecast: List[Dict[str, Any]]
+        interests: list[str],
+        weather_forecast: list[dict[str, Any]]
     ) -> str:
         """여행 일정 프롬프트 구성"""
 

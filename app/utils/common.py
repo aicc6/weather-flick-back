@@ -2,8 +2,8 @@
 공통 유틸리티 함수들
 """
 
-import uuid
 import json
+import uuid
 from datetime import datetime
 from typing import Any
 

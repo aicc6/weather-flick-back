@@ -1,13 +1,22 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import Any
 
 from app.auth import get_current_active_user
 from app.database import get_db
+
 # ORM 모델만 별도로 import
-from app.models import Restaurant, Accommodation, TouristAttraction, User
 # Pydantic 모델은 필요할 때만 별도로 import
-from app.models import ReviewCreate, SearchRequest, SearchResult, RestaurantResponse
+from app.models import (
+    Accommodation,
+    Restaurant,
+    ReviewCreate,
+    SearchRequest,
+    SearchResult,
+    TouristAttraction,
+    User,
+)
 from app.services.local_info_service import local_info_service
 
 router = APIRouter(prefix="/local", tags=["local_info"])

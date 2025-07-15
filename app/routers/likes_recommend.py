@@ -1,8 +1,9 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
-from app.database import get_db
+
 from app.auth import get_current_user
+from app.database import get_db
 from app.models import RecommendLike, RecommendLikeCreate, RecommendLikeResponse, User
 
 router = APIRouter(
@@ -49,7 +50,7 @@ async def get_course_likes(
     liked = db.query(RecommendLike).filter_by(course_id=course_id, user_id=current_user.id).first() is not None
     return {"total": total, "liked": liked}
 
-@router.get("/my", response_model=List[RecommendLikeResponse])
+@router.get("/my", response_model=list[RecommendLikeResponse])
 async def get_my_likes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

@@ -5,17 +5,17 @@ Revises: 3414a5163f27
 Create Date: 2025-07-13 01:16:03.099397
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '441a7369f96c'
-down_revision: Union[str, Sequence[str], None] = '3414a5163f27'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '3414a5163f27'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -24,9 +24,9 @@ def upgrade() -> None:
     # For destinations table
     op.drop_constraint('reviews_destination_id_fkey', 'reviews', type_='foreignkey')
     op.drop_constraint('fk_favorite_places_destination_id_destinations', 'favorite_places', type_='foreignkey')
-    
+
     # Note: weather_data will be dropped, so its constraint will be removed automatically
-    
+
     # Drop unused empty tables
     tables_to_drop = [
         'city_info',
@@ -40,7 +40,7 @@ def upgrade() -> None:
         'attraction_images',
         'tour_destination_images'
     ]
-    
+
     for table in tables_to_drop:
         op.drop_table(table)
 
@@ -60,7 +60,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate legal_dong_codes
     op.create_table('legal_dong_codes',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -81,7 +81,7 @@ def downgrade() -> None:
         sa.Column('updated_at', sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate weather_data
     op.create_table('weather_data',
         sa.Column('weather_id', sa.Integer(), nullable=False),
@@ -105,7 +105,7 @@ def downgrade() -> None:
         sa.Column('raw_data', sa.JSON(), nullable=True),
         sa.PrimaryKeyConstraint('weather_id')
     )
-    
+
     # Recreate historical_weather_daily
     op.create_table('historical_weather_daily',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -120,7 +120,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate destinations
     op.create_table('destinations',
         sa.Column('destination_id', sa.UUID(), nullable=False),
@@ -139,7 +139,7 @@ def downgrade() -> None:
         sa.Column('tags', sa.JSON(), nullable=True),
         sa.PrimaryKeyConstraint('destination_id')
     )
-    
+
     # Recreate tour_destinations
     op.create_table('tour_destinations',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -157,7 +157,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate attraction_details
     op.create_table('attraction_details',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -167,7 +167,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate tour_destination_details
     op.create_table('tour_destination_details',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -177,7 +177,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate attraction_images
     op.create_table('attraction_images',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -187,7 +187,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate tour_destination_images
     op.create_table('tour_destination_images',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -197,7 +197,7 @@ def downgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Recreate foreign key constraints
     op.create_foreign_key('weather_data_destination_id_fkey', 'weather_data', 'destinations', ['destination_id'], ['destination_id'])
     op.create_foreign_key('reviews_destination_id_fkey', 'reviews', 'destinations', ['destination_id'], ['destination_id'])

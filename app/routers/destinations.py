@@ -1,10 +1,10 @@
 import httpx
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_active_user
 from app.config import settings
 from app.database import get_db
-from app.auth import get_current_active_user
 from app.models import User
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
@@ -76,8 +76,8 @@ async def get_destination_recommendations(
     theme: str = Query(..., description="추천 테마 (예: popular, nature, culture)"),
     weather_conditions: str = Query("", description="날씨 조건 (쉼표로 구분)"),
     city: str = Query("서울", description="도시명"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    _db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_active_user)
 ):
     """
     테마와 날씨 조건을 기반으로 여행지를 추천합니다.
@@ -113,14 +113,14 @@ async def get_destination_recommendations(
                 "recommendation_score": 85
             }
         ]
-        
+
         return {
             "recommendations": mock_recommendations,
             "theme": theme,
             "weather_conditions": weather_conditions,
             "city": city
         }
-        
+
     except Exception as e:
         # 에러가 발생해도 빈 결과를 반환하여 프론트엔드가 계속 작동하도록 함
         return {

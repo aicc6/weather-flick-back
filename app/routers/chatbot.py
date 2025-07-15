@@ -1,18 +1,18 @@
+import logging
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import logging
 
+from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
-from app.auth import get_current_user_optional, get_current_user
-from app.models import User, ChatMessage
+from app.models import ChatMessage, User
 from app.schema_models.chatbot import (
+    ChatbotConfigResponse,
+    ChatHistoryResponse,
     ChatMessageRequest,
     ChatMessageResponse,
-    ChatHistoryResponse,
     InitialMessageResponse,
-    ChatbotConfigResponse,
 )
 from app.services.chatbot_service import ChatbotService
 
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/chatbot", tags=["chatbot"])
 async def send_chat_message(
     request: ChatMessageRequest,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User | None = Depends(get_current_user_optional),
 ) -> ChatMessageResponse:
     """
     챗봇에게 메시지를 전송하고 응답을 받습니다.
@@ -88,13 +88,13 @@ async def send_chat_message(
             detail="메시지 처리 중 오류가 발생했습니다"
         )
 
-@router.get("/history/{user_id}", response_model=List[ChatHistoryResponse])
+@router.get("/history/{user_id}", response_model=list[ChatHistoryResponse])
 async def get_chat_history(
     user_id: int,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> List[ChatHistoryResponse]:
+) -> list[ChatHistoryResponse]:
     """
     사용자의 챗봇 대화 히스토리를 조회합니다.
     """

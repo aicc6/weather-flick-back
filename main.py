@@ -3,33 +3,33 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
-from app.utils.redis_client import test_redis_connection
 from app.routers import (
+    attractions,
     auth,
     chatbot,
     config,
+    contact,
+    custom_travel,
+    custom_travel_converter,
+    destinations,
     events,
     kma_weather,
+    likes_recommend,
     local_info,
     location,
     naver_map,
     plan,
+    recommend_reviews,
+    review_likes,
     # recommendations,
     routes,
+    system,
+    travel_course,
+    travel_course_like,
     travel_plans,
     weather,
-    travel_course,
-    recommend_reviews,
-    likes_recommend,
-    review_likes,
-    travel_course_like,
-    custom_travel,
-    custom_travel_converter,
-    attractions,
-    destinations,
-    system,
-    contact
 )
+from app.utils.redis_client import test_redis_connection
 
 # 로깅 설정 초기화
 logger = setup_logging()

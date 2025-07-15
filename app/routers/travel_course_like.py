@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List, Optional
+
 from app.database import get_db
 from app.models import TravelCourseLike
 from app.schemas import TravelCourseLikeCreate, TravelCourseLikeResponse
@@ -17,9 +18,9 @@ async def create_travel_course_like(
     db.refresh(db_course)
     return db_course
 
-@router.get("/", response_model=List[TravelCourseLikeResponse])
+@router.get("/", response_model=list[TravelCourseLikeResponse])
 async def get_travel_course_likes(
-    user_id: Optional[int] = None, db: Session = Depends(get_db)
+    user_id: int | None = None, db: Session = Depends(get_db)
 ):
     query = db.query(TravelCourseLike)
     if user_id is not None:

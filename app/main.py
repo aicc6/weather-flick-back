@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import Base, engine
 from app.routers import travel_course, travel_course_like
-from app.database import engine, Base
 
 # Create database tables
 Base.metadata.create_all(bind=engine)

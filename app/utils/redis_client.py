@@ -3,11 +3,12 @@ Redis 클라이언트 유틸리티
 weather-flick-batch의 Redis 설정을 참조하여 구현
 """
 
-import redis
 import json
-from typing import Any, Optional, Dict
 import logging
 import os
+from typing import Any
+
+import redis
 from dotenv import load_dotenv
 
 # 환경 변수 로드
@@ -21,14 +22,14 @@ class RedisClient:
         self.logger = logging.getLogger(__name__)
         self._client = None
         self._connection_failed = False
-        
+
         # Redis 설정
         self.redis_host = os.getenv("REDIS_HOST", "localhost")
         self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
         self.redis_password = os.getenv("REDIS_PASSWORD", "")
         self.redis_db = int(os.getenv("REDIS_DB", "0"))
 
-    def get_client(self) -> Optional[redis.Redis]:
+    def get_client(self) -> redis.Redis | None:
         """Redis 클라이언트 생성 및 반환"""
         if self._client is None and not self._connection_failed:
             try:
@@ -96,7 +97,7 @@ class RedisClient:
             self.logger.error(f"캐시 저장 실패 [{key}]: {e}")
             return False
 
-    def get_cache(self, key: str) -> Optional[Any]:
+    def get_cache(self, key: str) -> Any | None:
         """캐시 데이터 조회"""
         try:
             client = self.get_client()
@@ -155,7 +156,7 @@ class RedisClient:
             client = self.get_client()
             if not client:
                 return 0
-                
+
             keys = client.keys(pattern)
             if keys:
                 deleted = client.delete(*keys)
@@ -166,13 +167,13 @@ class RedisClient:
             self.logger.error(f"패턴 캐시 삭제 실패 [{pattern}]: {e}")
             return 0
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """Redis 서버 정보 조회"""
         try:
             client = self.get_client()
             if not client:
                 return {}
-                
+
             info = client.info()
             return {
                 "redis_version": info.get("redis_version"),

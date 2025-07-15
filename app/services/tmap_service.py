@@ -4,11 +4,12 @@ TMAP API 서비스
 """
 
 import logging
-from typing import Dict, Any, Optional, List
-import httpx
-from app.config import settings
-import json
 from datetime import datetime
+from typing import Any
+
+import httpx
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,31 +19,31 @@ class TmapService:
         self.api_key = settings.tmap_api_key
         self.base_url = settings.tmap_api_url
         self.session = None
-    
+
     async def _get_session(self) -> httpx.AsyncClient:
         """HTTP 세션 생성"""
         if self.session is None or self.session.is_closed:
             self.session = httpx.AsyncClient(timeout=30.0)
         return self.session
-    
+
     async def close(self):
         """세션 종료"""
         if self.session and not self.session.is_closed:
             await self.session.aclose()
-    
-    async def get_car_route(self, start_x: float, start_y: float, 
-                           end_x: float, end_y: float, 
-                           route_option: str = "trafast") -> Dict[str, Any]:
+
+    async def get_car_route(self, start_x: float, start_y: float,
+                           end_x: float, end_y: float,
+                           route_option: str = "trafast") -> dict[str, Any]:
         """자동차 경로 안내"""
         try:
             session = await self._get_session()
-            
+
             url = f"{self.base_url}/routes"
             headers = {
                 "appKey": self.api_key,
                 "Content-Type": "application/json"
             }
-            
+
             data = {
                 "startX": str(start_x),
                 "startY": str(start_y),
@@ -53,16 +54,16 @@ class TmapService:
                 "searchOption": route_option,  # trafast(빠른길), tracomfort(편한길), traoptimal(최적)
                 "carType": 1  # 일반차량
             }
-            
+
             response = await session.post(url, headers=headers, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
+
             if result.get("features"):
                 # 경로 정보 추출
                 route_info = self._extract_route_info(result["features"])
-                
+
                 return {
                     "success": True,
                     "duration": route_info["total_time"] // 60,  # 초 -> 분
@@ -93,26 +94,26 @@ class TmapService:
                     "success": False,
                     "message": "경로를 찾을 수 없습니다."
                 }
-                
+
         except Exception as e:
             logger.error(f"TMAP API 호출 실패: {e}")
             return {
                 "success": False,
                 "message": f"자동차 경로 검색 중 오류 발생: {str(e)}"
             }
-    
-    async def get_walk_route(self, start_x: float, start_y: float, 
-                            end_x: float, end_y: float) -> Dict[str, Any]:
+
+    async def get_walk_route(self, start_x: float, start_y: float,
+                            end_x: float, end_y: float) -> dict[str, Any]:
         """도보 경로 안내"""
         try:
             session = await self._get_session()
-            
+
             url = f"{self.base_url}/routes/pedestrian"
             headers = {
                 "appKey": self.api_key,
                 "Content-Type": "application/json"
             }
-            
+
             data = {
                 "startX": str(start_x),
                 "startY": str(start_y),
@@ -123,16 +124,16 @@ class TmapService:
                 "startName": "출발지",
                 "endName": "도착지"
             }
-            
+
             response = await session.post(url, headers=headers, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
+
             if result.get("features"):
                 # 도보 경로 정보 추출
                 route_info = self._extract_walk_route_info(result["features"])
-                
+
                 return {
                     "success": True,
                     "duration": route_info["total_time"] // 60,  # 초 -> 분
@@ -151,15 +152,15 @@ class TmapService:
                     "success": False,
                     "message": "도보 경로를 찾을 수 없습니다."
                 }
-                
+
         except Exception as e:
             logger.error(f"TMAP 도보 경로 API 호출 실패: {e}")
             return {
                 "success": False,
                 "message": f"도보 경로 검색 중 오류 발생: {str(e)}"
             }
-    
-    def _extract_route_info(self, features: List[Dict]) -> Dict[str, Any]:
+
+    def _extract_route_info(self, features: list[dict]) -> dict[str, Any]:
         """자동차 경로 정보 추출 (상세 안내점 포함)"""
         total_time = 0
         total_distance = 0
@@ -168,11 +169,11 @@ class TmapService:
         guide_points = []
         detailed_guides = []
         geometry = []
-        
+
         for feature in features:
             props = feature.get("properties", {})
             geometry_data = feature.get("geometry", {})
-            
+
             # 총 시간 및 거리
             if props.get("totalTime"):
                 total_time = props["totalTime"]
@@ -182,7 +183,7 @@ class TmapService:
                 toll_fee = props["totalFare"]
             if props.get("taxiFare"):
                 taxi_fee = props["taxiFare"]
-            
+
             # 상세 안내점 정보 추출
             if props.get("description"):
                 guide_point = {
@@ -200,7 +201,7 @@ class TmapService:
                     "guide_arrow": props.get("guideArrow", ""),
                     "speed_limit": props.get("speedLimit", 0)
                 }
-                
+
                 # 턴 타입에 따른 상세 안내문 생성
                 if props.get("turnType"):
                     turn_type = props["turnType"]
@@ -226,9 +227,9 @@ class TmapService:
                         guide_point["turn_instruction"] = "분기점"
                     else:
                         guide_point["turn_instruction"] = "계속 진행"
-                
+
                 guide_points.append(guide_point)
-                
+
                 # 주요 안내점만 별도로 저장 (거리가 500m 이상인 경우)
                 if props.get("distance", 0) >= 500:
                     detailed_guides.append({
@@ -238,11 +239,11 @@ class TmapService:
                         "time": f"{props.get('time', 0)//60}분" if props.get('time', 0) >= 60 else f"{props.get('time', 0)}초",
                         "instruction": guide_point.get("turn_instruction", "계속 진행")
                     })
-            
+
             # 경로 geometry
             if geometry_data.get("coordinates"):
                 geometry.extend(geometry_data["coordinates"])
-        
+
         return {
             "total_time": total_time,
             "total_distance": total_distance,
@@ -252,24 +253,24 @@ class TmapService:
             "detailed_guides": detailed_guides,
             "geometry": geometry
         }
-    
-    def _extract_walk_route_info(self, features: List[Dict]) -> Dict[str, Any]:
+
+    def _extract_walk_route_info(self, features: list[dict]) -> dict[str, Any]:
         """도보 경로 정보 추출"""
         total_time = 0
         total_distance = 0
         guide_points = []
         geometry = []
-        
+
         for feature in features:
             props = feature.get("properties", {})
             geometry_data = feature.get("geometry", {})
-            
+
             # 총 시간 및 거리
             if props.get("totalTime"):
                 total_time = props["totalTime"]
             if props.get("totalDistance"):
                 total_distance = props["totalDistance"]
-            
+
             # 안내점 정보
             if props.get("description"):
                 guide_points.append({
@@ -277,39 +278,39 @@ class TmapService:
                     "distance": props.get("distance", 0),
                     "time": props.get("time", 0)
                 })
-            
+
             # 경로 geometry
             if geometry_data.get("coordinates"):
                 geometry.extend(geometry_data["coordinates"])
-        
+
         return {
             "total_time": total_time,
             "total_distance": total_distance,
             "guide_points": guide_points,
             "geometry": geometry
         }
-    
+
     def _calculate_fuel_cost(self, distance_m: float) -> float:
         """연료비 계산 (거리 기반)"""
         distance_km = distance_m / 1000
         fuel_efficiency = 12  # km/L (평균 연비)
         fuel_price = 1600  # 원/L (평균 휘발유 가격)
-        
+
         fuel_cost = (distance_km / fuel_efficiency) * fuel_price
         return round(fuel_cost, 0)
-    
-    async def get_poi_around(self, center_x: float, center_y: float, 
-                            radius: int = 1000, 
-                            categories: str = "parking") -> Dict[str, Any]:
+
+    async def get_poi_around(self, center_x: float, center_y: float,
+                            radius: int = 1000,
+                            categories: str = "parking") -> dict[str, Any]:
         """주변 POI 검색 (주차장, 주유소 등)"""
         try:
             session = await self._get_session()
-            
+
             url = f"{self.base_url}/pois"
             headers = {
                 "appKey": self.api_key
             }
-            
+
             params = {
                 "centerLon": center_x,
                 "centerLat": center_y,
@@ -320,12 +321,12 @@ class TmapService:
                 "reqCoordType": "WGS84GEO",
                 "count": 20
             }
-            
+
             response = await session.get(url, headers=headers, params=params)
             response.raise_for_status()
-            
+
             result = response.json()
-            
+
             if result.get("searchPoiInfo"):
                 pois = result["searchPoiInfo"].get("pois", {}).get("poi", [])
                 return {
@@ -338,28 +339,28 @@ class TmapService:
                     "success": False,
                     "message": "주변 시설을 찾을 수 없습니다."
                 }
-                
+
         except Exception as e:
             logger.error(f"TMAP POI 검색 실패: {e}")
             return {
                 "success": False,
                 "message": f"주변 시설 검색 중 오류 발생: {str(e)}"
             }
-    
-    async def get_car_route_with_time(self, start_x: float, start_y: float, 
-                                    end_x: float, end_y: float, 
+
+    async def get_car_route_with_time(self, start_x: float, start_y: float,
+                                    end_x: float, end_y: float,
                                     departure_time: str,
-                                    route_option: str = "trafast") -> Dict[str, Any]:
+                                    route_option: str = "trafast") -> dict[str, Any]:
         """타임머신 경로 안내 - 특정 시간대 기준 경로 예측"""
         try:
             session = await self._get_session()
-            
+
             url = f"{self.base_url}/routes"
             headers = {
                 "appKey": self.api_key,
                 "Content-Type": "application/json"
             }
-            
+
             # 시간 형식을 TMAP API 형식으로 변환 (YYYYMMDDHHMM)
             if departure_time:
                 try:
@@ -371,7 +372,7 @@ class TmapService:
                     formatted_time = datetime.now().strftime("%Y%m%d%H%M")
             else:
                 formatted_time = datetime.now().strftime("%Y%m%d%H%M")
-            
+
             data = {
                 "startX": str(start_x),
                 "startY": str(start_y),
@@ -383,16 +384,16 @@ class TmapService:
                 "carType": 1,  # 일반차량
                 "departureTime": formatted_time  # 타임머신 기능 - 출발 시간 지정
             }
-            
+
             response = await session.post(url, headers=headers, json=data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
+
             if result.get("features"):
                 # 경로 정보 추출
                 route_info = self._extract_route_info(result["features"])
-                
+
                 return {
                     "success": True,
                     "duration": route_info["total_time"] // 60,  # 초 -> 분
@@ -428,11 +429,11 @@ class TmapService:
                     "success": False,
                     "message": "해당 시간대의 경로를 찾을 수 없습니다."
                 }
-                
+
         except Exception as e:
             logger.error(f"TMAP 타임머신 API 호출 실패: {e}")
             logger.error(f"API URL: {url}, Headers: {headers}, Data: {data}")
-            
+
             # TMAP API 실패 시 모의 타임머신 데이터 반환
             return {
                 "success": True,
@@ -522,25 +523,25 @@ class TmapService:
                 },
                 "message": f"타임머신 예측 (모의 데이터): {departure_time} 출발 기준"
             }
-    
-    async def compare_routes_with_time(self, start_x: float, start_y: float, 
-                                     end_x: float, end_y: float, 
-                                     departure_time: str) -> Dict[str, Any]:
+
+    async def compare_routes_with_time(self, start_x: float, start_y: float,
+                                     end_x: float, end_y: float,
+                                     departure_time: str) -> dict[str, Any]:
         """여러 경로 옵션을 타임머신으로 비교"""
         try:
             route_options = [
                 ("trafast", "빠른길"),
-                ("tracomfort", "편한길"), 
+                ("tracomfort", "편한길"),
                 ("traoptimal", "최적")
             ]
-            
+
             results = []
-            
+
             for option, name in route_options:
                 route_result = await self.get_car_route_with_time(
                     start_x, start_y, end_x, end_y, departure_time, option
                 )
-                
+
                 if route_result.get("success"):
                     results.append({
                         "option": option,
@@ -552,13 +553,13 @@ class TmapService:
                         "taxi_fee": route_result.get("taxi_fee", 0),
                         "route_data": route_result["route_data"]
                     })
-            
+
             # 추천 경로 선택 (소요시간 기준)
             recommended = None
             if results:
                 recommended = min(results, key=lambda x: x["duration"])
                 recommended["is_recommended"] = True
-            
+
             return {
                 "success": True,
                 "departure_time": departure_time,
@@ -576,10 +577,10 @@ class TmapService:
                     }
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"경로 비교 중 오류: {e}")
-            
+
             # 오류 발생 시 모의 비교 데이터 반환
             return {
                 "success": True,

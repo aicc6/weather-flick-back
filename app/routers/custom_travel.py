@@ -1,11 +1,8 @@
 """맞춤 여행 추천 라우터"""
 
-import asyncio
 import hashlib
-import json
-import os
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -31,7 +28,7 @@ router = APIRouter(
 )
 
 # 인메모리 캐시 (실제 프로덕션에서는 Redis 사용 권장)
-recommendation_cache: Dict[str, Dict[str, Any]] = {}
+recommendation_cache: dict[str, dict[str, Any]] = {}
 CACHE_DURATION = timedelta(minutes=30)  # 30분 캐시
 
 # 카테고리 코드 캐시 (데이터베이스 조회 최소화)
@@ -41,20 +38,20 @@ def get_category_name(code: str, db: Session) -> str:
     """카테고리 코드를 한글 이름으로 변환 (데이터베이스 사용)"""
     if not code:
         return None
-    
+
     # 캐시 확인
     if code in category_code_cache:
         return category_code_cache[code]
-    
+
     # 데이터베이스에서 조회
     category = db.query(CategoryCode).filter(CategoryCode.category_code == code).first()
-    
+
     if category:
         category_name = category.category_name
         category_code_cache[code] = category_name
         print(f"Category code {code} converted to: {category_name}")
         return category_name
-    
+
     print(f"Category code {code} not found in database")
     # 데이터베이스에 없으면 코드 그대로 반환
     return code  # None 대신 코드를 반환하여 태그에 포함되도록 함
@@ -129,7 +126,7 @@ async def get_custom_travel_recommendations(
         for style in request.styles:
             if style in style_tags:
                 selected_tags.extend(style_tags[style])
-        
+
         # region_code 매핑 (프론트엔드 코드와 DB 코드 차이 해결)
         region_code_mapping = {
             "11": "1",    # 서울
@@ -150,14 +147,14 @@ async def get_custom_travel_recommendations(
             "51": "32",   # 강원
             "52": "37",   # 전북
         }
-        
+
         # 실제 DB에서 사용할 region_code
         db_region_code = region_code_mapping.get(request.region_code, request.region_code)
 
         # 순차적 DB 쿼리 실행 (안정성 우선)
         import logging
         logger = logging.getLogger(__name__)
-        
+
         try:
             # 관광지 조회
             attractions = (
@@ -167,7 +164,7 @@ async def get_custom_travel_recommendations(
                 .all()
             )
             logger.info(f"Found {len(attractions)} attractions")
-            
+
             # 문화시설 조회
             cultural_facilities = (
                 db.query(CulturalFacility)
@@ -176,7 +173,7 @@ async def get_custom_travel_recommendations(
                 .all()
             )
             logger.info(f"Found {len(cultural_facilities)} cultural facilities")
-            
+
             # 음식점 조회
             restaurants = (
                 db.query(Restaurant)
@@ -185,7 +182,7 @@ async def get_custom_travel_recommendations(
                 .all()
             )
             logger.info(f"Found {len(restaurants)} restaurants")
-            
+
             # 쇼핑 장소 조회
             shopping_places = (
                 db.query(Shopping)
@@ -194,7 +191,7 @@ async def get_custom_travel_recommendations(
                 .all()
             )
             logger.info(f"Found {len(shopping_places)} shopping places")
-            
+
             # 숙박시설 조회
             accommodations = (
                 db.query(Accommodation)
@@ -203,11 +200,11 @@ async def get_custom_travel_recommendations(
                 .all()
             )
             logger.info(f"Found {len(accommodations)} accommodations")
-            
+
         except Exception as e:
             logger.error(f"Database query error: {str(e)}")
             raise HTTPException(
-                status_code=500, 
+                status_code=500,
                 detail=f"데이터베이스 조회 중 오류 발생: {str(e)}"
             )
 
@@ -455,7 +452,7 @@ async def get_custom_travel_recommendations(
 
         # 점수 기준으로 정렬
         all_places.sort(key=lambda x: x["score"], reverse=True)
-        
+
         # 타입별로 최소한의 다양성을 보장하기 위해 재정렬
         # 각 타입별로 상위 N개씩 추출
         type_top_places = {
@@ -465,21 +462,21 @@ async def get_custom_travel_recommendations(
             "shopping": [],
             "accommodation": [],
         }
-        
+
         for place in all_places:
             place_type = place.get("type")
             if place_type in type_top_places and len(type_top_places[place_type]) < 20:
                 type_top_places[place_type].append(place)
-        
+
         # 라운드 로빈 방식으로 다양한 타입 보장
         diversified_places = []
         max_per_type = max(len(places) for places in type_top_places.values())
-        
+
         for i in range(max_per_type):
             for place_type in ["attraction", "cultural", "restaurant", "shopping", "accommodation"]:
                 if i < len(type_top_places[place_type]):
                     diversified_places.append(type_top_places[place_type][i])
-        
+
         # 나머지 장소들 추가
         remaining_places = [p for p in all_places if p not in diversified_places]
         all_places = diversified_places + remaining_places

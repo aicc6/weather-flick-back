@@ -1,6 +1,7 @@
+from typing import Any
+
 import httpx
 from sqlalchemy.orm import Session
-from typing import Any, Optional
 
 from app.config import settings
 from app.models import Region
@@ -18,10 +19,10 @@ class LocalInfoService:
     async def _search_db_restaurants(
         self,
         db: Session,
-        city: Optional[str],
-        region: Optional[str] = None,
-        category: Optional[str] = None,
-        keyword: Optional[str] = None,
+        city: str | None,
+        region: str | None = None,
+        category: str | None = None,
+        keyword: str | None = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """DB restaurants 테이블에서 직접 맛집 검색"""
@@ -77,12 +78,12 @@ class LocalInfoService:
 
     async def search_restaurants(
         self,
-        city: Optional[str],
-        region: Optional[str] = None,
-        category: Optional[str] = None,
-        keyword: Optional[str] = None,
+        city: str | None,
+        region: str | None = None,
+        category: str | None = None,
+        keyword: str | None = None,
         limit: int = 20,
-        db: Optional[Session] = None,
+        db: Session | None = None,
     ) -> list[dict[str, Any]]:
         """맛집 검색 (DB → 외부 API → 내장 데이터)"""
         results = []

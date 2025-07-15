@@ -1,6 +1,7 @@
 """이메일 인증 설정"""
 
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()

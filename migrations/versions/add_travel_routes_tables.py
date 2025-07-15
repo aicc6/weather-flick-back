@@ -5,9 +5,10 @@ Revises: c81ebbb9afa1
 Create Date: 2025-01-09 16:00:00.000000
 
 """
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = 'travel_routes_001'

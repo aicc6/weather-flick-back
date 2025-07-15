@@ -4,7 +4,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.config import settings
-from app.utils.cache_decorator import cache_result, invalidate_cache
+from app.utils.cache_decorator import cache_result
 
 
 class WeatherService:

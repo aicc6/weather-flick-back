@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from app.database import get_db
-from app.auth import get_current_user
-from app.models import RecommendReview, RecommendReviewCreate, RecommendReviewResponse, User
-from fastapi import Query
 import uuid
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
-from app.models import ReviewLike
+from sqlalchemy.orm import Session
+
+from app.auth import get_current_user
+from app.database import get_db
+from app.models import (
+    RecommendReview,
+    RecommendReviewCreate,
+    RecommendReviewResponse,
+    ReviewLike,
+    User,
+)
 
 router = APIRouter(
     prefix="/recommend-reviews",
@@ -33,10 +38,10 @@ async def create_recommend_review(
     db.refresh(db_review)
     return db_review
 
-@router.get("/course/{course_id}", response_model=List[RecommendReviewResponse])
+@router.get("/course/{course_id}", response_model=list[RecommendReviewResponse])
 async def get_recommend_reviews_by_course(
     course_id: int,
-    parent_id: Optional[uuid.UUID] = Query(None),
+    parent_id: uuid.UUID | None = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(RecommendReview).filter(RecommendReview.course_id == course_id)
@@ -47,7 +52,7 @@ async def get_recommend_reviews_by_course(
     reviews = query.order_by(RecommendReview.created_at.asc()).all()
     return reviews
 
-@router.get("/course/{course_id}/tree", response_model=List[RecommendReviewResponse])
+@router.get("/course/{course_id}/tree", response_model=list[RecommendReviewResponse])
 async def get_recommend_reviews_tree(
     course_id: int,
     db: Session = Depends(get_db),

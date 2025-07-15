@@ -5,22 +5,22 @@ Revises: accdbd0b595a
 Create Date: 2025-07-13 07:53:19.740600
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'dc0742a94a4a'
-down_revision: Union[str, Sequence[str], None] = 'accdbd0b595a'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'accdbd0b595a'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Consolidate weather tables into weather_forecasts table."""
-    
+
     # 0. weather_forecasts 테이블 구조 수정 - forecast_time을 날짜/시간 타입으로 변경
     op.execute("""
         -- 기존 forecast_time 데이터 백업
@@ -31,7 +31,7 @@ def upgrade() -> None:
         ALTER TABLE weather_forecasts DROP COLUMN forecast_time;
         ALTER TABLE weather_forecasts ADD COLUMN forecast_time TIMESTAMP;
     """)
-    
+
     # 1. weather_forecasts 테이블에 forecast_type 컬럼이 없으면 추가
     # 이미 존재할 수 있으므로 체크 후 추가
     op.execute("""
@@ -47,7 +47,7 @@ def upgrade() -> None:
             END IF;
         END$$;
     """)
-    
+
     # 2. current_weather 데이터를 weather_forecasts로 마이그레이션
     op.execute("""
         INSERT INTO weather_forecasts (
@@ -75,7 +75,7 @@ def upgrade() -> None:
         FROM current_weather cw
         LEFT JOIN regions r ON cw.region_code = r.region_code
     """)
-    
+
     # 3. city_weather_data를 weather_forecasts로 마이그레이션
     op.execute("""
         INSERT INTO weather_forecasts (
@@ -104,14 +104,14 @@ def upgrade() -> None:
         LEFT JOIN regions r ON r.region_name = cwd.city_name
         WHERE r.region_code IS NOT NULL
     """)
-    
+
     # 4. 기존 weather_forecasts 데이터의 forecast_type 업데이트
     op.execute("""
         UPDATE weather_forecasts 
         SET forecast_type = 'forecast' 
         WHERE forecast_type IS NULL
     """)
-    
+
     # 5. 삭제할 테이블들 삭제
     op.drop_table('current_weather')
     op.drop_table('city_weather_data')
@@ -119,7 +119,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Restore current_weather and city_weather_data tables."""
-    
+
     # 1. current_weather 테이블 재생성
     op.create_table('current_weather',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -137,7 +137,7 @@ def downgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_current_weather_region_code'), 'current_weather', ['region_code'], unique=False)
-    
+
     # 2. city_weather_data 테이블 재생성
     op.create_table('city_weather_data',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -160,6 +160,6 @@ def downgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('idx_city_weather_city_forecast', 'city_weather_data', ['city_name', 'forecast_time'], unique=False)
-    
+
     # 3. weather_forecasts에서 forecast_type 컬럼 제거
     op.drop_column('weather_forecasts', 'forecast_type')

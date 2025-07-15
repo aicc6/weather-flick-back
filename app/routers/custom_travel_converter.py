@@ -1,23 +1,21 @@
 """맞춤 여행 추천을 여행 계획으로 변환하는 라우터"""
 
 from datetime import datetime, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import (
-    TravelPlan,
-    User,
-    TravelPlanStatus,
-    CustomTravelRecommendationResponse,
     CustomTravelRecommendationRequest,
+    CustomTravelRecommendationResponse,
+    TravelPlan,
+    TravelPlanStatus,
+    User,
 )
 from app.utils import (
-    convert_uuids_to_strings,
     create_error_response,
     create_standard_response,
 )
@@ -32,12 +30,12 @@ class ConvertToTravelPlanRequest(BaseModel):
     """맞춤 여행 추천을 여행 계획으로 변환하는 요청"""
     custom_recommendation: CustomTravelRecommendationResponse
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     start_date: datetime
-    budget: Optional[int] = None
-    participants: Optional[int] = 1
-    transportation: Optional[str] = "자가용"
-    start_location: Optional[str] = None
+    budget: int | None = None
+    participants: int | None = 1
+    transportation: str | None = "자가용"
+    start_location: str | None = None
 
 
 @router.post("/convert-to-travel-plan", response_model=dict)
@@ -50,7 +48,7 @@ async def convert_to_travel_plan(
     try:
         # 종료일 계산 (일수 - 1일)
         end_date = request.start_date + timedelta(days=len(request.custom_recommendation.days) - 1)
-        
+
         # itinerary 형식으로 변환
         # 맞춤일정의 days 배열을 그대로 사용
         itinerary = {
@@ -60,7 +58,7 @@ async def convert_to_travel_plan(
             "recommendation_type": request.custom_recommendation.recommendation_type,
             "generated_at": datetime.now().isoformat()
         }
-        
+
         # 새 여행 계획 생성
         db_plan = TravelPlan(
             user_id=current_user.id,
@@ -93,7 +91,7 @@ async def convert_to_travel_plan(
         }
 
         return create_standard_response(
-            success=True, 
+            success=True,
             data={
                 "plan": response_data,
                 "message": "맞춤 여행 추천이 여행 계획으로 성공적으로 변환되었습니다."
@@ -116,15 +114,15 @@ async def get_recommendations_with_plan_format(
 ):
     """맞춤 여행 추천을 받으면서 동시에 여행 계획 형식으로도 변환하여 반환"""
     from app.routers.custom_travel import get_custom_travel_recommendations
-    
+
     try:
         # 기존 맞춤 여행 추천 API 호출
         recommendation_response = await get_custom_travel_recommendations(request, db)
-        
+
         # 여행 계획 형식으로 변환 준비
         start_date = datetime.now().date() + timedelta(days=7)  # 기본값: 일주일 후
         end_date = start_date + timedelta(days=request.days - 1)
-        
+
         # 지역 이름 매핑
         region_names = {
             "11": "서울", "26": "부산", "27": "대구", "28": "인천",
@@ -132,9 +130,9 @@ async def get_recommendations_with_plan_format(
             "41": "경기", "43": "충북", "44": "충남", "46": "전남",
             "47": "경북", "48": "경남", "50": "제주", "51": "강원", "52": "전북"
         }
-        
+
         region_name = region_names.get(request.region_code, "지역")
-        
+
         # 여행 계획 형식
         travel_plan_format = {
             "title": f"{region_name} {request.days}일 맞춤 여행",
@@ -155,7 +153,7 @@ async def get_recommendations_with_plan_format(
             "weather_info": recommendation_response.weather_summary,
             "status": "PLANNING"
         }
-        
+
         return create_standard_response(
             success=True,
             data={
@@ -165,7 +163,7 @@ async def get_recommendations_with_plan_format(
                 "message": "맞춤 여행 추천과 여행 계획 형식을 함께 반환합니다."
             }
         )
-        
+
     except Exception as e:
         return create_error_response(
             code="RECOMMENDATION_ERROR",

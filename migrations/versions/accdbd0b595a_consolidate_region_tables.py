@@ -5,22 +5,22 @@ Revises: 441a7369f96c
 Create Date: 2025-07-13 01:24:12.869011
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'accdbd0b595a'
-down_revision: Union[str, Sequence[str], None] = '441a7369f96c'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '441a7369f96c'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Consolidate region tables into regions table."""
-    
+
     # 1. regions 테이블에 필요한 컬럼 추가
     op.add_column('regions', sa.Column('grid_x', sa.Integer(), nullable=True))
     op.add_column('regions', sa.Column('grid_y', sa.Integer(), nullable=True))
@@ -31,7 +31,7 @@ def upgrade() -> None:
     op.add_column('regions', sa.Column('administrative_code', sa.String(), nullable=True))
     op.add_column('regions', sa.Column('is_active', sa.Boolean(), server_default='true', nullable=True))
     op.add_column('regions', sa.Column('boundary_data', sa.JSON(), nullable=True))
-    
+
     # 2. unified_regions에서 regions로 데이터 마이그레이션
     op.execute("""
         UPDATE regions r
@@ -46,7 +46,7 @@ def upgrade() -> None:
         FROM unified_regions ur
         WHERE r.region_code = ur.region_code
     """)
-    
+
     # 3. unified_regions에만 있는 데이터를 regions로 추가
     # parent_region_id가 UUID이므로, parent unified_region의 region_code를 찾아 매핑
     op.execute("""
@@ -70,7 +70,7 @@ def upgrade() -> None:
             WHERE r.region_code = ur.region_code
         )
     """)
-    
+
     # 4. weather_regions에서 grid 정보 업데이트
     op.execute("""
         UPDATE regions r
@@ -80,11 +80,11 @@ def upgrade() -> None:
         FROM weather_regions wr
         WHERE r.region_code = wr.region_code
     """)
-    
+
     # 5. 외래 키 제약조건 삭제
     op.drop_constraint('region_api_mappings_region_id_fkey', 'region_api_mappings', type_='foreignkey')
     op.drop_constraint('coordinate_transformations_region_id_fkey', 'coordinate_transformations', type_='foreignkey')
-    
+
     # 6. unified_regions, weather_regions 테이블 삭제
     op.drop_table('unified_regions')
     op.drop_table('weather_regions')
@@ -92,7 +92,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Restore unified_regions and weather_regions tables."""
-    
+
     # 1. unified_regions 테이블 재생성
     op.create_table('unified_regions',
         sa.Column('region_id', sa.UUID(), nullable=False),
@@ -113,7 +113,7 @@ def downgrade() -> None:
         sa.PrimaryKeyConstraint('region_id'),
         sa.UniqueConstraint('region_code')
     )
-    
+
     # 2. weather_regions 테이블 재생성
     op.create_table('weather_regions',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -128,11 +128,11 @@ def downgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('region_code')
     )
-    
+
     # 3. 외래 키 복원
     op.create_foreign_key('region_api_mappings_region_id_fkey', 'region_api_mappings', 'unified_regions', ['region_id'], ['region_id'])
     op.create_foreign_key('coordinate_transformations_region_id_fkey', 'coordinate_transformations', 'unified_regions', ['region_id'], ['region_id'])
-    
+
     # 4. regions 테이블에서 추가된 컬럼 제거
     op.drop_column('regions', 'boundary_data')
     op.drop_column('regions', 'is_active')

@@ -44,7 +44,7 @@ from app.models import (
     WithdrawRequest,
     WithdrawResponse,
 )
-from app.schemas import Token, RefreshTokenRequest, RefreshTokenResponse
+from app.schemas import RefreshTokenRequest, RefreshTokenResponse, Token
 from app.services.email_service import email_service, email_verification_service
 from app.services.google_oauth_service import google_oauth_service
 
@@ -106,7 +106,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         # 입력값 전처리
         if user.nickname and user.nickname.strip():
             user.nickname = user.nickname.strip()
-            
+
         # 이메일 중복 확인 (활성 사용자만)
         existing_email = (
             db.query(User)
@@ -116,7 +116,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             )
             .first()
         )
-        
+
         if existing_email:
             logger.warning(f"중복된 이메일로 회원가입 시도: {user.email}")
             raise ValidationError(
@@ -126,7 +126,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
                     {"field": "email", "message": "이미 사용 중인 이메일입니다."}
                 ],
             )
-        
+
         # 닉네임 중복 확인 (대소문자 무시, 활성 사용자만)
         from sqlalchemy import func
         existing_nickname = (
@@ -137,7 +137,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             )
             .first()
         )
-        
+
         if existing_nickname:
             logger.warning(f"중복된 닉네임으로 회원가입 시도: {user.nickname}")
             raise ValidationError(
@@ -165,7 +165,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
         # 이메일 인증 확인 (환경 설정에 따라)
         from app.config_email_verification import EMAIL_VERIFICATION_ENABLED
-        
+
         if EMAIL_VERIFICATION_ENABLED:
             if not email_verification_service.is_email_verified(db, user.email):
                 logger.warning(f"이메일 미인증 상태로 회원가입 시도: {user.email}")
@@ -239,7 +239,7 @@ async def login(
         data={"sub": user.email, "role": user.role.value},
         expires_delta=access_token_expires,
     )
-    
+
     # refresh token 생성
     refresh_token = create_refresh_token(
         data={"sub": user.email}
@@ -281,40 +281,40 @@ async def refresh_token(
 ):
     """Refresh token으로 새로운 access token 발급"""
     from jose import JWTError, jwt
-    
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate refresh token",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         # refresh token 검증
-        from app.auth import SECRET_KEY, ALGORITHM
+        from app.auth import ALGORITHM, SECRET_KEY
         payload = jwt.decode(request.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         token_type: str = payload.get("type")
-        
+
         if email is None or token_type != "refresh":
             raise credentials_exception
-            
+
         # 사용자 확인
         user = db.query(User).filter(User.email == email).first()
         if user is None or not user.is_active:
             raise credentials_exception
-            
+
         # 새로운 access token 발급
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": user.email, "role": user.role.value},
             expires_delta=access_token_expires,
         )
-        
+
         return {
             "access_token": access_token,
             "token_type": "bearer"
         }
-        
+
     except JWTError:
         raise credentials_exception
 
@@ -337,7 +337,7 @@ async def update_user_profile(
         logger.info(f"닉네임 업데이트 시도: {current_user.email} -> {user_update.nickname}")
         logger.info(f"현재 사용자 ID: {current_user.id} (type: {type(current_user.id)})")
         logger.info(f"현재 사용자 user_id: {current_user.user_id} (type: {type(current_user.user_id)})")
-        
+
         # 현재 닉네임과 동일한 경우 스킵
         if current_user.nickname and current_user.nickname.lower() == user_update.nickname.lower():
             logger.info(f"동일한 닉네임으로 변경 시도, 스킵: {user_update.nickname}")
@@ -347,19 +347,19 @@ async def update_user_profile(
             existing_user = (
                 db.query(User)
                 .filter(
-                    func.lower(User.nickname) == func.lower(user_update.nickname), 
+                    func.lower(User.nickname) == func.lower(user_update.nickname),
                     User.user_id != current_user.user_id,  # user_id 사용으로 변경
                     User.is_active == True  # 활성 사용자만 중복 체크
                 )
                 .first()
             )
-            
+
             if existing_user:
                 logger.warning(f"닉네임 중복 발견: {user_update.nickname} - 기존 사용자 ID: {existing_user.user_id}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
                 )
-            
+
             logger.info(f"닉네임 중복 체크 통과: {user_update.nickname}")
             current_user.nickname = user_update.nickname
 
@@ -452,7 +452,7 @@ async def google_login(
 
         # 액세스 토큰 생성
         access_token = google_oauth_service.create_access_token_for_user(user)
-        
+
         # refresh token 생성
         refresh_token = create_refresh_token(
             data={"sub": user.email}
@@ -598,7 +598,7 @@ async def exchange_google_auth_code(
 
         # JWT 토큰 생성
         jwt_token = google_oauth_service.create_access_token_for_user(user)
-        
+
         # refresh token 생성
         refresh_token = create_refresh_token(
             data={"sub": user.email}
@@ -791,14 +791,14 @@ async def resend_verification(
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
-    request: ForgotPasswordRequest, 
+    request: ForgotPasswordRequest,
     db: Session = Depends(get_db),
     http_request: Request = None,
 ):
     """비밀번호 찾기 - 임시 비밀번호 발급"""
     try:
         logger.info(f"비밀번호 찾기 요청: {request.email}")
-        
+
         # 이메일로 사용자 조회
         user = db.query(User).filter(User.email == request.email).first()
         if not user:
@@ -807,7 +807,7 @@ async def forgot_password(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="해당 이메일로 등록된 계정을 찾을 수 없습니다.",
             )
-        
+
         # 비활성화된 계정 확인
         if not user.is_active:
             logger.warning(f"비활성화된 계정으로 비밀번호 찾기 시도: {request.email}")
@@ -815,7 +815,7 @@ async def forgot_password(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="비활성화된 계정입니다. 고객센터에 문의하세요.",
             )
-        
+
         # OAuth 계정 확인 (구글 계정 등)
         if user.google_id and user.auth_provider != "local":
             logger.warning(f"OAuth 계정으로 비밀번호 찾기 시도: {request.email}")
@@ -823,16 +823,16 @@ async def forgot_password(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="소셜 로그인 계정입니다. 해당 서비스를 통해 로그인해주세요.",
             )
-        
+
         # 임시 비밀번호 생성
         temp_password = generate_temporary_password()
-        
+
         # 데이터베이스에 임시 비밀번호 저장
         user.hashed_password = get_password_hash(temp_password)
         db.commit()
-        
+
         logger.info(f"임시 비밀번호 생성 완료: {request.email}")
-        
+
         # 이메일로 임시 비밀번호 전송
         try:
             await email_service.send_temporary_password_email(
@@ -840,9 +840,9 @@ async def forgot_password(
                 temporary_password=temp_password,
                 nickname=user.nickname
             )
-            
+
             logger.info(f"임시 비밀번호 이메일 발송 완료: {request.email}")
-            
+
             # 사용자 활동 로그 기록
             if http_request:
                 log_user_activity(
@@ -853,22 +853,22 @@ async def forgot_password(
                     ip_address=http_request.client.host if http_request.client else None,
                     user_agent=http_request.headers.get("User-Agent") if http_request else None,
                 )
-            
+
             return ForgotPasswordResponse(
                 message="임시 비밀번호가 이메일로 전송되었습니다. 로그인 후 새로운 비밀번호로 변경해주세요.",
                 success=True
             )
-            
+
         except Exception as email_error:
             logger.error(f"임시 비밀번호 이메일 발송 실패: {request.email}, 오류: {str(email_error)}")
-            
+
             # 이메일 발송 실패 시에도 임시 비밀번호는 이미 설정되었으므로
             # 사용자에게 알림 (실제 서비스에서는 다른 방식으로 전달)
             return ForgotPasswordResponse(
                 message="임시 비밀번호가 발급되었으나 이메일 전송에 실패했습니다. 고객센터에 문의하세요.",
                 success=False
             )
-    
+
     except HTTPException:
         # HTTPException은 그대로 전파
         raise
@@ -891,7 +891,7 @@ async def withdraw_user(
     """회원탈퇴"""
     try:
         logger.info(f"회원탈퇴 요청: {current_user.email}")
-        
+
         # 소셜 로그인 사용자가 아닌 경우 비밀번호 확인
         if current_user.auth_provider == "local" and current_user.hashed_password:
             if not request.password:
@@ -900,7 +900,7 @@ async def withdraw_user(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="비밀번호를 입력해주세요.",
                 )
-            
+
             # 비밀번호 확인
             if not authenticate_user(db, current_user.email, request.password):
                 logger.warning(f"잘못된 비밀번호로 회원탈퇴 시도: {current_user.email}")
@@ -908,16 +908,16 @@ async def withdraw_user(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="비밀번호가 일치하지 않습니다.",
                 )
-        
+
         # 사용자 계정 비활성화 (소프트 삭제) 및 이메일 마스킹
         current_user.is_active = False
         current_user.email = f"deleted_{current_user.user_id}_{current_user.email}"
         current_user.updated_at = datetime.utcnow()
-        
+
         # 탈퇴 사유가 있는 경우 로그에 기록
         if request.reason:
             logger.info(f"회원탈퇴 사유: {current_user.email} - {request.reason}")
-        
+
         # 사용자 활동 로그 기록
         if http_request:
             log_user_activity(
@@ -928,16 +928,16 @@ async def withdraw_user(
                 ip_address=http_request.client.host if http_request.client else None,
                 user_agent=http_request.headers.get("User-Agent") if http_request else None,
             )
-        
+
         db.commit()
-        
+
         logger.info(f"회원탈퇴 완료: {current_user.email}")
-        
+
         return WithdrawResponse(
             message="회원탈퇴가 완료되었습니다. 그동안 서비스를 이용해주셔서 감사합니다.",
             success=True
         )
-        
+
     except HTTPException:
         # HTTPException은 그대로 전파
         raise

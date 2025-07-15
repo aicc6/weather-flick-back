@@ -1,13 +1,12 @@
 """관광지 정보 라우터"""
 
-from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_
-from typing import Optional
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import TouristAttraction
-from app.utils import create_standard_response, create_error_response
+from app.utils import create_error_response, create_standard_response
 
 router = APIRouter(
     prefix="/attractions",
@@ -38,7 +37,7 @@ async def search_attractions(
                 success=True,
                 data={"suggestions": []}
             )
-        
+
         # 관광지명, 주소에서 검색
         search_pattern = f"%{query}%"
         attractions = (
@@ -52,7 +51,7 @@ async def search_attractions(
             .limit(limit)
             .all()
         )
-        
+
         # 자동완성 형식으로 변환
         suggestions = []
         for attraction in attractions:
@@ -64,12 +63,12 @@ async def search_attractions(
                     "secondary_text": attraction.address
                 }
             })
-        
+
         return create_standard_response(
             success=True,
             data={"suggestions": suggestions}
         )
-        
+
     except Exception as e:
         return create_error_response(
             code="SEARCH_ERROR",
@@ -118,14 +117,14 @@ async def get_attractions_by_region(
             "11000000": "1",  # 서울
             "42000000": "31", # 경기도
         }
-        
+
         # 긴 형태의 region_code를 짧은 형태로 변환
         if len(region_code) > 2:
             short_code = region_code[:2]
             db_region_code = region_code_mapping.get(short_code, region_code)
         else:
             db_region_code = region_code_mapping.get(region_code, region_code)
-        
+
         # 관광지 조회
         attractions = (
             db.query(TouristAttraction)
@@ -133,7 +132,7 @@ async def get_attractions_by_region(
             .limit(limit)
             .all()
         )
-        
+
         # 응답 데이터 구성
         attraction_list = []
         for attraction in attractions:
@@ -148,7 +147,7 @@ async def get_attractions_by_region(
                 "image_url": attraction.image_url,
                 "created_at": attraction.created_at.isoformat() if attraction.created_at else None,
             })
-        
+
         return create_standard_response(
             success=True,
             data={
@@ -158,7 +157,7 @@ async def get_attractions_by_region(
                 "db_region_code": db_region_code
             }
         )
-        
+
     except Exception as e:
         return create_error_response(
             code="QUERY_ERROR",
@@ -187,13 +186,13 @@ async def get_attraction_detail(
             .filter(TouristAttraction.content_id == content_id)
             .first()
         )
-        
+
         if not attraction:
             return create_error_response(
                 code="NOT_FOUND",
                 message="관광지를 찾을 수 없습니다."
             )
-        
+
         # 응답 데이터 구성
         attraction_data = {
             "content_id": attraction.content_id,
@@ -209,12 +208,12 @@ async def get_attraction_detail(
             "created_at": attraction.created_at.isoformat() if attraction.created_at else None,
             "updated_at": attraction.updated_at.isoformat() if attraction.updated_at else None,
         }
-        
+
         return create_standard_response(
             success=True,
             data=attraction_data
         )
-        
+
     except Exception as e:
         return create_error_response(
             code="QUERY_ERROR",

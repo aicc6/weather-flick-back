@@ -36,7 +36,7 @@ async def get_supported_cities_endpoint():
 
 @router.get("/current/all-cities")
 async def get_all_cities_current_weather_kma(
-    current_user: User | None = Depends(get_current_active_user),
+    _current_user: User | None = Depends(get_current_active_user),
 ):
     """모든 주요 도시의 현재 날씨 조회"""
     weather_data = await kma_weather_service.get_all_cities_current_weather()
@@ -45,7 +45,7 @@ async def get_all_cities_current_weather_kma(
 
 @router.get("/current/{city}")
 async def get_current_weather_kma(
-    city: str, current_user: User | None = Depends(get_current_active_user)
+    city: str, _current_user: User | None = Depends(get_current_active_user)
 ):
     """기상청 현재 날씨 조회"""
     if not is_supported_city(city):
@@ -68,7 +68,7 @@ async def get_current_weather_kma(
 
 @router.get("/forecast/short/{city}")
 async def get_short_forecast_kma(
-    city: str, current_user: User | None = Depends(get_current_active_user)
+    city: str, _current_user: User | None = Depends(get_current_active_user)
 ):
     """기상청 단기예보 조회 (3일)"""
     if not is_supported_city(city):
@@ -92,7 +92,7 @@ async def get_short_forecast_kma(
 
 @router.get("/forecast/mid/{city}")
 async def get_mid_forecast_kma(
-    city: str, current_user: User | None = Depends(get_current_active_user)
+    city: str, _current_user: User | None = Depends(get_current_active_user)
 ):
     """기상청 중기예보 조회 (3~10일)"""
     if not is_supported_city(city):
@@ -127,7 +127,7 @@ async def get_weather_warning_kma(
 
 @router.get("/compare/{city}")
 async def compare_weather_sources(
-    city: str, current_user: User | None = Depends(get_current_active_user)
+    city: str, _current_user: User | None = Depends(get_current_active_user)
 ):
     """WeatherAPI와 기상청 API 비교"""
     if not is_supported_city(city):

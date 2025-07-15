@@ -1,9 +1,10 @@
 """
 create reviews_recommend table for recommend course comments
 """
-from alembic import op
+
 import sqlalchemy as sa
-import uuid
+
+from alembic import op
 
 revision = '20240610_add_reviews_recommend_table'
 down_revision = None

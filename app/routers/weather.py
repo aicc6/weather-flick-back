@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
 import os
+
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth import get_current_active_user
 from app.models import ForecastResponse, User, WeatherRequest, WeatherResponse

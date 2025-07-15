@@ -4,6 +4,16 @@
 ### dotenv ###
 .env
 
+### Project specific ###
+*.log
+*.log.*
+logs/
+htmlcov/
+test-results/
+cookies.txt
+hardcoded_values_report.md
+scripts/archive/
+
 ### Git ###
 # Created by git for backups. To disable backups in Git:
 # $ git config --global mergetool.keepBackup false

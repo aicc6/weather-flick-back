@@ -5,9 +5,10 @@ Revises: dc0742a94a4a
 Create Date: 2025-01-13 08:15:00.000000
 
 """
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = 'create_reviews_recommend'
