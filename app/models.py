@@ -186,27 +186,15 @@ class TravelRoute(Base):
     """
     __tablename__ = "travel_routes"
 
-    route_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
-    day = Column(Integer, nullable=False)
-    sequence = Column(Integer, nullable=False)
-
-    # 출발지 정보
-    departure_name = Column(String, nullable=False)
-    departure_lat = Column(Float)
-    departure_lng = Column(Float)
-
-    # 도착지 정보
-    destination_name = Column(String, nullable=False)
-    destination_lat = Column(Float)
-    destination_lng = Column(Float)
-
-    # 교통 정보
-    transport_type = Column(String)  # car, bus, subway, walk, taxi
-    route_data = Column(JSONB)  # 상세 경로 정보
-    duration = Column(Integer)  # 소요 시간 (분)
-    distance = Column(Float)  # 거리 (km)
-    cost = Column(Float)  # 교통비 (원)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    travel_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    origin_place_id = Column(String)
+    destination_place_id = Column(String)
+    route_order = Column(Integer)
+    transport_mode = Column(String)
+    duration_minutes = Column(Integer)
+    distance_km = Column(Float)
+    route_data = Column(JSONB)
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -224,29 +212,15 @@ class TransportationDetail(Base):
     """
     __tablename__ = "transportation_details"
 
-    detail_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    route_id = Column(UUID(as_uuid=True), ForeignKey("travel_routes.route_id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    travel_route_id = Column(UUID(as_uuid=True), ForeignKey("travel_routes.id"), nullable=False)
 
-    # 교통수단 정보
-    transport_name = Column(String)  # 지하철 2호선, 버스 146번 등
-    transport_color = Column(String)  # 노선 색상
-
-    # 정류장/역 정보
-    departure_station = Column(String)
-    arrival_station = Column(String)
-
-    # 시간 정보
     departure_time = Column(DateTime)
     arrival_time = Column(DateTime)
-
-    # 요금 정보
-    fare = Column(Float)
-
-    # 환승 정보
-    transfer_info = Column(JSONB)
-
+    cost = Column(Integer)
+    booking_info = Column(JSONB)
+    notes = Column(String)
     created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     route = relationship("TravelRoute", back_populates="transport_details")
@@ -1887,22 +1861,51 @@ class TravelRouteUpdate(BaseModel):
 
 class TravelRouteResponse(BaseModel):
     """여행 경로 응답 스키마"""
+    # 프론트엔드 호환성을 위해 route_id 필드 유지
     route_id: uuid.UUID
     plan_id: uuid.UUID
-    day: int
-    sequence: int
-    departure_name: str
-    departure_lat: float | None = None
-    departure_lng: float | None = None
-    destination_name: str
-    destination_lat: float | None = None
-    destination_lng: float | None = None
-    transport_type: str | None = None
+    
+    # 실제 DB 스키마 기반 필드들
+    origin_place_id: str | None = None
+    destination_place_id: str | None = None
+    route_order: int | None = None
+    transport_mode: str | None = None
+    duration_minutes: int | None = None
+    distance_km: float | None = None
     route_data: dict[str, Any] | None = None
+    created_at: datetime
+    
+    # 프론트엔드에서 기대하는 추가 필드들 (매핑용)
+    sequence: int | None = None
+    transport_type: str | None = None
+    departure_name: str | None = None
+    destination_name: str | None = None
     duration: int | None = None
     distance: float | None = None
-    cost: float | None = None
-    created_at: datetime
+    
+    @classmethod
+    def from_orm_with_mapping(cls, obj):
+        """ORM 객체를 프론트엔드 호환 형식으로 변환"""
+        return cls(
+            route_id=obj.id,  # id -> route_id 매핑
+            plan_id=obj.travel_plan_id,  # travel_plan_id -> plan_id 매핑
+            origin_place_id=obj.origin_place_id,
+            destination_place_id=obj.destination_place_id,
+            route_order=obj.route_order,
+            transport_mode=obj.transport_mode,
+            duration_minutes=obj.duration_minutes,
+            distance_km=obj.distance_km,
+            route_data=obj.route_data,
+            created_at=obj.created_at,
+            
+            # 프론트엔드 호환성을 위한 매핑
+            sequence=obj.route_order,
+            transport_type=obj.transport_mode,
+            departure_name=obj.origin_place_id,
+            destination_name=obj.destination_place_id,
+            duration=obj.duration_minutes,
+            distance=obj.distance_km,
+        )
 
     class Config:
         from_attributes = True
@@ -1910,29 +1913,23 @@ class TravelRouteResponse(BaseModel):
 
 class TransportationDetailCreate(BaseModel):
     """교통수단 상세 정보 생성 스키마"""
-    route_id: uuid.UUID
-    transport_name: str | None = None
-    transport_color: str | None = None
-    departure_station: str | None = None
-    arrival_station: str | None = None
+    travel_route_id: uuid.UUID
     departure_time: datetime | None = None
     arrival_time: datetime | None = None
-    fare: float | None = None
-    transfer_info: dict[str, Any] | None = None
+    cost: int | None = None
+    booking_info: dict[str, Any] | None = None
+    notes: str | None = None
 
 
 class TransportationDetailResponse(BaseModel):
     """교통수단 상세 정보 응답 스키마"""
-    detail_id: uuid.UUID
-    route_id: uuid.UUID
-    transport_name: str | None = None
-    transport_color: str | None = None
-    departure_station: str | None = None
-    arrival_station: str | None = None
+    id: uuid.UUID
+    travel_route_id: uuid.UUID
     departure_time: datetime | None = None
     arrival_time: datetime | None = None
-    fare: float | None = None
-    transfer_info: dict[str, Any] | None = None
+    cost: int | None = None
+    booking_info: dict[str, Any] | None = None
+    notes: str | None = None
     created_at: datetime
 
     class Config:
