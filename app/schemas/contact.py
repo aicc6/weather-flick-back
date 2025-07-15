@@ -10,10 +10,13 @@ class ContactCreate(BaseModel):
     name: str = Field(..., max_length=50)
     email: EmailStr
     is_public: bool = False
+    password: str | None = None  # 비공개 문의 비밀번호(plain, 입력용)
 
 class ContactResponse(ContactCreate):
     id: int
     created_at: datetime
+    approval_status: str
+    password: str | None = None  # 응답에는 보통 포함하지 않지만, 일관성 위해 추가(실제 응답에선 제외 가능)
 
     class Config:
         from_attributes = True
