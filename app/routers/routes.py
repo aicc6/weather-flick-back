@@ -124,7 +124,7 @@ async def create_travel_route(
     try:
         # 여행 계획 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route_data.plan_id,
+            TravelPlan.plan_id == route_data.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -136,8 +136,15 @@ async def create_travel_route(
 
         # 새 경로 생성
         new_route = TravelRoute(
-            route_id=uuid.uuid4(),
-            **route_data.dict()
+            id=uuid.uuid4(),
+            travel_plan_id=route_data.travel_plan_id,
+            origin_place_id=route_data.origin_place_id,
+            destination_place_id=route_data.destination_place_id,
+            route_order=route_data.route_order,
+            transport_mode=route_data.transport_mode,
+            duration_minutes=route_data.duration_minutes,
+            distance_km=route_data.distance_km,
+            route_data=route_data.route_data
         )
 
         db.add(new_route)
@@ -176,12 +183,13 @@ async def get_travel_plan_routes(
                 detail="여행 계획을 찾을 수 없거나 접근 권한이 없습니다."
             )
 
-        # 경로 조회 (일차 및 순서별 정렬)
+        # 경로 조회 (루트 순서별 정렬)
         routes = db.query(TravelRoute).filter(
-            TravelRoute.plan_id == plan_id
-        ).order_by(TravelRoute.day, TravelRoute.sequence).all()
+            TravelRoute.travel_plan_id == plan_id
+        ).order_by(TravelRoute.route_order).all()
 
-        return routes
+        # 프론트엔드 호환 형식으로 변환
+        return [TravelRouteResponse.from_orm_with_mapping(route) for route in routes]
 
     except HTTPException:
         raise
@@ -201,7 +209,7 @@ async def get_travel_route(
     """특정 경로 상세 조회"""
     try:
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == route_id
+            TravelRoute.id == route_id
         ).first()
 
         if not route:
@@ -212,7 +220,7 @@ async def get_travel_route(
 
         # 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -243,7 +251,7 @@ async def update_travel_route(
     """여행 경로 수정"""
     try:
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == route_id
+            TravelRoute.id == route_id
         ).first()
 
         if not route:
@@ -254,7 +262,7 @@ async def update_travel_route(
 
         # 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -293,7 +301,7 @@ async def delete_travel_route(
     """여행 경로 삭제"""
     try:
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == route_id
+            TravelRoute.id == route_id
         ).first()
 
         if not route:
@@ -304,7 +312,7 @@ async def delete_travel_route(
 
         # 소유권 확인
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -316,7 +324,7 @@ async def delete_travel_route(
 
         # 관련된 교통수단 상세 정보도 함께 삭제
         db.query(TransportationDetail).filter(
-            TransportationDetail.route_id == route_id
+            TransportationDetail.travel_route_id == route_id
         ).delete()
 
         # 경로 삭제
@@ -363,19 +371,19 @@ async def auto_generate_routes(
 
         # 기존 경로들을 먼저 삭제 (중복 방지)
         existing_routes = db.query(TravelRoute).filter(
-            TravelRoute.plan_id == plan_id
+            TravelRoute.travel_plan_id == plan_id
         ).all()
 
         if existing_routes:
             # 관련된 교통수단 상세 정보도 함께 삭제
             for route in existing_routes:
                 db.query(TransportationDetail).filter(
-                    TransportationDetail.route_id == route.route_id
+                    TransportationDetail.travel_route_id == route.id
                 ).delete()
 
             # 기존 경로 삭제
             db.query(TravelRoute).filter(
-                TravelRoute.plan_id == plan_id
+                TravelRoute.travel_plan_id == plan_id
             ).delete()
 
             db.commit()
@@ -468,21 +476,15 @@ async def auto_generate_routes(
 
                             # 출발지 → 첫 번째 목적지 경로 저장 (sequence = 0)
                             start_route = TravelRoute(
-                                route_id=uuid.uuid4(),
-                                plan_id=plan_id,
-                                day=1,
-                                sequence=0,  # 출발지는 sequence 0
-                                departure_name=start_coords['name'],
-                                departure_lat=start_coords['latitude'],
-                                departure_lng=start_coords['longitude'],
-                                destination_name=first_coords['name'],
-                                destination_lat=first_coords['latitude'],
-                                destination_lng=first_coords['longitude'],
-                                transport_type=recommended.get('transport_type'),
-                                route_data=recommended.get('route_data'),
-                                duration=recommended.get('duration'),
-                                distance=recommended.get('distance'),
-                                cost=recommended.get('cost')
+                                id=uuid.uuid4(),
+                                travel_plan_id=plan_id,
+                                origin_place_id=start_coords['name'],
+                                destination_place_id=first_coords['name'],
+                                route_order=0,
+                                transport_mode=recommended.get('transport_type'),
+                                duration_minutes=recommended.get('duration'),
+                                distance_km=recommended.get('distance'),
+                                route_data=recommended.get('route_data')
                             )
 
                             db.add(start_route)
@@ -550,21 +552,15 @@ async def auto_generate_routes(
 
                                 # 경로 정보 저장
                                 new_route = TravelRoute(
-                                    route_id=uuid.uuid4(),
-                                    plan_id=plan_id,
-                                    day=day,
-                                    sequence=i + 1,
-                                    departure_name=current_coords['name'],
-                                    departure_lat=current_coords['latitude'],
-                                    departure_lng=current_coords['longitude'],
-                                    destination_name=next_coords['name'],
-                                    destination_lat=next_coords['latitude'],
-                                    destination_lng=next_coords['longitude'],
-                                    transport_type=recommended.get('transport_type'),
-                                    route_data=recommended.get('route_data'),
-                                    duration=recommended.get('duration'),
-                                    distance=recommended.get('distance'),
-                                    cost=recommended.get('cost')
+                                    id=uuid.uuid4(),
+                                    travel_plan_id=plan_id,
+                                    origin_place_id=current_coords['name'],
+                                    destination_place_id=next_coords['name'],
+                                    route_order=i + 1,
+                                    transport_mode=recommended.get('transport_type'),
+                                    duration_minutes=recommended.get('duration'),
+                                    distance_km=recommended.get('distance'),
+                                    route_data=recommended.get('route_data')
                                 )
 
                                 db.add(new_route)
@@ -645,21 +641,15 @@ async def auto_generate_routes(
 
                         # 일차 간 경로 정보 저장 (다음 일차에 속하도록 설정)
                         new_route = TravelRoute(
-                            route_id=uuid.uuid4(),
-                            plan_id=plan_id,
-                            day=next_day,
-                            sequence=0,  # 일차 간 경로는 sequence 0으로 설정
-                            departure_name=last_coords['name'],
-                            departure_lat=last_coords['latitude'],
-                            departure_lng=last_coords['longitude'],
-                            destination_name=first_coords['name'],
-                            destination_lat=first_coords['latitude'],
-                            destination_lng=first_coords['longitude'],
-                            transport_type=recommended.get('transport_type'),
-                            route_data=recommended.get('route_data'),
-                            duration=recommended.get('duration'),
-                            distance=recommended.get('distance'),
-                            cost=recommended.get('cost')
+                            id=uuid.uuid4(),
+                            travel_plan_id=plan_id,
+                            origin_place_id=last_coords['name'],
+                            destination_place_id=first_coords['name'],
+                            route_order=0,
+                            transport_mode=recommended.get('transport_type'),
+                            duration_minutes=recommended.get('duration'),
+                            distance_km=recommended.get('distance'),
+                            route_data=recommended.get('route_data')
                         )
 
                         db.add(new_route)
@@ -702,7 +692,7 @@ async def create_transportation_detail(
     try:
         # 경로 존재 확인 및 소유권 검증
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == detail_data.route_id
+            TravelRoute.id == detail_data.travel_route_id
         ).first()
 
         if not route:
@@ -712,7 +702,7 @@ async def create_transportation_detail(
             )
 
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -754,7 +744,7 @@ async def get_transportation_details(
     try:
         # 경로 존재 확인 및 소유권 검증
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == route_id
+            TravelRoute.id == route_id
         ).first()
 
         if not route:
@@ -764,7 +754,7 @@ async def get_transportation_details(
             )
 
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -776,7 +766,7 @@ async def get_transportation_details(
 
         # 교통수단 상세 정보 조회
         details = db.query(TransportationDetail).filter(
-            TransportationDetail.route_id == route_id
+            TransportationDetail.travel_route_id == route_id
         ).all()
 
         return details
@@ -802,7 +792,7 @@ async def get_detailed_route_info(
     try:
         # 경로 존재 확인 및 소유권 검증
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == route_id
+            TravelRoute.id == route_id
         ).first()
 
         if not route:
@@ -812,7 +802,7 @@ async def get_detailed_route_info(
             )
 
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -824,7 +814,7 @@ async def get_detailed_route_info(
 
         # 기본 경로 정보
         route_info = {
-            "route_id": str(route.route_id),
+            "route_id": str(route.id),
             "departure": {
                 "name": route.departure_name,
                 "latitude": route.departure_lat,
@@ -1034,7 +1024,7 @@ async def get_timemachine_route_info(
     try:
         # 경로 존재 확인 및 소유권 검증
         route = db.query(TravelRoute).filter(
-            TravelRoute.route_id == route_id
+            TravelRoute.id == route_id
         ).first()
 
         if not route:
@@ -1044,7 +1034,7 @@ async def get_timemachine_route_info(
             )
 
         travel_plan = db.query(TravelPlan).filter(
-            TravelPlan.plan_id == route.plan_id,
+            TravelPlan.plan_id == route.travel_plan_id,
             TravelPlan.user_id == current_user.user_id
         ).first()
 
@@ -1073,7 +1063,7 @@ async def get_timemachine_route_info(
 
         # 기본 경로 정보
         route_info = {
-            "route_id": str(route.route_id),
+            "route_id": str(route.id),
             "day": route.day,
             "sequence": route.sequence,
             "departure": {
