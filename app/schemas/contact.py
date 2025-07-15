@@ -12,6 +12,19 @@ class ContactCreate(BaseModel):
     is_public: bool = False
     password: str | None = None  # 비공개 문의 비밀번호(plain, 입력용)
 
+
+class ContactListResponse(BaseModel):
+    id: int
+    category: str
+    title: str
+    approval_status: str
+    views: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class ContactResponse(ContactCreate):
     id: int
     created_at: datetime

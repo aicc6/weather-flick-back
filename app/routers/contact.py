@@ -1,9 +1,10 @@
+from typing import List
 from fastapi import APIRouter, Depends, status, HTTPException
 
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.contact import ContactCreate, ContactResponse, PasswordVerifyRequest
+from app.schemas.contact import ContactCreate, ContactListResponse, ContactResponse, PasswordVerifyRequest
 from app.services.contact_service import create_contact, get_contacts, verify_contact_password, increment_contact_views
 from app.models import Contact
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/contact", tags=["contact"])
 def submit_contact(contact: ContactCreate, db: Session = Depends(get_db)):
     return create_contact(db, contact)
 
-@router.get("/", response_model=list[ContactResponse])
+@router.get("/", response_model=list[ContactListResponse])
 def list_contacts(db: Session = Depends(get_db)):
     return get_contacts(db)
 
