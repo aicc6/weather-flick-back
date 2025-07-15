@@ -17,6 +17,8 @@ class ContactListResponse(BaseModel):
     id: int
     category: str
     title: str
+    name: str
+    email: str
     approval_status: str
     views: int
     created_at: datetime

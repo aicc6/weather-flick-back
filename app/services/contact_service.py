@@ -39,14 +39,27 @@ def verify_contact_password(db: Session, contact_id: int, password: str) -> bool
 
     return bcrypt.checkpw(password.encode('utf-8'), contact.password_hash.encode('utf-8'))
 
-def get_contact(db: Session, contact_id: int):
+def get_contact(db: Session, contact_id: int, increment_view: bool = True):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
 
-    contact.views += 1
-
-    db.commit()
-    db.refresh(contact)
+    # 공개 글인 경우에만 조회수 증가 (비공개 글은 비밀번호 확인 후 증가)
+    if increment_view and not contact.is_private:
+        contact.views += 1
+        db.commit()
+        db.refresh(contact)
 
     return ContactResponse.model_validate(contact)
+
+def increment_contact_view(db: Session, contact_id: int):
+    """비공개 글의 비밀번호 확인 후 조회수 증가"""
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
+    
+    contact.views += 1
+    db.commit()
+    db.refresh(contact)
+    
+    return contact

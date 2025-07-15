@@ -22,6 +22,10 @@ def list_contacts(db: Session = Depends(get_db)):
 def verify_contact_password_route(contact_id: int, data: PasswordVerifyRequest, db: Session = Depends(get_db)):
     if not contact_service.verify_contact_password(db, contact_id, data.password):
         raise HTTPException(status_code=403, detail="비밀번호가 일치하지 않습니다.")
+    
+    # 비밀번호 확인 성공 시 조회수 증가
+    contact_service.increment_contact_view(db, contact_id)
+    
     return {"success": True}
 
 @router.get("/{contact_id}", response_model=ContactResponse)
