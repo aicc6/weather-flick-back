@@ -1144,7 +1144,7 @@ class Contact(Base):
     name = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    is_public = Column(Boolean, default=True, nullable=True)
+    is_private = Column(Boolean, default=False, nullable=False)
     approval_status = Column(SqlEnum('PENDING', 'PROCESSING', 'COMPLETE', name='approval_status'), default='PENDING', nullable=False)
     password_hash = Column(String(128), nullable=True)
     views = Column(Integer, default=0, nullable=False)

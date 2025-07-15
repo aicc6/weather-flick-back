@@ -13,7 +13,8 @@ def create_contact(db: Session, contact_data: ContactCreate):
     data = contact_data.model_dump()
     password = data.pop('password', None)
 
-    if password:
+    # is_private가 True이고 password가 있을 때만 해시 저장
+    if data.get('is_private', False) and password:
         # 비공개 문의: 비밀번호 해시 저장
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         data['password_hash'] = hashed.decode('utf-8')
