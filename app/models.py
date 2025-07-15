@@ -1144,7 +1144,7 @@ class Contact(Base):
     name = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    is_public = Column(Boolean, default=False, nullable=False)
+    is_public = Column(Boolean, default=True, nullable=True)
     approval_status = Column(SqlEnum('PENDING', 'PROCESSING', 'COMPLETE', name='approval_status'), default='PENDING', nullable=False)
     password_hash = Column(String(128), nullable=True)
     views = Column(Integer, default=0, nullable=False)
@@ -1868,7 +1868,7 @@ class TravelRouteResponse(BaseModel):
     # 프론트엔드 호환성을 위해 route_id 필드 유지
     route_id: uuid.UUID
     plan_id: uuid.UUID
-    
+
     # 실제 DB 스키마 기반 필드들
     origin_place_id: str | None = None
     destination_place_id: str | None = None
@@ -1878,7 +1878,7 @@ class TravelRouteResponse(BaseModel):
     distance_km: float | None = None
     route_data: dict[str, Any] | None = None
     created_at: datetime
-    
+
     # 프론트엔드에서 기대하는 추가 필드들 (매핑용)
     sequence: int | None = None
     transport_type: str | None = None
@@ -1886,7 +1886,7 @@ class TravelRouteResponse(BaseModel):
     destination_name: str | None = None
     duration: int | None = None
     distance: float | None = None
-    
+
     @classmethod
     def from_orm_with_mapping(cls, obj):
         """ORM 객체를 프론트엔드 호환 형식으로 변환"""
@@ -1901,7 +1901,7 @@ class TravelRouteResponse(BaseModel):
             distance_km=obj.distance_km,
             route_data=obj.route_data,
             created_at=obj.created_at,
-            
+
             # 프론트엔드 호환성을 위한 매핑
             sequence=obj.route_order,
             transport_type=obj.transport_mode,

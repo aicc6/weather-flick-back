@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import logging
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -11,7 +12,8 @@ import bcrypt
 def create_contact(db: Session, contact_data: ContactCreate):
     data = contact_data.model_dump()
     password = data.pop('password', None)
-    if data.get('is_public') and password:
+
+    if password:
         # 비공개 문의: 비밀번호 해시 저장
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         data['password_hash'] = hashed.decode('utf-8')
@@ -31,13 +33,14 @@ def get_contacts(db: Session, skip: int = 0, limit: int = 100):
 
 def verify_contact_password(db: Session, contact_id: int, password: str) -> bool:
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact or not bool(contact.password_hash):
-        return False
+    if not contact:
+        raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
+
     return bcrypt.checkpw(password.encode('utf-8'), contact.password_hash.encode('utf-8'))
 
 def get_contact(db: Session, contact_id: int):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact or not bool(contact.password_hash):
+    if not contact:
         raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
 
     contact.views += 1

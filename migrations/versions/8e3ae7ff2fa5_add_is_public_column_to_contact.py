@@ -19,7 +19,7 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('contact', sa.Column('is_public', sa.Boolean(), nullable=False, server_default=sa.false()))
+    op.add_column('contact', sa.Column('is_public', sa.Boolean(), nullable=True, server_default=sa.false()))
 
 
 def downgrade():

@@ -9,7 +9,7 @@ class ContactCreate(BaseModel):
     content: str
     name: str = Field(..., max_length=50)
     email: EmailStr
-    is_public: bool = False
+    is_public: bool = True
     password: str | None = None  # 비공개 문의 비밀번호(plain, 입력용)
 
 
@@ -20,6 +20,7 @@ class ContactListResponse(BaseModel):
     approval_status: str
     views: int
     created_at: datetime
+    is_public: bool
 
     class Config:
         from_attributes = True
