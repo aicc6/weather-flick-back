@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import Contact
-from app.schemas.contact import ContactCreate
+from app.schemas.contact import ContactCreate, ContactResponse
 import bcrypt
 
 
@@ -34,12 +35,14 @@ def verify_contact_password(db: Session, contact_id: int, password: str) -> bool
         return False
     return bcrypt.checkpw(password.encode('utf-8'), contact.password_hash.encode('utf-8'))
 
-def increment_contact_views(db: Session, contact_id: int) -> int:
+def get_contact(db: Session, contact_id: int):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
-    if not contact:
-        raise ValueError("문의글을 찾을 수 없습니다.")
-    current_views = int(getattr(contact, "views", 0) or 0)
-    contact.__dict__["views"] = current_views + 1
+    if not contact or not bool(contact.password_hash):
+        raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
+
+    contact.views += 1
+
     db.commit()
     db.refresh(contact)
-    return int(contact.__dict__["views"])
+
+    return ContactResponse.model_validate(contact)
