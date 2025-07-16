@@ -12,7 +12,7 @@ class WeatherService:
         self.api_key = settings.weather_api_key
         self.base_url = settings.weather_api_url
 
-    @cache_result(prefix="weather:current", expire=600)  # 10분 캐싱
+    @cache_result(prefix="weather:current", expire=600, include_cache_info=True)  # 10분 캐싱
     async def get_current_weather(
         self, city: str, country: str | None = None
     ) -> dict[str, Any]:
@@ -47,7 +47,7 @@ class WeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="Weather API unavailable")
 
-    @cache_result(prefix="weather:forecast", expire=1800)  # 30분 캐싱
+    @cache_result(prefix="weather:forecast", expire=1800, include_cache_info=True)  # 30분 캐싱
     async def get_forecast(
         self, city: str, days: int = 3, country: str | None = None
     ) -> dict[str, Any]:
@@ -87,17 +87,21 @@ class WeatherService:
             "city": location.get("name", ""),
             "country": location.get("country", ""),
             "region": location.get("region", ""),
-            "temperature": current.get("temp_c", 0),
-            "feels_like": current.get("feelslike_c", 0),
-            "description": current.get("condition", {}).get("text", ""),
-            "icon": current.get("condition", {}).get("icon", ""),
-            "humidity": current.get("humidity", 0),
-            "wind_speed": current.get("wind_kph", 0),
-            "wind_direction": current.get("wind_dir", ""),
-            "pressure": current.get("pressure_mb", 0),
-            "visibility": current.get("vis_km", 0),
-            "uv_index": current.get("uv", 0),
-            "last_updated": current.get("last_updated", ""),
+            "current": {
+                "temperature": current.get("temp_c", 0),
+                "feels_like": current.get("feelslike_c", 0),
+                "condition": str(current.get("condition", {}).get("code", "1000")),
+                "description": current.get("condition", {}).get("text", ""),
+                "icon": current.get("condition", {}).get("icon", ""),
+                "humidity": current.get("humidity", 0),
+                "wind_speed": current.get("wind_kph", 0),
+                "wind_direction": current.get("wind_degree", 0),
+                "pressure": current.get("pressure_mb", 0),
+                "visibility": current.get("vis_km", 0),
+                "uv_index": current.get("uv", 0),
+            },
+            "timezone": location.get("tz_id", ""),
+            "local_time": location.get("localtime", ""),
         }
 
     def _parse_forecast(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -111,15 +115,14 @@ class WeatherService:
             forecast_days.append(
                 {
                     "date": day.get("date", ""),
-                    "max_temp": day_data.get("maxtemp_c", 0),
-                    "min_temp": day_data.get("mintemp_c", 0),
-                    "avg_temp": day_data.get("avgtemp_c", 0),
+                    "temperature_max": day_data.get("maxtemp_c", 0),
+                    "temperature_min": day_data.get("mintemp_c", 0),
+                    "condition": str(day_data.get("condition", {}).get("code", "1000")),
                     "description": day_data.get("condition", {}).get("text", ""),
                     "icon": day_data.get("condition", {}).get("icon", ""),
                     "humidity": day_data.get("avghumidity", 0),
-                    "chance_of_rain": day_data.get("daily_chance_of_rain", 0),
-                    "chance_of_snow": day_data.get("daily_chance_of_snow", 0),
-                    "uv_index": day_data.get("uv", 0),
+                    "wind_speed": day_data.get("maxwind_kph", 0),
+                    "precipitation_chance": day_data.get("daily_chance_of_rain", 0),
                 }
             )
 
@@ -128,6 +131,7 @@ class WeatherService:
             "country": location.get("country", ""),
             "region": location.get("region", ""),
             "forecast": forecast_days,
+            "timezone": location.get("tz_id", ""),
         }
 
 
