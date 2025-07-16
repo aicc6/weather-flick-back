@@ -2445,27 +2445,6 @@ class Accommodation(Base):
         return self.tel
 
 
-class TravelCourseLike(Base):
-    """
-    여행 코스 좋아요 테이블
-    사용처: weather-flick-back
-    설명: 사용자가 좋아요한 여행 코스
-    """
-
-    __tablename__ = "travel_course_likes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True
-    )
-    title = Column(String(255), nullable=False)
-    subtitle = Column(String(255))
-    summary = Column(Text)
-    description = Column(Text)
-    region = Column(String(50))
-    itinerary = Column(JSONB)
-
-
 class TravelCourseSpot(Base):
     """
     여행 코스 구성 지점 테이블

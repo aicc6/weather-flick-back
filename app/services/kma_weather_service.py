@@ -4,15 +4,17 @@ from typing import Any
 
 import httpx
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
 from app.utils.kma_utils import (
-    CITY_COORDINATES,
     convert_precipitation_type,
     convert_wind_direction,
     format_weather_data,
     get_base_time,
     get_cities_in_province,
+    get_city_coordinates,
 )
 
 
@@ -152,26 +154,27 @@ class KMAWeatherService:
         except httpx.RequestError:
             raise HTTPException(status_code=503, detail="기상청 API 서비스 불가")
 
-    async def get_weather_for_province(self, province: str) -> list[dict[str, Any]]:
+    async def get_weather_for_province(self, province: str, db: Session = None) -> list[dict[str, Any]]:
         """특정 도/광역시의 모든 도시 현재 날씨 정보 조회"""
-        cities_in_province = get_cities_in_province(province)
+        if db is None:
+            db = next(get_db())
+            
+        cities_in_province = get_cities_in_province(province, db)
         if not cities_in_province:
             return []
 
         tasks = []
+        cities_with_coords = []
         for city in cities_in_province:
-            coords = CITY_COORDINATES.get(city)
+            coords = get_city_coordinates(city, db)
             if coords:
                 task = self.get_current_weather(coords["nx"], coords["ny"])
                 tasks.append(task)
+                cities_with_coords.append(city)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         weather_data = []
-        # Filter out cities that might not have been found in CITY_COORDINATES
-        cities_with_coords = [
-            city for city in cities_in_province if city in CITY_COORDINATES
-        ]
         for i, result in enumerate(results):
             city = cities_with_coords[i]
             if isinstance(result, Exception):
@@ -183,19 +186,29 @@ class KMAWeatherService:
 
         return weather_data
 
-    async def get_all_cities_current_weather(self) -> list[dict[str, Any]]:
+    async def get_all_cities_current_weather(self, db: Session = None) -> list[dict[str, Any]]:
         """모든 지원 도시의 현재 날씨 정보 조회"""
+        if db is None:
+            db = next(get_db())
+            
+        from app.utils.kma_utils import get_supported_cities
+        
         tasks = []
-        for city, coords in CITY_COORDINATES.items():
-            task = self.get_current_weather(coords["nx"], coords["ny"])
-            tasks.append(task)
+        cities_with_coords = []
+        cities = get_supported_cities(db)
+        
+        for city in cities:
+            coords = get_city_coordinates(city, db)
+            if coords:
+                task = self.get_current_weather(coords["nx"], coords["ny"])
+                tasks.append(task)
+                cities_with_coords.append(city)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         weather_data = []
-        cities = list(CITY_COORDINATES.keys())
         for i, result in enumerate(results):
-            city = cities[i]
+            city = cities_with_coords[i]
             if isinstance(result, Exception):
                 weather_data.append({"city": city, "error": str(result)})
             else:
