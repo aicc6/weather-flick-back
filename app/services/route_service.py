@@ -138,18 +138,31 @@ class RouteService:
             duration = int(distance * 1.5)  # 자동차 평균 속도 고려
             fuel_cost = distance * 150
 
-            # 거리에 따른 mock 경로 안내점 생성
+            # 거리에 따른 mock 경로 안내점 생성 (지역 특성 반영)
             guide_points = []
+            
+            # 좌표로 지역 판단 (제주도: 33.1-33.6도, 126.1-126.9도)
+            is_jeju = (33.1 <= departure_lat <= 33.6 and 126.1 <= departure_lng <= 126.9) or \
+                      (33.1 <= destination_lat <= 33.6 and 126.1 <= destination_lng <= 126.9)
+            
             if distance > 5:  # 5km 이상인 경우
-                guide_points = [
-                    {"description": "출발지에서 주요 도로로 진입", "distance": 500, "time": 2},
-                    {"description": "고속도로 또는 간선도로 이용", "distance": int(distance * 800), "time": int(duration * 0.7)},
-                    {"description": "목적지 근처 도로로 진입", "distance": 300, "time": 1}
-                ]
+                if is_jeju:
+                    guide_points = [
+                        {"description": "출발지에서 주요 도로로 진입", "distance": 500, "time": 2},
+                        {"description": "제주도 내 주요 도로 이용 (1100번도 또는 1132번도)", "distance": int(distance * 800), "time": int(duration * 0.7)},
+                        {"description": "목적지 근처 도로로 진입", "distance": 300, "time": 1}
+                    ]
+                else:
+                    guide_points = [
+                        {"description": "출발지에서 주요 도로로 진입", "distance": 500, "time": 2},
+                        {"description": "고속도로 또는 간선도로 이용", "distance": int(distance * 800), "time": int(duration * 0.7)},
+                        {"description": "목적지 근처 도로로 진입", "distance": 300, "time": 1}
+                    ]
             elif distance > 1:  # 1km 이상인 경우
+                road_type = "지역 도로" if is_jeju else "일반 도로"
                 guide_points = [
                     {"description": "출발지에서 도로로 진입", "distance": 200, "time": 1},
-                    {"description": "목적지까지 직진", "distance": int(distance * 800), "time": int(duration * 0.8)},
+                    {"description": f"{road_type}를 통해 목적지까지 이동", "distance": int(distance * 800), "time": int(duration * 0.8)},
                     {"description": "목적지 도착", "distance": 100, "time": 1}
                 ]
 
@@ -243,11 +256,64 @@ class RouteService:
     async def _get_google_directions(self, departure_lat: float, departure_lng: float,
                                    destination_lat: float, destination_lng: float,
                                    mode: str = "walking") -> dict[str, Any]:
-        """구글 Directions API 호출"""
+        """구글 Directions API 호출 (대중교통 모드 우선 사용)"""
         try:
             session = await self._get_session()
 
             url = "https://maps.googleapis.com/maps/api/directions/json"
+            
+            # 대중교통이 가능한지 먼저 확인
+            if mode in ["driving", "walking"]:
+                # 대중교통 모드로 먼저 시도
+                transit_params = {
+                    "origin": f"{departure_lat},{departure_lng}",
+                    "destination": f"{destination_lat},{destination_lng}",
+                    "mode": "transit",
+                    "key": self.google_api_key,
+                    "language": "ko",
+                    "region": "kr"
+                }
+                
+                try:
+                    transit_response = await session.get(url, params=transit_params)
+                    transit_response.raise_for_status()
+                    transit_data = transit_response.json()
+                    
+                    if transit_data.get("status") == "OK" and transit_data.get("routes"):
+                        route = transit_data["routes"][0]
+                        leg = route["legs"][0]
+                        
+                        # 대중교통 정보를 자동차/도보로 변환
+                        duration = leg["duration"]["value"] // 60  # 초 -> 분
+                        distance = leg["distance"]["value"] / 1000  # m -> km
+                        
+                        # 모드에 따라 시간 조정
+                        if mode == "driving":
+                            duration = max(int(duration * 0.4), 5)  # 자동차는 대중교통의 40% 시간
+                        elif mode == "walking":
+                            duration = max(int(duration * 1.2), 10)  # 도보는 대중교통의 120% 시간
+                        
+                        return {
+                            "success": True,
+                            "duration": duration,
+                            "distance": distance,
+                            "route_data": {
+                                "overview_polyline": route.get("overview_polyline", {}),
+                                "steps": leg.get("steps", []),
+                                "start_address": leg.get("start_address", ""),
+                                "end_address": leg.get("end_address", ""),
+                                "warnings": route.get("warnings", []),
+                                "summary": route.get("summary", ""),
+                                "bounds": route.get("bounds", {}),
+                                "copyrights": route.get("copyrights", ""),
+                                "source_mode": "transit_converted",
+                                "target_mode": mode
+                            }
+                        }
+                except Exception as e:
+                    logger.info(f"대중교통 모드 변환 실패, 기본 모드로 시도: {e}")
+            
+            # 기본 모드로 시도
             params = {
                 "origin": f"{departure_lat},{departure_lng}",
                 "destination": f"{destination_lat},{destination_lng}",
@@ -281,7 +347,8 @@ class RouteService:
                         "warnings": route.get("warnings", []),
                         "summary": route.get("summary", ""),
                         "bounds": route.get("bounds", {}),
-                        "copyrights": route.get("copyrights", "")
+                        "copyrights": route.get("copyrights", ""),
+                        "source_mode": mode
                     }
                 }
             else:

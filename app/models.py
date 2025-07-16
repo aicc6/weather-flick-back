@@ -1880,13 +1880,26 @@ class TravelRouteResponse(BaseModel):
     created_at: datetime
 
     # 프론트엔드에서 기대하는 추가 필드들 (매핑용)
+    day: int | None = None
     sequence: int | None = None
     transport_type: str | None = None
     departure_name: str | None = None
     destination_name: str | None = None
+    departure_lat: float | None = None
+    departure_lng: float | None = None
+    destination_lat: float | None = None
+    destination_lng: float | None = None
     duration: int | None = None
     distance: float | None = None
 
+    @classmethod
+    def _calculate_day_from_route_order(cls, route_order: int) -> int:
+        """루트 순서로부터 일차 계산 (기본적으로 3개 이동 당 1일차로 가정)"""
+        if route_order is None:
+            return 1
+        # 루트 순서를 기반으로 일차 계산 (0,1,2 = 1일차, 3,4,5 = 2일차, ...)
+        return (route_order // 3) + 1
+    
     @classmethod
     def from_orm_with_mapping(cls, obj):
         """ORM 객체를 프론트엔드 호환 형식으로 변환"""
@@ -1903,10 +1916,15 @@ class TravelRouteResponse(BaseModel):
             created_at=obj.created_at,
 
             # 프론트엔드 호환성을 위한 매핑
+            day=cls._calculate_day_from_route_order(obj.route_order),
             sequence=obj.route_order,
             transport_type=obj.transport_mode,
             departure_name=obj.origin_place_id,
             destination_name=obj.destination_place_id,
+            departure_lat=37.5665,  # 서울 기본 좌표 (추후 좌표 데이터 연동 필요)
+            departure_lng=126.9780,
+            destination_lat=37.5665,
+            destination_lng=126.9780,
             duration=obj.duration_minutes,
             distance=obj.distance_km,
         )

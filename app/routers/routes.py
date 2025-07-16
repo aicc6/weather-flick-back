@@ -189,7 +189,33 @@ async def get_travel_plan_routes(
         ).order_by(TravelRoute.route_order).all()
 
         # 프론트엔드 호환 형식으로 변환
-        return [TravelRouteResponse.from_orm_with_mapping(route) for route in routes]
+        enhanced_routes = []
+        for route in routes:
+            route_response = TravelRouteResponse.from_orm_with_mapping(route)
+            
+            # 장소명에서 좌표 추출 시도
+            try:
+                # 우선 Google Places API로 좌표 검색 시도
+                if route.origin_place_id:
+                    origin_info = await google_places_service.search_place_by_text(route.origin_place_id)
+                    if origin_info and 'latitude' in origin_info and 'longitude' in origin_info:
+                        route_response.departure_lat = origin_info['latitude']
+                        route_response.departure_lng = origin_info['longitude']
+                
+                if route.destination_place_id:
+                    dest_info = await google_places_service.search_place_by_text(route.destination_place_id)
+                    if dest_info and 'latitude' in dest_info and 'longitude' in dest_info:
+                        route_response.destination_lat = dest_info['latitude']
+                        route_response.destination_lng = dest_info['longitude']
+                        
+            except Exception as coord_error:
+                logger.warning(f"좌표 검색 실패: {str(coord_error)}")
+                # 좌표 검색 실패 시 기본값 유지
+                pass
+            
+            enhanced_routes.append(route_response)
+        
+        return enhanced_routes
 
     except HTTPException:
         raise
