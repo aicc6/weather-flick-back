@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import Contact
-from app.schemas.contact import ContactCreate, ContactResponse
+from app.schemas.contact import ContactCreate, ContactResponse, ContactListResponse
 import bcrypt
 
 
@@ -23,13 +23,22 @@ def create_contact(db: Session, contact_data: ContactCreate):
     db.refresh(contact)
     return contact
 
-def get_contacts(db: Session, skip: int = 0, limit: int = 100):
-    contacts = db.query(Contact).order_by(Contact.id.desc()).offset(skip).limit(limit).all()
+def get_contacts(db: Session, page: int = 1, limit: int = 10):
+    offset = (page - 1) * limit
+    contacts = (
+        db.query(Contact)
+        .order_by(Contact.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    total = db.query(Contact).count()
     # created_at이 naive면 UTC로 보정
     for c in contacts:
         if hasattr(c, 'created_at') and isinstance(c.created_at, datetime) and c.created_at.tzinfo is None:
             c.created_at = c.created_at.replace(tzinfo=UTC)
-    return contacts
+    items = [ContactListResponse.model_validate(c) for c in contacts]
+    return {"items": items, "total": total}
 
 def verify_contact_password(db: Session, contact_id: int, password: str) -> bool:
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
