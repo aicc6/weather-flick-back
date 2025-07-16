@@ -426,46 +426,76 @@ class LocalInfoService:
         return await self._get_local_city_info(city)
 
     def _categorize_restaurant(self, category_name: str) -> str:
-        """카테고리명을 기반으로 맛집 분류"""
-        category_name = category_name.lower()
-        if any(
-            keyword in category_name for keyword in ["한식", "국밥", "김치", "비빔밥"]
-        ):
-            return "한식"
-        elif any(
-            keyword in category_name
-            for keyword in ["중식", "짜장면", "탕수육", "마파두부"]
-        ):
-            return "중식"
-        elif any(
-            keyword in category_name for keyword in ["일식", "초밥", "라멘", "우동"]
-        ):
-            return "일식"
-        elif any(
-            keyword in category_name
-            for keyword in ["양식", "파스타", "피자", "스테이크"]
-        ):
-            return "양식"
-        elif any(keyword in category_name for keyword in ["카페", "커피", "디저트"]):
-            return "카페"
-        else:
-            return "기타"
+        """카테고리명을 기반으로 맛집 분류 (데이터베이스 기반)"""
+        try:
+            from app.services.category_service import get_category_service
+            from app.database import get_db
+            
+            # 데이터베이스 세션 획득
+            db = next(get_db())
+            category_service = get_category_service(db)
+            
+            # 데이터베이스 기반 분류 사용
+            result = category_service.categorize_restaurant_by_name(category_name)
+            db.close()
+            
+            return result
+        except Exception as e:
+            # 오류 발생 시 기존 로직 사용
+            category_name = category_name.lower()
+            if any(
+                keyword in category_name for keyword in ["한식", "국밥", "김치", "비빔밥"]
+            ):
+                return "한식"
+            elif any(
+                keyword in category_name
+                for keyword in ["중식", "짜장면", "탕수육", "마파두부"]
+            ):
+                return "중식"
+            elif any(
+                keyword in category_name for keyword in ["일식", "초밥", "라멘", "우동"]
+            ):
+                return "일식"
+            elif any(
+                keyword in category_name
+                for keyword in ["양식", "파스타", "피자", "스테이크"]
+            ):
+                return "양식"
+            elif any(keyword in category_name for keyword in ["카페", "커피", "디저트"]):
+                return "카페"
+            else:
+                return "기타"
 
     def _categorize_accommodation(self, category_name: str) -> str:
-        """카테고리명을 기반으로 숙소 분류"""
-        category_name = category_name.lower()
-        if "호텔" in category_name:
-            return "호텔"
-        elif "펜션" in category_name:
-            return "펜션"
-        elif "게스트" in category_name:
-            return "게스트하우스"
-        elif "모텔" in category_name:
-            return "모텔"
-        elif "리조트" in category_name:
-            return "리조트"
-        else:
-            return "호텔"
+        """카테고리명을 기반으로 숙소 분류 (데이터베이스 기반)"""
+        try:
+            from app.services.category_service import get_category_service
+            from app.database import get_db
+            
+            # 데이터베이스 세션 획득
+            db = next(get_db())
+            category_service = get_category_service(db)
+            
+            # 데이터베이스 기반 분류 사용
+            result = category_service.categorize_accommodation_by_name(category_name)
+            db.close()
+            
+            return result
+        except Exception as e:
+            # 오류 발생 시 기존 로직 사용
+            category_name = category_name.lower()
+            if "호텔" in category_name:
+                return "호텔"
+            elif "펜션" in category_name:
+                return "펜션"
+            elif "게스트" in category_name:
+                return "게스트하우스"
+            elif "모텔" in category_name:
+                return "모텔"
+            elif "리조트" in category_name:
+                return "리조트"
+            else:
+                return "호텔"
 
     def _get_area_code(self, city: str) -> str:
         """도시명을 기반으로 지역 코드 반환"""

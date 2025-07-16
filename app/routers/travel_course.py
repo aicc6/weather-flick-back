@@ -1,9 +1,9 @@
 # app/routers/travel_courses.py
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import TravelCourse
-from app.schema_models.travel_course import TravelCourseListResponse
+from app.schema_models.travel_course import TravelCourseListResponse, TravelCourseDetailResponse
 
 router = APIRouter(prefix="/travel-courses", tags=["travel-courses"])
 
@@ -29,3 +29,26 @@ async def get_travel_courses(
     total_count = query.count()
     courses = query.offset(offset).limit(limit).all()
     return {"courses": courses, "totalCount": total_count}
+
+@router.get("/{course_id}", response_model=TravelCourseDetailResponse)
+async def get_travel_course_detail(
+    course_id: str,
+    db: Session = Depends(get_db)
+):
+    """여행 코스 상세 정보 조회"""
+    course = db.query(TravelCourse).filter(TravelCourse.content_id == course_id).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="여행 코스를 찾을 수 없습니다")
+    
+    # datetime 필드를 문자열로 변환
+    course_dict = {}
+    for key, value in course.__dict__.items():
+        if key.startswith('_'):
+            continue
+        if hasattr(value, 'isoformat'):  # datetime 객체인 경우
+            course_dict[key] = value.isoformat() if value else None
+        else:
+            course_dict[key] = value
+    
+    return course_dict

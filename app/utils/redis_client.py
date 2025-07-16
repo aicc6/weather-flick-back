@@ -239,6 +239,9 @@ def test_redis_connection() -> bool:
         return False
 
 
+# Redis 클라이언트 인스턴스 생성
+redis_client = RedisClient()
+
 if __name__ == "__main__":
     # 직접 실행시 연결 테스트
     test_redis_connection()

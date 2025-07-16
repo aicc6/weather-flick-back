@@ -16,6 +16,7 @@ from app.models import (
     CustomTravelRecommendationResponse,
     DayItinerary,
     PlaceRecommendation,
+    Region,
     Restaurant,
     Shopping,
     TouristAttraction,
@@ -127,29 +128,32 @@ async def get_custom_travel_recommendations(
             if style in style_tags:
                 selected_tags.extend(style_tags[style])
 
-        # region_code 매핑 (프론트엔드 코드와 DB 코드 차이 해결)
-        region_code_mapping = {
-            "11": "1",    # 서울
-            "26": "6",    # 부산
-            "27": "4",    # 대구
-            "28": "2",    # 인천
-            "29": "5",    # 광주
-            "30": "3",    # 대전
-            "31": "7",    # 울산
-            "36": "8",    # 세종
-            "41": "31",   # 경기
-            "43": "33",   # 충북
-            "44": "34",   # 충남
-            "46": "36",   # 전남
-            "47": "35",   # 경북
-            "48": "38",   # 경남
-            "50": "39",   # 제주
-            "51": "32",   # 강원
-            "52": "37",   # 전북
-        }
-
-        # 실제 DB에서 사용할 region_code
-        db_region_code = region_code_mapping.get(request.region_code, request.region_code)
+        # region_code를 tour_api_area_code로 매핑
+        region = db.query(Region).filter(Region.region_code == request.region_code).first()
+        if region and region.tour_api_area_code:
+            db_region_code = region.tour_api_area_code
+        else:
+            # 기존 하드코딩된 매핑 유지 (fallback)
+            region_code_mapping = {
+                "11": "1",    # 서울
+                "26": "6",    # 부산
+                "27": "4",    # 대구
+                "28": "2",    # 인천
+                "29": "5",    # 광주
+                "30": "3",    # 대전
+                "31": "7",    # 울산
+                "36": "8",    # 세종
+                "41": "31",   # 경기
+                "43": "33",   # 충북
+                "44": "34",   # 충남
+                "46": "36",   # 전남
+                "47": "35",   # 경북
+                "48": "38",   # 경남
+                "50": "39",   # 제주
+                "51": "32",   # 강원
+                "52": "37",   # 전북
+            }
+            db_region_code = region_code_mapping.get(request.region_code, request.region_code)
 
         # 순차적 DB 쿼리 실행 (안정성 우선)
         import logging

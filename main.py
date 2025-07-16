@@ -6,6 +6,7 @@ from app.logging_config import setup_logging
 from app.routers import (
     attractions,
     auth,
+    categories,
     chatbot,
     config,
     contact,
@@ -77,6 +78,7 @@ app.include_router(travel_course_like.router, prefix="/api")
 app.include_router(custom_travel.router, prefix="/api")
 app.include_router(custom_travel_converter.router, prefix="/api")
 app.include_router(attractions.router, prefix="/api")
+app.include_router(categories.router, prefix="/api")  # 카테고리 API 라우터 추가
 app.include_router(regions.router)  # 지역 API 라우터 (prefix는 라우터에서 정의됨)
 app.include_router(system.router, prefix="/api")
 
