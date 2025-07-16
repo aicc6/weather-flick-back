@@ -155,13 +155,13 @@ async def get_all_restaurants(
             "filters": {
                 "region_code": region_code,
                 "category_code": category_code,
-            }
+            },
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"레스토랑 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
+            detail=f"레스토랑 정보를 가져오는 중 오류가 발생했습니다: {str(e)}",
         )
 
 
@@ -276,13 +276,13 @@ async def get_all_accommodations(
                 "region_code": region_code,
                 "category_code": category_code,
                 "accommodation_type": accommodation_type,
-            }
+            },
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"숙소 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
+            detail=f"숙소 정보를 가져오는 중 오류가 발생했습니다: {str(e)}",
         )
 
 
@@ -365,13 +365,13 @@ async def get_all_tourist_attractions(
             "filters": {
                 "region_code": region_code,
                 "category_code": category_code,
-            }
+            },
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"관광지 정보를 가져오는 중 오류가 발생했습니다: {str(e)}"
+            detail=f"관광지 정보를 가져오는 중 오류가 발생했습니다: {str(e)}",
         )
 
 
@@ -529,7 +529,7 @@ async def create_review(
 
     return {
         "message": "Review created successfully",
-        "review_id": new_review.review_id,
+        "review_id": new_review.id,
     }
 
 
@@ -554,7 +554,7 @@ async def get_place_reviews(
 
     return [
         {
-            "review_id": review.review_id,
+            "review_id": review.id,
             "user_id": review.user_id,
             "rating": review.rating,
             "content": review.content,

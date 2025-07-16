@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func
 import sqlalchemy as sa
 
 from app.config import settings

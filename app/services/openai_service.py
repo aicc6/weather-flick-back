@@ -18,8 +18,17 @@ class OpenAIService:
             logger.warning("OpenAI API key not configured")
             self.client = None
         else:
-            self.client = OpenAI(api_key=settings.openai_api_key)
-            logger.info("OpenAI client initialized successfully")
+            # Python 3.13 호환성 문제 해결을 위해 프록시 환경 변수 제거
+            import os
+            for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']:
+                os.environ.pop(proxy_var, None)
+            
+            try:
+                self.client = OpenAI(api_key=settings.openai_api_key)
+                logger.info("OpenAI client initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI client: {e}")
+                self.client = None
 
     async def generate_travel_recommendation(
         self,
@@ -276,6 +285,60 @@ class OpenAIService:
         """
 
         return prompt.strip()
+
+    async def generate_personalized_response(
+        self,
+        user_message: str,
+        conversation_history: list[dict[str, str]],
+        system_prompt: str,
+        user_context: dict[str, Any] | None = None
+    ) -> str:
+        """
+        사용자 맞춤형 챗봇 응답 생성
+
+        Args:
+            user_message: 사용자 메시지
+            conversation_history: 대화 기록
+            system_prompt: 개인화된 시스템 프롬프트
+            user_context: 사용자 컨텍스트 정보
+
+        Returns:
+            str: 생성된 응답
+        """
+        if not self.client:
+            return await self.generate_chatbot_response(user_message, conversation_history)
+
+        try:
+            # 메시지 구성
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # 대화 기록 추가
+            messages.extend(conversation_history)
+            
+            # 현재 메시지 추가
+            current_message = user_message
+            
+            # 사용자 컨텍스트가 있으면 메시지에 포함
+            if user_context and user_context.get("recent_searches"):
+                current_message += f"\n\n[최근 검색: {', '.join(user_context['recent_searches'][:3])}]"
+            
+            messages.append({"role": "user", "content": current_message})
+
+            response = self.client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=messages,
+                temperature=0.8,
+                max_tokens=300,
+                presence_penalty=0.1,
+                frequency_penalty=0.1
+            )
+
+            return response.choices[0].message.content
+
+        except Exception as e:
+            logger.error(f"개인화된 챗봇 응답 생성 실패: {e}")
+            # Fallback to regular response
+            return await self.generate_chatbot_response(user_message, conversation_history)
 
 # OpenAI 서비스 인스턴스
 openai_service = OpenAIService()

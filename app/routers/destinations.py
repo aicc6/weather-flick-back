@@ -34,6 +34,8 @@ async def search_destination(query: str = Query(...)):
             photo_url = None
             address = None
             category = None
+            latitude = None
+            longitude = None
             if place_id:
                 # Place Details API 호출
                 details_url = "https://maps.googleapis.com/maps/api/place/details/json"
@@ -41,7 +43,7 @@ async def search_destination(query: str = Query(...)):
                     details_url,
                     params={
                         "place_id": place_id,
-                        "fields": "photo,formatted_address,types,name",
+                        "fields": "photo,formatted_address,types,name,geometry",
                         "key": GOOGLE_API_KEY,
                         "language": "ko",
                     },
@@ -51,6 +53,14 @@ async def search_destination(query: str = Query(...)):
                 photos = result.get("photos", [])
                 address = result.get("formatted_address")
                 types = result.get("types", [])
+                geometry = result.get("geometry", {})
+                
+                # 좌표 정보 추출
+                if geometry and "location" in geometry:
+                    location = geometry["location"]
+                    latitude = location.get("lat")
+                    longitude = location.get("lng")
+                
                 # 대표적인 카테고리 하나를 선택
                 if types:
                     category = types[0]
@@ -67,6 +77,8 @@ async def search_destination(query: str = Query(...)):
                 "photo_url": photo_url,
                 "address": address,
                 "category": category,
+                "latitude": latitude,
+                "longitude": longitude,
             })
     return {"suggestions": suggestions}
 

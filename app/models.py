@@ -30,9 +30,11 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+)
+from sqlalchemy import (
     Enum as SqlEnum,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -43,8 +45,10 @@ Base = declarative_base()
 # Enum 정의
 # ===========================================
 
+
 class AdminStatus(enum.Enum):
     """관리자 계정 상태"""
+
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     LOCKED = "LOCKED"
@@ -52,6 +56,7 @@ class AdminStatus(enum.Enum):
 
 class TravelPlanStatus(enum.Enum):
     """여행 계획 상태"""
+
     PLANNING = "PLANNING"
     CONFIRMED = "CONFIRMED"
     IN_PROGRESS = "IN_PROGRESS"
@@ -61,6 +66,7 @@ class TravelPlanStatus(enum.Enum):
 
 class UserRole(enum.Enum):
     """사용자 역할"""
+
     USER = "USER"
     ADMIN = "ADMIN"
 
@@ -69,18 +75,24 @@ class UserRole(enum.Enum):
 # 사용자 및 인증 관련 테이블
 # ===========================================
 
+
 class User(Base):
     """
     사용자 정보 테이블
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 일반 사용자 계정 정보 및 프로필 관리
     """
+
     __tablename__ = "users"
     __table_args__ = {"extend_existing": True, "autoload_replace": False}
 
-    user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
+    )
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=True)  # OAuth 사용자는 비밀번호가 없을 수 있음
+    hashed_password = Column(
+        String, nullable=True
+    )  # OAuth 사용자는 비밀번호가 없을 수 있음
     nickname = Column(String, index=True, nullable=False)
     profile_image = Column(String)
     preferences = Column(JSONB, default=dict)
@@ -103,9 +115,15 @@ class User(Base):
         return self.user_id
 
     # 관계 설정
-    travel_plans = relationship("TravelPlan", back_populates="user", cascade="all, delete-orphan")
-    reviews = relationship("Review", back_populates="user", cascade="all, delete-orphan")
-    activity_logs = relationship("UserActivityLog", back_populates="user", cascade="all, delete-orphan")
+    travel_plans = relationship(
+        "TravelPlan", back_populates="user", cascade="all, delete-orphan"
+    )
+    reviews = relationship(
+        "Review", back_populates="user", cascade="all, delete-orphan"
+    )
+    activity_logs = relationship(
+        "UserActivityLog", back_populates="user", cascade="all, delete-orphan"
+    )
     chat_messages = relationship("ChatMessage", back_populates="user")
 
 
@@ -115,6 +133,7 @@ class Admin(Base):
     사용처: weather-flick-admin-back
     설명: 관리자 계정 정보 및 권한 관리
     """
+
     __tablename__ = "admins"
 
     admin_id = Column(Integer, primary_key=True, index=True)
@@ -134,6 +153,7 @@ class EmailVerification(Base):
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 이메일 인증 코드 관리
     """
+
     __tablename__ = "email_verifications"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -148,15 +168,19 @@ class EmailVerification(Base):
 # 여행 계획 및 일정 관련 테이블
 # ===========================================
 
+
 class TravelPlan(Base):
     """
     여행 계획 테이블
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 사용자의 여행 계획 및 일정 정보
     """
+
     __tablename__ = "travel_plans"
 
-    plan_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
@@ -185,10 +209,13 @@ class TravelRoute(Base):
     사용처: weather-flick-back
     설명: 여행 계획의 상세 경로 및 교통 정보
     """
+
     __tablename__ = "travel_routes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    travel_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    travel_plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False
+    )
     origin_place_id = Column(String)
     destination_place_id = Column(String)
     route_order = Column(Integer)
@@ -211,10 +238,13 @@ class TransportationDetail(Base):
     사용처: weather-flick-back
     설명: 경로별 상세 교통 정보 (환승, 요금 등)
     """
+
     __tablename__ = "transportation_details"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    travel_route_id = Column(UUID(as_uuid=True), ForeignKey("travel_routes.id"), nullable=False)
+    travel_route_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_routes.id"), nullable=False
+    )
 
     departure_time = Column(DateTime)
     arrival_time = Column(DateTime)
@@ -231,15 +261,19 @@ class TransportationDetail(Base):
 # 여행지 및 시설 정보 테이블
 # ===========================================
 
+
 class Destination(Base):
     """
     여행지 정보 테이블
     사용처: weather-flick-admin-back
     설명: 추천 여행지 기본 정보 (관리자용)
     """
+
     __tablename__ = "destinations"
 
-    destination_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    destination_id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
+    )
     name = Column(String, nullable=False, index=True)
     province = Column(String, nullable=False, index=True)  # 도/광역시
     region = Column(String, index=True)  # 시/군/구
@@ -265,13 +299,16 @@ class TouristAttraction(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 한국관광공사 API 기반 관광지 정보
     """
+
     __tablename__ = "tourist_attractions"
 
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
 
     # Foreign Keys
-    region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
+    region_code = Column(
+        String, ForeignKey("regions.region_code"), nullable=False, index=True
+    )
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -318,13 +355,16 @@ class CulturalFacility(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 박물관, 전시관 등 문화시설 정보
     """
+
     __tablename__ = "cultural_facilities"
 
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
 
     # Foreign Keys
-    region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
+    region_code = Column(
+        String, ForeignKey("regions.region_code"), nullable=False, index=True
+    )
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -383,13 +423,16 @@ class FestivalEvent(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 지역 축제 및 행사 정보
     """
+
     __tablename__ = "festivals_events"
 
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
 
     # Foreign Keys
-    region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
+    region_code = Column(
+        String, ForeignKey("regions.region_code"), nullable=False, index=True
+    )
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -454,6 +497,7 @@ class Restaurant(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 한국관광공사 API 기반 음식점 정보
     """
+
     __tablename__ = "restaurants"
     __table_args__ = {"extend_existing": True, "autoload_replace": False}
 
@@ -515,6 +559,7 @@ class Accommodation(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 한국관광공사 API 기반 숙박시설 정보
     """
+
     __tablename__ = "accommodations"
     __table_args__ = {"extend_existing": True, "autoload_replace": False}
 
@@ -522,7 +567,9 @@ class Accommodation(Base):
     content_id = Column(String(20), primary_key=True, index=True)
 
     # Foreign Keys
-    region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
+    region_code = Column(
+        String, ForeignKey("regions.region_code"), nullable=False, index=True
+    )
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -573,13 +620,16 @@ class Shopping(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 쇼핑 시설 및 상점 정보
     """
+
     __tablename__ = "shopping"
 
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
 
     # Foreign Keys
-    region_code = Column(String, ForeignKey("regions.region_code"), nullable=False, index=True)
+    region_code = Column(
+        String, ForeignKey("regions.region_code"), nullable=False, index=True
+    )
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -640,6 +690,7 @@ class LeisureSports(Base):
     사용처: weather-flick-admin-back, weather-flick-batch
     설명: 레저 및 스포츠 시설 정보
     """
+
     __tablename__ = "leisure_sports"
 
     content_id = Column(String(20), primary_key=True, index=True)
@@ -687,6 +738,7 @@ class TravelCourse(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 추천 여행 코스 정보
     """
+
     __tablename__ = "travel_courses"
 
     content_id = Column(String, primary_key=True)
@@ -732,6 +784,7 @@ class PetTourInfo(Base):
     사용처: weather-flick-back, weather-flick-batch
     설명: 반려동물 동반 가능 시설 정보
     """
+
     __tablename__ = "pet_tour_info"
 
     # Primary Key
@@ -786,6 +839,7 @@ class Transportation(Base):
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 대중교통 정보
     """
+
     __tablename__ = "transportation"
 
     id = Column(String, primary_key=True, index=True)
@@ -804,6 +858,7 @@ class CityInfo(Base):
     사용처: weather-flick-admin-back
     설명: 도시별 기본 정보 및 통계
     """
+
     __tablename__ = "city_info"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -821,16 +876,22 @@ class CityInfo(Base):
 # 날씨 관련 테이블
 # ===========================================
 
+
 class WeatherData(Base):
     """
     날씨 데이터 테이블
     사용처: weather-flick-admin-back
     설명: 기상청 API 기반 날씨 예보 데이터 (관리자용)
     """
+
     __tablename__ = "weather_data"
 
-    weather_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    destination_id = Column(UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=True)
+    weather_id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
+    )
+    destination_id = Column(
+        UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=True
+    )
 
     # 기상청 격자 좌표
     grid_x = Column(Integer)  # nx: 예보지점 X 좌표
@@ -874,12 +935,15 @@ class ApiRawData(Base):
     사용처: weather-flick-batch
     설명: 외부 API 호출 결과 원본 데이터 저장
     """
+
     __tablename__ = "api_raw_data"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    api_provider = Column(String(50), nullable=False)  # 'tourapi', 'kma', 'google_maps' 등
+    api_provider = Column(
+        String(50), nullable=False
+    )  # 'tourapi', 'kma', 'google_maps' 등
     endpoint = Column(String(200), nullable=False)
-    request_method = Column(String(10), default='GET')
+    request_method = Column(String(10), default="GET")
     request_params = Column(JSONB)
     request_headers = Column(JSONB)
     response_status = Column(Integer)
@@ -899,6 +963,7 @@ class HistoricalWeatherDaily(Base):
     사용처: weather-flick-batch
     설명: 과거 날씨 통계 데이터 (일별)
     """
+
     __tablename__ = "historical_weather_daily"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -912,7 +977,7 @@ class HistoricalWeatherDaily(Base):
 
     # 복합 인덱스: region_code + weather_date 조합으로 자주 조회
     __table_args__ = (
-        Index('idx_historical_weather_region_date', 'region_code', 'weather_date'),
+        Index("idx_historical_weather_region_date", "region_code", "weather_date"),
     )
 
 
@@ -922,6 +987,7 @@ class WeatherCurrent(Base):
     사용처: weather-flick-batch
     설명: 실시간 날씨 정보
     """
+
     __tablename__ = "weather_current"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -950,6 +1016,7 @@ class WeatherForecast(Base):
     사용처: weather-flick-batch
     설명: 단기/중기 날씨 예보 데이터
     """
+
     __tablename__ = "weather_forecast"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -967,7 +1034,7 @@ class WeatherForecast(Base):
 
     # 복합 인덱스
     __table_args__ = (
-        Index('idx_weather_forecast_region_date', 'region_code', 'forecast_date'),
+        Index("idx_weather_forecast_region_date", "region_code", "forecast_date"),
     )
 
 
@@ -975,12 +1042,14 @@ class WeatherForecast(Base):
 # 지역 정보 관련 테이블
 # ===========================================
 
+
 class Region(Base):
     """
     지역 정보 테이블
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 기본 지역 코드 및 계층 정보
     """
+
     __tablename__ = "regions"
 
     region_code = Column(String, primary_key=True)
@@ -1010,6 +1079,7 @@ class CategoryCode(Base):
     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
     설명: 한국관광공사 API 카테고리 코드 정보
     """
+
     __tablename__ = "category_codes"
 
     category_code = Column(String, primary_key=True)
@@ -1025,18 +1095,24 @@ class CategoryCode(Base):
 # 리뷰 및 평가 관련 테이블
 # ===========================================
 
+
 class Review(Base):
     """
     리뷰 테이블
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 여행지 및 여행 계획에 대한 리뷰
     """
+
     __tablename__ = "reviews"
 
-    review_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    destination_id = Column(UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=True)
-    travel_plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=True)
+    destination_id = Column(
+        UUID(as_uuid=True), ForeignKey("destinations.destination_id"), nullable=True
+    )
+    travel_plan_id = Column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=True
+    )
     rating = Column(Integer, nullable=False)
     content = Column(Text)
     photos = Column(JSONB)
@@ -1054,6 +1130,7 @@ class RecommendReview(Base):
     사용처: weather-flick-back
     설명: 추천 여행 코스에 대한 리뷰
     """
+
     __tablename__ = "reviews_recommend"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -1063,7 +1140,9 @@ class RecommendReview(Base):
     rating = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
-    parent_id = Column(UUID(as_uuid=True), ForeignKey("reviews_recommend.id"), nullable=True)  # 답글용
+    parent_id = Column(
+        UUID(as_uuid=True), ForeignKey("reviews_recommend.id"), nullable=True
+    )  # 답글용
 
     # 관계 설정
     user = relationship("User")
@@ -1075,6 +1154,7 @@ class RecommendLike(Base):
     사용처: weather-flick-back
     설명: 추천 여행 코스 좋아요 기록
     """
+
     __tablename__ = "likes_recommend"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -1082,7 +1162,9 @@ class RecommendLike(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
-    __table_args__ = (UniqueConstraint('course_id', 'user_id', name='uq_likes_recommend_course_user'),)
+    __table_args__ = (
+        UniqueConstraint("course_id", "user_id", name="uq_likes_recommend_course_user"),
+    )
 
     # 관계 설정
     user = relationship("User")
@@ -1094,16 +1176,24 @@ class ReviewLike(Base):
     사용처: weather-flick-back
     설명: 리뷰에 대한 좋아요/싫어요 기록
     """
+
     __tablename__ = "review_likes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    review_id = Column(UUID(as_uuid=True), ForeignKey("reviews_recommend.id"), nullable=False, index=True)
+    review_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("reviews_recommend.id"),
+        nullable=False,
+        index=True,
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     is_like = Column(Boolean, nullable=False)  # True=Like, False=Dislike
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint('review_id', 'user_id', 'is_like', name='uq_review_like_user_type'),
+        UniqueConstraint(
+            "review_id", "user_id", "is_like", name="uq_review_like_user_type"
+        ),
     )
 
 
@@ -1113,10 +1203,13 @@ class TravelCourseLike(Base):
     사용처: weather-flick-back
     설명: 사용자가 좋아요한 여행 코스
     """
+
     __tablename__ = "travel_course_likes"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True
+    )
     title = Column(String(255), nullable=False)
     subtitle = Column(String(255))
     summary = Column(Text)
@@ -1129,12 +1222,14 @@ class TravelCourseLike(Base):
 # 기타 기능 테이블
 # ===========================================
 
+
 class Contact(Base):
     """
     문의사항 테이블
     사용처: weather-flick-back
     설명: 사용자 문의사항 관리
     """
+
     __tablename__ = "contact"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -1143,11 +1238,50 @@ class Contact(Base):
     content = Column(Text, nullable=False)
     name = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     is_private = Column(Boolean, default=False, nullable=False)
-    approval_status = Column(SqlEnum('PENDING', 'PROCESSING', 'COMPLETE', name='approval_status'), default='PENDING', nullable=False)
+    approval_status = Column(
+        SqlEnum("PENDING", "PROCESSING", "COMPLETE", name="approval_status"),
+        default="PENDING",
+        nullable=False,
+    )
     password_hash = Column(String(128), nullable=True)
     views = Column(Integer, default=0, nullable=False)
+
+    # 관계 설정
+    answer = relationship("ContactAnswer", uselist=False, back_populates="contact")
+
+
+class ContactAnswer(Base):
+    """
+    문의사항 답변 테이블
+    사용처: weather-flick-admin-back (읽기전용으로 weather-flick-back에서도 사용)
+    설명: 관리자의 문의사항 답변 관리
+    """
+
+    __tablename__ = "contact_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, ForeignKey("contact.id"), nullable=False, unique=True)
+    admin_id = Column(
+        Integer, ForeignKey("admins.admin_id"), nullable=False
+    )  # 답변한 관리자
+    content = Column(Text, nullable=False)  # 답변 내용
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # 관계 설정
+    contact = relationship("Contact", back_populates="answer")
+    admin = relationship("Admin")
 
 
 class ChatMessage(Base):
@@ -1156,14 +1290,18 @@ class ChatMessage(Base):
     사용처: weather-flick-back
     설명: AI 챗봇 대화 기록
     """
+
     __tablename__ = "chat_messages"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     message = Column(Text, nullable=False)
-    sender = Column(String, nullable=False)  # 'user' 또는 'bot'
-    context = Column(JSONB, nullable=True)  # 대화 컨텍스트
-    suggestions = Column(JSONB, nullable=True)  # 추천 질문 목록
+    response = Column(Text, nullable=True)  # 봇의 응답
+    sender = Column(
+        String(50), nullable=True, server_default="user"
+    )  # 'user' 또는 'bot'
+    context = Column(JSONB, nullable=True)  # 대화 컨텍스트 정보
+    suggestions = Column(ARRAY(Text), nullable=True)  # 추천 질문 목록
     created_at = Column(DateTime, server_default=func.now())
 
     # 관계 설정
@@ -1176,6 +1314,7 @@ class FavoritePlace(Base):
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 사용자가 즐겨찾기한 장소 정보
     """
+
     __tablename__ = "favorite_places"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -1193,12 +1332,14 @@ class FavoritePlace(Base):
 # 로그 및 활동 기록 테이블
 # ===========================================
 
+
 class SystemLog(Base):
     """
     시스템 로그 테이블
     사용처: weather-flick-back, weather-flick-admin-back
     설명: 시스템 전반의 로그 기록
     """
+
     __tablename__ = "system_logs"
 
     log_id = Column(Integer, primary_key=True, index=True)
@@ -1215,13 +1356,16 @@ class UserActivityLog(Base):
     사용처: weather-flick-admin-back
     설명: 사용자 활동 추적 및 분석
     """
+
     __tablename__ = "user_activity_logs"
 
-    log_id = Column(Integer, primary_key=True, index=True)
+    log_id = Column(UUID(as_uuid=True), primary_key=True, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     activity_type = Column(String, nullable=False)
-    resource_type = Column(String)
-    details = Column(JSONB)
+    activity_data = Column(JSONB)  # 실제 DB 컬럼명에 맞춤
+    ip_address = Column(String)
+    user_agent = Column(String)
+    session_id = Column(String)
     created_at = Column(DateTime, server_default=func.now())
 
     # 관계 설정
@@ -1234,13 +1378,18 @@ class AdminActivityLog(Base):
     사용처: weather-flick-admin-back
     설명: 관리자 활동 및 중요 작업 기록
     """
+
     __tablename__ = "admin_activity_logs"
 
     log_id = Column(Integer, primary_key=True, index=True)
     admin_id = Column(Integer, ForeignKey("admins.admin_id"), nullable=False)
-    action = Column(String, nullable=False)  # 수행된 작업 (예: USER_DELETE, USER_UPDATE)
+    action = Column(
+        String, nullable=False
+    )  # 수행된 작업 (예: USER_DELETE, USER_UPDATE)
     description = Column(Text, nullable=False)  # 작업 설명
-    target_resource = Column(String, nullable=True)  # 대상 리소스 (예: user_id, plan_id)
+    target_resource = Column(
+        String, nullable=True
+    )  # 대상 리소스 (예: user_id, plan_id)
     severity = Column(String, default="NORMAL")  # 심각도 (NORMAL, HIGH, CRITICAL)
     ip_address = Column(String, nullable=True)  # IP 주소
     user_agent = Column(String, nullable=True)  # 사용자 에이전트
@@ -1254,12 +1403,14 @@ class AdminActivityLog(Base):
 # 배치 작업 관련 테이블
 # ===========================================
 
+
 class AdminBatchJob(Base):
     """
     관리자 배치 작업 테이블
     사용처: weather-flick-admin-back
     설명: 관리자가 실행한 배치 작업 기록
     """
+
     __tablename__ = "admin_batch_jobs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -1282,7 +1433,9 @@ class AdminBatchJob(Base):
     # 관계 설정
     creator = relationship("Admin", foreign_keys=[created_by])
     stopper = relationship("Admin", foreign_keys=[stopped_by])
-    logs = relationship("AdminBatchJobDetail", back_populates="job", cascade="all, delete-orphan")
+    logs = relationship(
+        "AdminBatchJobDetail", back_populates="job", cascade="all, delete-orphan"
+    )
 
     # 인덱스
     __table_args__ = (
@@ -1297,10 +1450,15 @@ class AdminBatchJobDetail(Base):
     사용처: weather-flick-admin-back
     설명: 배치 작업의 상세 실행 로그
     """
+
     __tablename__ = "admin_batch_job_details"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    job_id = Column(UUID(as_uuid=True), ForeignKey("admin_batch_jobs.id", ondelete="CASCADE"), nullable=False)
+    job_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("admin_batch_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     level = Column(String(20), nullable=False, index=True)
     message = Column(Text, nullable=False)
@@ -1325,19 +1483,45 @@ Index("idx_travel_plan_user_status", TravelPlan.user_id, TravelPlan.status)
 Index("idx_travel_plan_dates", TravelPlan.start_date, TravelPlan.end_date)
 
 # 날씨 데이터 관련 인덱스
-Index("idx_weather_forecast_location", WeatherData.forecast_date, WeatherData.grid_x, WeatherData.grid_y)
-Index("idx_weather_destination_date", WeatherData.destination_id, WeatherData.forecast_date)
+Index(
+    "idx_weather_forecast_location",
+    WeatherData.forecast_date,
+    WeatherData.grid_x,
+    WeatherData.grid_y,
+)
+Index(
+    "idx_weather_destination_date",
+    WeatherData.destination_id,
+    WeatherData.forecast_date,
+)
 
 # 리뷰 관련 인덱스
 Index("idx_review_destination_date", Review.destination_id, Review.created_at)
 Index("idx_review_user_rating", Review.user_id, Review.rating)
 
 # 지역별 시설 정보 인덱스
-Index("idx_tourist_attractions_region_category", TouristAttraction.region_code, TouristAttraction.category_code)
-Index("idx_cultural_facilities_region_type", CulturalFacility.region_code, CulturalFacility.facility_type)
-Index("idx_festivals_events_region_dates", FestivalEvent.region_code, FestivalEvent.event_start_date, FestivalEvent.event_end_date)
+Index(
+    "idx_tourist_attractions_region_category",
+    TouristAttraction.region_code,
+    TouristAttraction.category_code,
+)
+Index(
+    "idx_cultural_facilities_region_type",
+    CulturalFacility.region_code,
+    CulturalFacility.facility_type,
+)
+Index(
+    "idx_festivals_events_region_dates",
+    FestivalEvent.region_code,
+    FestivalEvent.event_start_date,
+    FestivalEvent.event_end_date,
+)
 Index("idx_restaurants_region_cuisine", Restaurant.region_code, Restaurant.cuisine_type)
-Index("idx_accommodations_region_type", Accommodation.region_code, Accommodation.accommodation_type)
+Index(
+    "idx_accommodations_region_type",
+    Accommodation.region_code,
+    Accommodation.accommodation_type,
+)
 Index("idx_shopping_region_type", Shopping.region_code, Shopping.shop_type)
 Index("idx_pet_tour_info_content_id", PetTourInfo.content_id)
 
@@ -1346,14 +1530,17 @@ Index("idx_pet_tour_info_content_id", PetTourInfo.content_id)
 # Pydantic 스키마 정의
 # ===========================================
 
+
 class WeatherRequest(BaseModel):
     """날씨 요청 스키마"""
+
     city: str
     country: str | None = None
 
 
 class WeatherCondition(BaseModel):
     """날씨 상태 스키마"""
+
     temperature: float
     feels_like: float
     humidity: int
@@ -1369,6 +1556,7 @@ class WeatherCondition(BaseModel):
 
 class WeatherResponse(BaseModel):
     """날씨 응답 스키마"""
+
     city: str
     country: str
     current: WeatherCondition
@@ -1378,6 +1566,7 @@ class WeatherResponse(BaseModel):
 
 class ForecastDay(BaseModel):
     """일일 예보 스키마"""
+
     date: str
     temperature_max: float
     temperature_min: float
@@ -1391,6 +1580,7 @@ class ForecastDay(BaseModel):
 
 class ForecastResponse(BaseModel):
     """예보 응답 스키마"""
+
     city: str
     country: str
     forecast: list[ForecastDay]
@@ -1400,12 +1590,14 @@ class ForecastResponse(BaseModel):
 # 인증 관련 Pydantic 모델들
 class TokenData(BaseModel):
     """토큰 데이터 스키마"""
+
     email: str | None = None
     role: str | None = None
 
 
 class UserCreate(BaseModel):
     """사용자 생성 스키마"""
+
     email: str
     password: str
     nickname: str
@@ -1413,6 +1605,7 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
     """사용자 응답 스키마"""
+
     user_id: uuid.UUID
     email: str
     nickname: str | None = None
@@ -1430,6 +1623,7 @@ class UserResponse(BaseModel):
 
 class Token(BaseModel):
     """인증 토큰 스키마"""
+
     access_token: str
     token_type: str
     expires_in: int
@@ -1438,6 +1632,7 @@ class Token(BaseModel):
 
 class UserUpdate(BaseModel):
     """사용자 정보 수정 스키마"""
+
     nickname: str | None = None
     profile_image: str | None = None
     preferences: list[str | None] = []
@@ -1448,18 +1643,21 @@ class UserUpdate(BaseModel):
 
 class PasswordChange(BaseModel):
     """비밀번호 변경 스키마"""
+
     current_password: str
     new_password: str
 
 
 class GoogleLoginRequest(BaseModel):
     """구글 로그인 요청 스키마"""
+
     code: str
     redirect_uri: str
 
 
 class GoogleLoginResponse(BaseModel):
     """구글 로그인 응답 스키마"""
+
     access_token: str
     refresh_token: str
     token_type: str
@@ -1470,35 +1668,41 @@ class GoogleLoginResponse(BaseModel):
 
 class GoogleAuthUrlResponse(BaseModel):
     """구글 인증 URL 응답 스키마"""
+
     auth_url: str
     state: str
 
 
 class GoogleAuthCodeRequest(BaseModel):
     """구글 인증 코드 요청 스키마"""
+
     auth_code: str
 
 
 class EmailVerificationRequest(BaseModel):
     """이메일 인증 요청 스키마"""
+
     email: str
     nickname: str
 
 
 class EmailVerificationConfirm(BaseModel):
     """이메일 인증 확인 스키마"""
+
     email: str
     code: str
 
 
 class EmailVerificationResponse(BaseModel):
     """이메일 인증 응답 스키마"""
+
     message: str
     success: bool
 
 
 class ResendVerificationRequest(BaseModel):
     """이메일 재인증 요청 스키마"""
+
     email: str
     nickname: str
 
@@ -1506,6 +1710,7 @@ class ResendVerificationRequest(BaseModel):
 # 추천 및 여행 계획 관련 모델들
 class StandardResponse(BaseModel):
     """표준 응답 스키마"""
+
     success: bool
     message: str
     data: dict[str, Any | None] = {}
@@ -1513,6 +1718,7 @@ class StandardResponse(BaseModel):
 
 class PaginationInfo(BaseModel):
     """페이지네이션 정보 스키마"""
+
     page: int
     page_size: int
     total_count: int
@@ -1521,6 +1727,7 @@ class PaginationInfo(BaseModel):
 
 class RecommendationRequest(BaseModel):
     """추천 요청 스키마"""
+
     destination_types: list[str | None] = []
     budget_range: dict[str, float | None] = {}
     travel_dates: dict[str, str | None] = {}
@@ -1529,6 +1736,7 @@ class RecommendationRequest(BaseModel):
 
 class RecommendationResponse(BaseModel):
     """추천 응답 스키마"""
+
     destinations: list[dict]
     total_count: int
     recommendation_score: float
@@ -1536,6 +1744,7 @@ class RecommendationResponse(BaseModel):
 
 class TravelPlanCreate(BaseModel):
     """여행 계획 생성 스키마"""
+
     title: str
     description: str | None = None
     start_date: str
@@ -1553,6 +1762,7 @@ class TravelPlanCreate(BaseModel):
 
 class TravelPlanUpdate(BaseModel):
     """여행 계획 수정 스키마"""
+
     title: str | None = None
     description: str | None = None
     start_date: str | None = None
@@ -1568,6 +1778,7 @@ class TravelPlanUpdate(BaseModel):
 
 class TravelPlanResponse(BaseModel):
     """여행 계획 응답 스키마"""
+
     plan_id: uuid.UUID
     user_id: uuid.UUID
     title: str
@@ -1591,6 +1802,7 @@ class TravelPlanResponse(BaseModel):
 # 지역 정보 관련 모델들
 class SearchRequest(BaseModel):
     """검색 요청 스키마"""
+
     query: str
     category: str | None = None
     location: str | None = None
@@ -1599,6 +1811,7 @@ class SearchRequest(BaseModel):
 
 class SearchResult(BaseModel):
     """검색 결과 스키마"""
+
     results: list[dict[str, Any]]
     total_count: int
     category: str
@@ -1606,6 +1819,7 @@ class SearchResult(BaseModel):
 
 class RestaurantResponse(BaseModel):
     """음식점 응답 스키마"""
+
     content_id: str
     region_code: str
     restaurant_name: str
@@ -1643,6 +1857,7 @@ class RestaurantResponse(BaseModel):
 
 class AccommodationResponse(BaseModel):
     """숙박시설 응답 스키마"""
+
     id: str
     name: str
     type: str  # hotel, motel, guesthouse, etc.
@@ -1657,6 +1872,7 @@ class AccommodationResponse(BaseModel):
 
 class TransportationResponse(BaseModel):
     """교통수단 응답 스키마"""
+
     id: str
     name: str
     type: str  # bus, subway, taxi, etc.
@@ -1668,6 +1884,7 @@ class TransportationResponse(BaseModel):
 
 class FavoritePlaceResponse(BaseModel):
     """즐겨찾기 장소 응답 스키마"""
+
     id: int
     place_name: str
     place_type: str
@@ -1683,6 +1900,7 @@ class FavoritePlaceResponse(BaseModel):
 
 class ReviewCreate(BaseModel):
     """리뷰 생성 스키마"""
+
     destination_id: uuid.UUID
     travel_plan_id: uuid.UUID | None = None
     rating: int
@@ -1692,6 +1910,7 @@ class ReviewCreate(BaseModel):
 
 class ReviewResponse(BaseModel):
     """리뷰 응답 스키마"""
+
     review_id: uuid.UUID
     user_id: uuid.UUID
     destination_id: uuid.UUID
@@ -1708,6 +1927,7 @@ class ReviewResponse(BaseModel):
 # 관광지 정보 관련 스키마
 class TouristAttractionResponse(BaseModel):
     """관광지 정보 응답 스키마"""
+
     content_id: str
     region_code: str
     attraction_name: str
@@ -1730,6 +1950,7 @@ class TouristAttractionResponse(BaseModel):
 
 class CulturalFacilityResponse(BaseModel):
     """문화시설 정보 응답 스키마"""
+
     content_id: str
     region_code: str
     facility_name: str
@@ -1754,6 +1975,7 @@ class CulturalFacilityResponse(BaseModel):
 
 class FestivalEventResponse(BaseModel):
     """축제/행사 정보 응답 스키마"""
+
     content_id: str
     region_code: str
     event_name: str
@@ -1781,6 +2003,7 @@ class FestivalEventResponse(BaseModel):
 
 class ShoppingResponse(BaseModel):
     """쇼핑 정보 응답 스키마"""
+
     content_id: str
     region_code: str
     shop_name: str
@@ -1807,6 +2030,7 @@ class ShoppingResponse(BaseModel):
 
 class PetTourInfoResponse(BaseModel):
     """반려동물 관광정보 응답 스키마"""
+
     id: uuid.UUID
     content_id: str | None = None
     content_type_id: str | None = None
@@ -1835,6 +2059,7 @@ class PetTourInfoResponse(BaseModel):
 # 경로 정보 관련 Pydantic 스키마
 class TravelRouteCreate(BaseModel):
     """여행 경로 생성 스키마"""
+
     plan_id: uuid.UUID
     day: int
     sequence: int
@@ -1849,6 +2074,7 @@ class TravelRouteCreate(BaseModel):
 
 class TravelRouteUpdate(BaseModel):
     """여행 경로 수정 스키마"""
+
     day: int | None = None
     sequence: int | None = None
     departure_name: str | None = None
@@ -1865,6 +2091,7 @@ class TravelRouteUpdate(BaseModel):
 
 class TravelRouteResponse(BaseModel):
     """여행 경로 응답 스키마"""
+
     # 프론트엔드 호환성을 위해 route_id 필드 유지
     route_id: uuid.UUID
     plan_id: uuid.UUID
@@ -1899,7 +2126,7 @@ class TravelRouteResponse(BaseModel):
             return 1
         # 루트 순서를 기반으로 일차 계산 (0,1,2 = 1일차, 3,4,5 = 2일차, ...)
         return (route_order // 3) + 1
-    
+
     @classmethod
     def from_orm_with_mapping(cls, obj):
         """ORM 객체를 프론트엔드 호환 형식으로 변환"""
@@ -1914,7 +2141,6 @@ class TravelRouteResponse(BaseModel):
             distance_km=obj.distance_km,
             route_data=obj.route_data,
             created_at=obj.created_at,
-
             # 프론트엔드 호환성을 위한 매핑
             day=cls._calculate_day_from_route_order(obj.route_order),
             sequence=obj.route_order,
@@ -1935,6 +2161,7 @@ class TravelRouteResponse(BaseModel):
 
 class TransportationDetailCreate(BaseModel):
     """교통수단 상세 정보 생성 스키마"""
+
     travel_route_id: uuid.UUID
     departure_time: datetime | None = None
     arrival_time: datetime | None = None
@@ -1945,6 +2172,7 @@ class TransportationDetailCreate(BaseModel):
 
 class TransportationDetailResponse(BaseModel):
     """교통수단 상세 정보 응답 스키마"""
+
     id: uuid.UUID
     travel_route_id: uuid.UUID
     departure_time: datetime | None = None
@@ -1960,6 +2188,7 @@ class TransportationDetailResponse(BaseModel):
 
 class RouteCalculationRequest(BaseModel):
     """경로 계산 요청 스키마"""
+
     departure_lat: float
     departure_lng: float
     destination_lat: float
@@ -1969,6 +2198,7 @@ class RouteCalculationRequest(BaseModel):
 
 class RouteCalculationResponse(BaseModel):
     """경로 계산 응답 스키마"""
+
     success: bool
     duration: int | None = None  # 분
     distance: float | None = None  # km
@@ -1980,6 +2210,7 @@ class RouteCalculationResponse(BaseModel):
 
 class RecommendReviewCreate(BaseModel):
     """추천 코스 리뷰 생성 스키마"""
+
     course_id: int
     rating: int = Field(..., ge=1, le=5)
     content: str
@@ -1989,6 +2220,7 @@ class RecommendReviewCreate(BaseModel):
 
 class RecommendReviewResponse(BaseModel):
     """추천 코스 리뷰 응답 스키마"""
+
     id: uuid.UUID
     course_id: int
     user_id: uuid.UUID
@@ -2006,11 +2238,13 @@ class RecommendReviewResponse(BaseModel):
 
 class RecommendLikeCreate(BaseModel):
     """추천 코스 좋아요 생성 스키마"""
+
     course_id: int
 
 
 class RecommendLikeResponse(BaseModel):
     """추천 코스 좋아요 응답 스키마"""
+
     id: uuid.UUID
     course_id: int
     user_id: uuid.UUID
@@ -2021,12 +2255,14 @@ class RecommendLikeResponse(BaseModel):
 
 class ReviewLikeCreate(BaseModel):
     """리뷰 좋아요/싫어요 생성 스키마"""
+
     review_id: uuid.UUID
     is_like: bool
 
 
 class ReviewLikeResponse(BaseModel):
     """리뷰 좋아요/싫어요 응답 스키마"""
+
     id: uuid.UUID
     review_id: uuid.UUID
     user_id: uuid.UUID
@@ -2040,18 +2276,16 @@ class ReviewLikeResponse(BaseModel):
 # 임시 비밀번호 관련 스키마
 class ForgotPasswordRequest(BaseModel):
     """비밀번호 찾기 요청"""
+
     email: str
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "email": "user@example.com"
-            }
-        }
+        json_schema_extra = {"example": {"email": "user@example.com"}}
 
 
 class ForgotPasswordResponse(BaseModel):
     """비밀번호 찾기 응답"""
+
     message: str
     success: bool = True
 
@@ -2059,7 +2293,7 @@ class ForgotPasswordResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "message": "임시 비밀번호가 이메일로 전송되었습니다.",
-                "success": True
+                "success": True,
             }
         }
 
@@ -2067,6 +2301,7 @@ class ForgotPasswordResponse(BaseModel):
 # 회원탈퇴 관련 스키마
 class WithdrawRequest(BaseModel):
     """회원탈퇴 요청"""
+
     password: str | None = None  # 소셜 로그인 사용자는 비밀번호 불필요
     reason: str | None = None  # 탈퇴 사유 (선택사항)
 
@@ -2074,39 +2309,45 @@ class WithdrawRequest(BaseModel):
         json_schema_extra = {
             "example": {
                 "password": "current_password",
-                "reason": "서비스 이용이 불필요해짐"
+                "reason": "서비스 이용이 불필요해짐",
             }
         }
 
 
 class WithdrawResponse(BaseModel):
     """회원탈퇴 응답"""
+
     message: str
     success: bool = True
 
     class Config:
         json_schema_extra = {
-            "example": {
-                "message": "회원탈퇴가 완료되었습니다.",
-                "success": True
-            }
+            "example": {"message": "회원탈퇴가 완료되었습니다.", "success": True}
         }
 
 
 # 맞춤 일정 추천 관련 모델들
 class CustomTravelRecommendationRequest(BaseModel):
     """맞춤 일정 추천 요청 모델"""
+
     region_code: str = Field(..., description="지역 코드")
     region_name: str = Field(..., description="지역 이름")
     period: str = Field(..., description="여행 기간 (당일치기, 1박2일 등)")
     days: int = Field(..., ge=1, le=7, description="여행 일수")
-    who: str = Field(..., description="동행자 유형 (solo, couple, family, friends, colleagues, group)")
-    styles: list[str] = Field(..., description="여행 스타일 (activity, hotplace, nature, landmark, healing, culture, local, shopping, food, pet)")
+    who: str = Field(
+        ...,
+        description="동행자 유형 (solo, couple, family, friends, colleagues, group)",
+    )
+    styles: list[str] = Field(
+        ...,
+        description="여행 스타일 (activity, hotplace, nature, landmark, healing, culture, local, shopping, food, pet)",
+    )
     schedule: str = Field(..., description="일정 유형 (packed, relaxed)")
 
 
 class PlaceRecommendation(BaseModel):
     """추천 장소 모델"""
+
     id: str = Field(..., description="장소 ID")
     name: str = Field(..., description="장소 이름")
     time: str = Field(..., description="방문 시간 (예: 09:00-11:00)")
@@ -2121,6 +2362,7 @@ class PlaceRecommendation(BaseModel):
 
 class DayItinerary(BaseModel):
     """일별 여행 일정"""
+
     day: int = Field(..., description="일차")
     date: str | None = Field(None, description="날짜")
     places: list[PlaceRecommendation] = Field(..., description="추천 장소 목록")
@@ -2129,6 +2371,7 @@ class DayItinerary(BaseModel):
 
 class CustomTravelRecommendationResponse(BaseModel):
     """맞춤 일정 추천 응답 모델"""
+
     days: list[DayItinerary] = Field(..., description="일별 여행 일정")
     weather_summary: dict | None = Field(None, description="전체 날씨 요약")
     total_places: int = Field(..., description="총 추천 장소 수")

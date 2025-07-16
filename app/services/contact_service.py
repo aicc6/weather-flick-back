@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import Contact
 from app.schemas.contact import ContactCreate, ContactResponse, ContactListResponse
@@ -48,7 +48,8 @@ def verify_contact_password(db: Session, contact_id: int, password: str) -> bool
     return bcrypt.checkpw(password.encode('utf-8'), contact.password_hash.encode('utf-8'))
 
 def get_contact(db: Session, contact_id: int, increment_view: bool = True):
-    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    # 답변 정보를 함께 조회
+    contact = db.query(Contact).options(joinedload(Contact.answer)).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
 

@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,7 +21,7 @@ class ChatMessageResponse(BaseModel):
     """챗봇 메시지 응답 스키마"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: int | None = Field(None, description="메시지 ID (익명 사용자는 None)")
+    id: UUID | None = Field(None, description="메시지 ID (익명 사용자는 None)")
     text: str = Field(..., description="메시지 내용")
     sender: SenderType = Field(..., description="발신자 타입")
     timestamp: str = Field(..., description="메시지 시간")
@@ -30,7 +31,7 @@ class ChatHistoryResponse(BaseModel):
     """챗봇 대화 히스토리 응답 스키마"""
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: UUID
     text: str = Field(..., description="메시지 내용")
     sender: SenderType = Field(..., description="발신자 타입")
     timestamp: str = Field(..., description="메시지 시간")
