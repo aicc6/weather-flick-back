@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-import logging
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -25,7 +24,7 @@ def create_contact(db: Session, contact_data: ContactCreate):
     return contact
 
 def get_contacts(db: Session, skip: int = 0, limit: int = 100):
-    contacts = db.query(Contact).order_by(Contact.created_at.desc()).offset(skip).limit(limit).all()
+    contacts = db.query(Contact).order_by(Contact.id.desc()).offset(skip).limit(limit).all()
     # created_at이 naive면 UTC로 보정
     for c in contacts:
         if hasattr(c, 'created_at') and isinstance(c.created_at, datetime) and c.created_at.tzinfo is None:
@@ -45,8 +44,9 @@ def get_contact(db: Session, contact_id: int, increment_view: bool = True):
         raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
 
     # 공개 글인 경우에만 조회수 증가 (비공개 글은 비밀번호 확인 후 증가)
-    if increment_view and not contact.is_private:
-        contact.views += 1
+    if increment_view and not bool(getattr(contact, 'is_private', False)):
+        # 실제 값만 증가
+        object.__setattr__(contact, 'views', (getattr(contact, 'views', 0) or 0) + 1)
         db.commit()
         db.refresh(contact)
 
@@ -57,9 +57,9 @@ def increment_contact_view(db: Session, contact_id: int):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="문의글을 찾을 수 없습니다.")
-    
-    contact.views += 1
+
+    object.__setattr__(contact, 'views', (getattr(contact, 'views', 0) or 0) + 1)
     db.commit()
     db.refresh(contact)
-    
+
     return contact
