@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -28,12 +29,23 @@ class ContactListResponse(BaseModel):
         from_attributes = True
 
 
+class ContactAnswerResponse(BaseModel):
+    id: int
+    content: str
+    created_at: datetime
+    admin_id: int
+    
+    class Config:
+        from_attributes = True
+
+
 class ContactResponse(ContactCreate):
     id: int
     created_at: datetime
     approval_status: str
     views: int
     password: str | None = None  # 응답에는 보통 포함하지 않지만, 일관성 위해 추가(실제 응답에선 제외 가능)
+    answer: Optional[ContactAnswerResponse] = None  # 답변 정보 추가
 
     class Config:
         from_attributes = True

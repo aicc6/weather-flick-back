@@ -20,6 +20,7 @@ from app.routers import (
     naver_map,
     plan,
     recommend_reviews,
+    regions,
     review_likes,
     # recommendations,
     routes,
@@ -76,6 +77,7 @@ app.include_router(travel_course_like.router, prefix="/api")
 app.include_router(custom_travel.router, prefix="/api")
 app.include_router(custom_travel_converter.router, prefix="/api")
 app.include_router(attractions.router, prefix="/api")
+app.include_router(regions.router)  # 지역 API 라우터 (prefix는 라우터에서 정의됨)
 app.include_router(system.router, prefix="/api")
 
 @app.on_event("startup")

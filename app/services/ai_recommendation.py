@@ -17,7 +17,15 @@ from app.services.kma_weather_service import KMAWeatherService
 from app.utils.kma_utils import get_city_coordinates
 
 # OpenAI 클라이언트 초기화
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Python 3.13 호환성 문제 해결을 위해 프록시 환경 변수 제거
+for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']:
+    os.environ.pop(proxy_var, None)
+
+try:
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+except Exception as e:
+    print(f"Failed to initialize OpenAI client: {e}")
+    client = None
 
 
 class AIRecommendationService:

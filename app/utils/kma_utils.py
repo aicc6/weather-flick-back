@@ -1,130 +1,110 @@
 """
-기상청 API 유틸리티 함수들
+기상청 API 유틸리티 함수들 - 데이터베이스 기반으로 리팩토링됨
 """
 
-# 모든 타입은 built-in 타입으로 대체됨
+from typing import Dict, List, Optional
+from sqlalchemy.orm import Session
 
-# 주요 도시의 격자 좌표 (nx, ny)
-CITY_COORDINATES = {
-    "서울": {"nx": 60, "ny": 127},
-    "부산": {"nx": 97, "ny": 74},
-    "대구": {"nx": 89, "ny": 90},
-    "인천": {"nx": 55, "ny": 124},
-    "광주": {"nx": 58, "ny": 74},
-    "대전": {"nx": 67, "ny": 100},
-    "울산": {"nx": 102, "ny": 84},
-    "세종": {"nx": 66, "ny": 103},
-    "수원": {"nx": 60, "ny": 120},
-    "고양": {"nx": 57, "ny": 128},
-    "용인": {"nx": 64, "ny": 119},
-    "창원": {"nx": 89, "ny": 76},
-    "포항": {"nx": 102, "ny": 94},
-    "제주": {"nx": 53, "ny": 38},
-}
-
-# 중기예보 지역 코드
-REGION_CODES = {
-    "서울": "11B10101",
-    "부산": "11H20201",
-    "대구": "11H10701",
-    "인천": "11B20201",
-    "광주": "11F20501",
-    "대전": "11C20401",
-    "울산": "11H20101",
-    "세종": "11C20404",
-    "수원": "11B20601",
-    "고양": "11B20301",
-    "용인": "11B20602",
-    "창원": "11H20301",
-    "포항": "11H10201",
-    "제주": "11G00201",
-}
-
-# 도/특별시/광역시별 도시 매핑
-PROVINCE_CITIES = {
-    "서울특별시": ["서울"],
-    "부산광역시": ["부산"],
-    "대구광역시": ["대구"],
-    "인천광역시": ["인천"],
-    "광주광역시": ["광주"],
-    "대전광역시": ["대전"],
-    "울산광역시": ["울산"],
-    "세종특별자치시": ["세종"],
-    "경기도": ["수원", "고양", "용인"],
-    "경상남도": ["창원"],
-    "경상북도": ["포항"],
-    "제주특별자치도": ["제주"],
-}
-
-KMA_AREA_CODE_MAP = {
-    # ... (기존 매핑 정보)
-}
-
-# 도시 이름을 TourAPI 지역 코드로 변환하는 맵
-CITY_TO_TOURAPI_AREA_CODE = {
-    "서울": "1",
-    "인천": "2",
-    "대전": "3",
-    "대구": "4",
-    "광주": "5",
-    "부산": "6",
-    "울산": "7",
-    "세종": "8",
-    "경기도": "31",
-    "강원도": "32",
-    "충청북도": "33",
-    "충청남도": "34",
-    "경상북도": "35",
-    "경상남도": "36",
-    "전라북도": "37",
-    "전라남도": "38",
-    "제주도": "39",
-}
+# 데이터베이스 기반 지역 서비스 import
+from app.services.region_service import region_service, RegionService
+from app.database import get_db
 
 
-def get_city_coordinates(city: str) -> dict[str, int] | None:
-    """도시의 격자 좌표 조회"""
-    return CITY_COORDINATES.get(city)
+def get_city_coordinates(city: str, db: Session = None) -> Dict[str, int] | None:
+    """도시의 격자 좌표 조회 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    coordinates = RegionService.get_kma_grid_coordinates(db, city)
+    return coordinates
 
 
-def get_region_code(city: str) -> str | None:
-    """도시의 중기예보 지역 코드 조회"""
-    return REGION_CODES.get(city)
+def get_region_code(city: str, db: Session = None) -> str | None:
+    """도시의 중기예보 지역 코드 조회 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    mappings = RegionService.get_api_mappings(db, city)
+    if mappings:
+        kma_info = mappings.get("kma", {})
+        return kma_info.get("region_code")
+    return None
 
 
-def get_supported_cities() -> list[str]:
-    """지원되는 도시 목록 반환"""
-    return list(CITY_COORDINATES.keys())
+def get_supported_cities(db: Session = None) -> List[str]:
+    """지원되는 도시 목록 반환 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    return RegionService.get_supported_cities(db)
 
 
-def is_supported_city(city: str) -> bool:
-    """도시가 지원되는지 확인"""
-    return city in CITY_COORDINATES
+def is_supported_city(city: str, db: Session = None) -> bool:
+    """도시가 지원되는지 확인 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    return RegionService.is_supported_city(db, city)
 
 
-def get_supported_provinces() -> list[str]:
-    """지원되는 도/광역시 목록 반환"""
-    return list(PROVINCE_CITIES.keys())
+def get_supported_provinces(db: Session = None) -> List[str]:
+    """지원되는 도/광역시 목록 반환 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    provinces = RegionService.get_provinces(db)
+    return [province.region_name for province in provinces]
 
 
-def is_supported_province(province: str) -> bool:
-    """도/광역시가 지원되는지 확인"""
-    return province in PROVINCE_CITIES
+def is_supported_province(province: str, db: Session = None) -> bool:
+    """도/광역시가 지원되는지 확인 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    region = RegionService.get_region_by_name(db, province)
+    return region is not None and region.region_level == 1
 
 
-def get_cities_in_province(province: str) -> list[str] | None:
-    """도/광역시에 속한 도시 목록 반환"""
-    return PROVINCE_CITIES.get(province)
+def get_cities_in_province(province: str, db: Session = None) -> List[str] | None:
+    """도/광역시에 속한 도시 목록 반환 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    # 광역시도 찾기
+    province_region = RegionService.get_region_by_name(db, province)
+    if not province_region:
+        return None
+    
+    # 하위 시군구 찾기
+    cities = RegionService.get_cities(db, province_region.region_code)
+    return [city.region_name for city in cities]
 
 
-def get_all_city_info() -> dict[str, dict]:
-    """모든 도시 정보 반환"""
+def get_all_city_info(db: Session = None) -> Dict[str, Dict]:
+    """모든 도시 정보 반환 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    regions = RegionService.get_all_regions(db)
     result = {}
-    for city in CITY_COORDINATES:
-        result[city] = {
-            "coordinates": CITY_COORDINATES[city],
-            "region_code": REGION_CODES.get(city, "N/A"),
+    
+    for region in regions:
+        coordinates = RegionService.get_kma_grid_coordinates(db, region.region_code)
+        mappings = RegionService.get_api_mappings(db, region.region_code)
+        
+        region_code = "N/A"
+        if mappings:
+            kma_info = mappings.get("kma", {})
+            region_code = kma_info.get("region_code", "N/A")
+        
+        result[region.region_name] = {
+            "coordinates": coordinates or {},
+            "region_code": region_code,
+            "latitude": float(region.latitude) if region.latitude else None,
+            "longitude": float(region.longitude) if region.longitude else None,
+            "region_level": region.region_level,
         }
+    
     return result
 
 
@@ -204,16 +184,25 @@ def validate_coordinates(nx: int, ny: int) -> bool:
     return 50 <= nx <= 150 and 30 <= ny <= 150
 
 
-def get_nearest_city(nx: int, ny: int) -> str | None:
-    """가장 가까운 도시 찾기"""
+def get_nearest_city(nx: int, ny: int, db: Session = None) -> str | None:
+    """가장 가까운 도시 찾기 - DB 기반"""
+    if db is None:
+        db = next(get_db())
+    
+    regions = RegionService.get_weather_compatible_regions(db)
+    
     min_distance = float("inf")
     nearest_city = None
 
-    for city, coords in CITY_COORDINATES.items():
-        distance = ((nx - coords["nx"]) ** 2 + (ny - coords["ny"]) ** 2) ** 0.5
-        if distance < min_distance:
-            min_distance = distance
-            nearest_city = city
+    for region in regions:
+        if region.grid_x and region.grid_y:
+            distance = (
+                (nx - region.grid_x) ** 2 + (ny - region.grid_y) ** 2
+            ) ** 0.5
+            
+            if distance < min_distance:
+                min_distance = distance
+                nearest_city = region.region_name
 
     return nearest_city
 
@@ -235,15 +224,11 @@ def format_weather_data(data: dict) -> dict:
     return data
 
 
-def get_area_code_for_city(city_name: str) -> str | None:
+def get_area_code_for_city(city_name: str, db: Session = None) -> str | None:
     """
-    KMA 도시 이름(예: '서울', '수원')을 TourAPI 지역 코드(예: '1', '31')로 변환합니다.
+    KMA 도시 이름을 TourAPI 지역 코드로 변환 - DB 기반
     """
-    if city_name in CITY_TO_TOURAPI_AREA_CODE:
-        return CITY_TO_TOURAPI_AREA_CODE[city_name]
-
-    for province, cities in PROVINCE_CITIES.items():
-        if city_name in cities:
-            return CITY_TO_TOURAPI_AREA_CODE.get(province)
-
-    return None
+    if db is None:
+        db = next(get_db())
+    
+    return RegionService.get_tour_api_area_code(db, city_name)
