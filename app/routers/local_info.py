@@ -601,6 +601,12 @@ async def get_regions(db: Session = Depends(get_db)):
     return {"regions": regions}
 
 
+@router.get("/regions/top_level_dedup")
+async def get_top_level_regions_with_dedup(db: Session = Depends(get_db)):
+    regions = await local_info_service.get_top_level_regions_with_dedup(db)
+    return {"regions": regions}
+
+
 @router.get("/regions_point")
 async def get_regions_point(db: Session = Depends(get_db)):
     """통합 지역정보 포인트 조회"""

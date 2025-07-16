@@ -2,6 +2,8 @@ from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import func, and_
+import sqlalchemy as sa
 
 from app.config import settings
 from app.models import Region
@@ -842,6 +844,55 @@ class LocalInfoService:
                 "is_active": r.is_active if hasattr(r, 'is_active') else True,
             }
             for r in regions
+        ]
+
+    async def get_top_level_regions_with_dedup(self, db):
+        """
+        region_level=1, parent_region_code IS NULL 조건에서
+        (latitude, longitude)가 중복이면 region_name이 두 글자인 것만 남기고,
+        나머지는 모두 포함하여 region_name 오름차순으로 반환
+        (auto-correlation 에러 없이 동작)
+        """
+        # 1. (lat, lon) 중복 그룹 찾기
+        dup_coords = db.query(
+            func.cast(Region.latitude, sa.Float).label("lat"),
+            func.cast(Region.longitude, sa.Float).label("lon")
+        ).filter(
+            Region.region_level == 1,
+            Region.parent_region_code == None
+        ).group_by(
+            func.cast(Region.latitude, sa.Float),
+            func.cast(Region.longitude, sa.Float)
+        ).having(func.count() > 1).all()
+
+        dup_set = set((float(lat), float(lon)) for lat, lon in dup_coords)
+
+        # 2. 전체 후보 조회
+        all_regions = db.query(Region).filter(
+            Region.region_level == 1,
+            Region.parent_region_code == None
+        ).all()
+
+        result = []
+        for r in all_regions:
+            key = (float(r.latitude), float(r.longitude))
+            if key in dup_set:
+                if len(r.region_name) == 2:
+                    result.append(r)
+            else:
+                result.append(r)
+
+        # 정렬
+        result.sort(key=lambda r: r.region_name)
+
+        return [
+            {
+                "region_code": r.region_code,
+                "region_name": r.region_name,
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+            }
+            for r in result
         ]
 
 
