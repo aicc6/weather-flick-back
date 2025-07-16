@@ -26,7 +26,7 @@ async def get_travel_courses(
         }
         region_name = region_name_map.get(regionCode, regionCode)
         query = query.filter(TravelCourse.address.contains(region_name))
-    total_count = query.count()
+    total_count = query.count()  # 전체 개수
     courses = query.offset(offset).limit(limit).all()
     return {"courses": courses, "totalCount": total_count}
 
@@ -37,10 +37,10 @@ async def get_travel_course_detail(
 ):
     """여행 코스 상세 정보 조회"""
     course = db.query(TravelCourse).filter(TravelCourse.content_id == course_id).first()
-    
+
     if not course:
         raise HTTPException(status_code=404, detail="여행 코스를 찾을 수 없습니다")
-    
+
     # datetime 필드를 문자열로 변환
     course_dict = {}
     for key, value in course.__dict__.items():
@@ -50,5 +50,5 @@ async def get_travel_course_detail(
             course_dict[key] = value.isoformat() if value else None
         else:
             course_dict[key] = value
-    
+
     return course_dict
