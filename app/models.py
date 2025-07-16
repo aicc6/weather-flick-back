@@ -688,7 +688,6 @@ class TravelCourse(Base):
     설명: 추천 여행 코스 정보
     """
     __tablename__ = "travel_courses"
-
     content_id = Column(String, primary_key=True)
     region_code = Column(String, primary_key=True)
     course_name = Column(String, primary_key=True)
@@ -1899,7 +1898,7 @@ class TravelRouteResponse(BaseModel):
             return 1
         # 루트 순서를 기반으로 일차 계산 (0,1,2 = 1일차, 3,4,5 = 2일차, ...)
         return (route_order // 3) + 1
-    
+
     @classmethod
     def from_orm_with_mapping(cls, obj):
         """ORM 객체를 프론트엔드 호환 형식으로 변환"""
