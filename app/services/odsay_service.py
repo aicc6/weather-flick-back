@@ -109,7 +109,7 @@ class OdsayService:
         """세부 경로 정보 처리"""
         processed_paths = []
 
-        for sub_path in sub_paths:
+        for i, sub_path in enumerate(sub_paths):
             path_type = sub_path.get("trafficType")
 
             if path_type == 1:  # 지하철
@@ -150,8 +150,31 @@ class OdsayService:
                     "way_code": sub_path.get("wayCode", 0)
                 })
             elif path_type == 3:  # 도보
+                # 도보 구간의 출발지/도착지 추론
+                start_location = ""
+                end_location = ""
+                
+                # 이전/다음 교통수단으로부터 위치 추론
+                if i > 0:  # 이전 구간이 있는 경우
+                    prev_path = sub_paths[i-1]
+                    if prev_path.get("trafficType") in [1, 2]:  # 지하철 또는 버스
+                        start_location = prev_path.get("endName", "")
+                
+                if i < len(sub_paths) - 1:  # 다음 구간이 있는 경우
+                    next_path = sub_paths[i+1]
+                    if next_path.get("trafficType") in [1, 2]:  # 지하철 또는 버스
+                        end_location = next_path.get("startName", "")
+                
+                # 첫 번째 도보구간이면 출발지, 마지막 도보구간이면 목적지
+                if i == 0:
+                    start_location = "출발지"
+                if i == len(sub_paths) - 1:
+                    end_location = "목적지"
+                
                 processed_paths.append({
                     "type": "walk",
+                    "start_station": start_location,
+                    "end_station": end_location,
                     "distance": sub_path.get("distance", 0),
                     "section_time": sub_path.get("sectionTime", 0)
                 })
