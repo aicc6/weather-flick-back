@@ -58,3 +58,12 @@ async def get_travel_course_detail(
 
     # ORM 객체를 Pydantic 모델로 변환
     return TravelCourseDetailResponse.model_validate(course, from_attributes=True)
+
+@router.get("/{course_id}/google-review")
+async def get_google_review_for_course(course_id: str, db: Session = Depends(get_db)):
+    course = db.query(TravelCourse).filter(TravelCourse.content_id == course_id).first()
+    if not course or not course.place_id:
+        raise HTTPException(status_code=404, detail="place_id가 없습니다")
+    from app.services.google_places_service import GooglePlacesService
+    service = GooglePlacesService()
+    return await service.get_place_reviews_and_rating(course.place_id)

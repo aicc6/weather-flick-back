@@ -775,6 +775,7 @@ class TravelCourse(Base):
     createdtime = Column(String)
     modifiedtime = Column(String)
     sigungu_code = Column(String)
+    place_id = Column(String, nullable=True, index=True)  # 구글 Place ID
 
 
 class PetTourInfo(Base):
@@ -1736,7 +1737,8 @@ class RecommendationRequest(BaseModel):
 
 class RecommendationResponse(BaseModel):
     """추천 응답 스키마"""
-
+    place_id: str  # 추가
+    destination_name: str
     destinations: list[dict]
     total_count: int
     recommendation_score: float

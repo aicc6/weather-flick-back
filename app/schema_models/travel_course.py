@@ -15,6 +15,7 @@ class TravelCourseResponse(BaseModel):
     overview: Optional[str]
     first_image: Optional[str]
     created_at: Optional[str]
+    place_id: str | None = None
     # 필요에 따라 필드 추가
     class Config:
         orm_mode = True
@@ -47,5 +48,5 @@ class TravelCourseDetailResponse(BaseModel):
     updated_at: Optional[str] = None
     detail_intro_info: Optional[dict]
     detail_additional_info: Optional[dict]
-    
+
     model_config = ConfigDict(from_attributes=True)

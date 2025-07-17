@@ -54,13 +54,13 @@ async def search_destination(query: str = Query(...)):
                 address = result.get("formatted_address")
                 types = result.get("types", [])
                 geometry = result.get("geometry", {})
-                
+
                 # 좌표 정보 추출
                 if geometry and "location" in geometry:
                     location = geometry["location"]
                     latitude = location.get("lat")
                     longitude = location.get("lng")
-                
+
                 # 대표적인 카테고리 하나를 선택
                 if types:
                     category = types[0]
