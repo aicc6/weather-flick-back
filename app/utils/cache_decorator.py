@@ -30,7 +30,8 @@ def generate_cache_key(prefix: str, *args, **kwargs) -> str:
 def cache_result(
     prefix: str,
     expire: int = 3600,
-    key_generator: Callable | None = None
+    key_generator: Callable | None = None,
+    include_cache_info: bool = False
 ):
     """
     함수 결과를 캐싱하는 데코레이터
@@ -39,6 +40,7 @@ def cache_result(
         prefix: 캐시 키 접두사
         expire: 캐시 만료 시간 (초)
         key_generator: 커스텀 키 생성 함수
+        include_cache_info: 캐시 정보를 응답에 포함할지 여부
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -56,6 +58,15 @@ def cache_result(
             cached_value = redis_client.get_cache(cache_key)
             if cached_value is not None:
                 logger.debug(f"캐시 히트: {cache_key}")
+                if include_cache_info:
+                    # 캐시 정보 추가
+                    import time
+                    cached_value["cache_info"] = {
+                        "is_cached": True,
+                        "cache_key": cache_key,
+                        "retrieved_at": time.time(),
+                        "expires_in": expire
+                    }
                 return cached_value
 
             # 캐시 미스 - 함수 실행
@@ -65,6 +76,15 @@ def cache_result(
             # 결과를 캐시에 저장
             if result is not None:
                 redis_client.set_cache(cache_key, result, expire)
+                if include_cache_info:
+                    # 캐시 정보 추가
+                    import time
+                    result["cache_info"] = {
+                        "is_cached": False,
+                        "cache_key": cache_key,
+                        "cached_at": time.time(),
+                        "expires_in": expire
+                    }
 
             return result
 
@@ -83,6 +103,15 @@ def cache_result(
             cached_value = redis_client.get_cache(cache_key)
             if cached_value is not None:
                 logger.debug(f"캐시 히트: {cache_key}")
+                if include_cache_info:
+                    # 캐시 정보 추가
+                    import time
+                    cached_value["cache_info"] = {
+                        "is_cached": True,
+                        "cache_key": cache_key,
+                        "retrieved_at": time.time(),
+                        "expires_in": expire
+                    }
                 return cached_value
 
             # 캐시 미스 - 함수 실행
@@ -92,6 +121,15 @@ def cache_result(
             # 결과를 캐시에 저장
             if result is not None:
                 redis_client.set_cache(cache_key, result, expire)
+                if include_cache_info:
+                    # 캐시 정보 추가
+                    import time
+                    result["cache_info"] = {
+                        "is_cached": False,
+                        "cache_key": cache_key,
+                        "cached_at": time.time(),
+                        "expires_in": expire
+                    }
 
             return result
 

@@ -125,6 +125,11 @@ class User(Base):
         "UserActivityLog", back_populates="user", cascade="all, delete-orphan"
     )
     chat_messages = relationship("ChatMessage", back_populates="user")
+    
+    # 알림 관련 관계
+    notification_settings = relationship("UserNotificationSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    device_tokens = relationship("UserDeviceToken", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 
 class Admin(Base):
@@ -1555,6 +1560,16 @@ class WeatherCondition(BaseModel):
     uv_index: float
 
 
+class CacheInfo(BaseModel):
+    """캐시 정보 스키마"""
+    
+    is_cached: bool
+    cache_key: str | None = None
+    cached_at: float | None = None
+    retrieved_at: float | None = None
+    expires_in: int | None = None
+
+
 class WeatherResponse(BaseModel):
     """날씨 응답 스키마"""
 
@@ -1563,6 +1578,7 @@ class WeatherResponse(BaseModel):
     current: WeatherCondition
     timezone: str
     local_time: str
+    cache_info: CacheInfo | None = None
 
 
 class ForecastDay(BaseModel):
@@ -1586,6 +1602,7 @@ class ForecastResponse(BaseModel):
     country: str
     forecast: list[ForecastDay]
     timezone: str
+    cache_info: CacheInfo | None = None
 
 
 # 인증 관련 Pydantic 모델들
@@ -3051,4 +3068,288 @@ class BatchJobSchedule(Base):
     __table_args__ = (
         Index("idx_schedule_status_time", "status", "scheduled_time"),
         Index("idx_schedule_job", "job_id"),
+    )
+
+
+# ===========================================
+# 알림 관련 테이블
+# ===========================================
+
+
+class NotificationStatus(enum.Enum):
+    """알림 상태"""
+    PENDING = "PENDING"
+    SENT = "SENT"
+    DELIVERED = "DELIVERED"
+    READ = "READ"
+    FAILED = "FAILED"
+
+
+class NotificationType(enum.Enum):
+    """알림 유형"""
+    WEATHER_ALERT = "WEATHER_ALERT"          # 날씨 변화 알림
+    TRAVEL_PLAN_UPDATE = "TRAVEL_PLAN_UPDATE"  # 여행 계획 업데이트
+    RECOMMENDATION = "RECOMMENDATION"        # 추천 알림
+    MARKETING = "MARKETING"                  # 마케팅 알림
+    SYSTEM = "SYSTEM"                        # 시스템 알림
+    EMERGENCY = "EMERGENCY"                  # 긴급 알림
+
+
+class NotificationChannel(enum.Enum):
+    """알림 채널"""
+    PUSH = "PUSH"          # FCM 푸시 알림
+    EMAIL = "EMAIL"        # 이메일 알림
+    SMS = "SMS"            # SMS 알림
+    IN_APP = "IN_APP"      # 인앱 알림
+
+
+class UserNotificationSettings(Base):
+    """
+    사용자 알림 설정 테이블
+    사용처: weather-flick-back
+    설명: 사용자별 알림 설정 관리
+    """
+    __tablename__ = "user_notification_settings"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True)
+    
+    # 알림 채널별 설정
+    push_enabled = Column(Boolean, default=True)
+    email_enabled = Column(Boolean, default=False)
+    sms_enabled = Column(Boolean, default=False)
+    in_app_enabled = Column(Boolean, default=True)
+    
+    # 알림 유형별 설정
+    weather_alerts = Column(Boolean, default=True)
+    travel_plan_updates = Column(Boolean, default=True)
+    recommendation_updates = Column(Boolean, default=True)
+    marketing_messages = Column(Boolean, default=False)
+    system_messages = Column(Boolean, default=True)
+    emergency_alerts = Column(Boolean, default=True)
+    
+    # 방해 금지 시간 설정
+    quiet_hours_enabled = Column(Boolean, default=False)
+    quiet_hours_start = Column(String(5))  # HH:MM 형식
+    quiet_hours_end = Column(String(5))    # HH:MM 형식
+    
+    # 알림 빈도 설정
+    digest_enabled = Column(Boolean, default=False)  # 요약 알림
+    digest_frequency = Column(String(20), default="daily")  # daily, weekly
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    user = relationship("User", back_populates="notification_settings")
+    
+    # 인덱스
+    __table_args__ = (
+        Index("idx_user_notification_settings", "user_id"),
+    )
+
+
+class UserDeviceToken(Base):
+    """
+    사용자 디바이스 토큰 테이블
+    사용처: weather-flick-back
+    설명: FCM 푸시 알림을 위한 디바이스 토큰 관리
+    """
+    __tablename__ = "user_device_tokens"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True)
+    
+    # 디바이스 정보
+    device_token = Column(String, nullable=False, unique=True, index=True)
+    device_type = Column(String(20))  # android, ios, web
+    device_id = Column(String)  # 디바이스 고유 ID
+    device_name = Column(String)  # 사용자 지정 디바이스 이름
+    
+    # 토큰 상태
+    is_active = Column(Boolean, default=True)
+    last_used = Column(DateTime)
+    
+    # 메타데이터
+    user_agent = Column(String)
+    app_version = Column(String)
+    os_version = Column(String)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    user = relationship("User", back_populates="device_tokens")
+    
+    # 인덱스
+    __table_args__ = (
+        Index("idx_device_token", "device_token"),
+        Index("idx_user_device_tokens", "user_id", "is_active"),
+    )
+
+
+class Notification(Base):
+    """
+    알림 테이블
+    사용처: weather-flick-back
+    설명: 모든 알림 메시지 관리
+    """
+    __tablename__ = "notifications"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # 수신자 정보
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True)
+    
+    # 알림 기본 정보
+    type = Column(Enum(NotificationType), nullable=False, index=True)
+    channel = Column(Enum(NotificationChannel), nullable=False, index=True)
+    status = Column(Enum(NotificationStatus), default=NotificationStatus.PENDING, index=True)
+    
+    # 알림 내용
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    data = Column(JSONB)  # 추가 데이터 (딥링크, 액션 등)
+    
+    # 우선순위 및 만료
+    priority = Column(Integer, default=5)  # 1-10, 높을수록 우선순위 높음
+    expires_at = Column(DateTime)
+    
+    # 전송 관련
+    scheduled_at = Column(DateTime)  # 예약 전송 시간
+    sent_at = Column(DateTime)
+    delivered_at = Column(DateTime)
+    read_at = Column(DateTime)
+    
+    # 실패 관련
+    failure_reason = Column(String)
+    retry_count = Column(Integer, default=0)
+    max_retry_count = Column(Integer, default=3)
+    
+    # 외부 서비스 응답
+    external_id = Column(String)  # FCM 메시지 ID 등
+    external_response = Column(JSONB)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    user = relationship("User", back_populates="notifications")
+    
+    # 인덱스
+    __table_args__ = (
+        Index("idx_notification_user_status", "user_id", "status"),
+        Index("idx_notification_type_channel", "type", "channel"),
+        Index("idx_notification_scheduled", "scheduled_at"),
+        Index("idx_notification_created", "created_at"),
+    )
+
+
+class NotificationTemplate(Base):
+    """
+    알림 템플릿 테이블
+    사용처: weather-flick-back
+    설명: 알림 메시지 템플릿 관리
+    """
+    __tablename__ = "notification_templates"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    
+    # 템플릿 정보
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    type = Column(Enum(NotificationType), nullable=False, index=True)
+    channel = Column(Enum(NotificationChannel), nullable=False, index=True)
+    
+    # 템플릿 내용
+    title_template = Column(String(255), nullable=False)
+    message_template = Column(Text, nullable=False)
+    
+    # 템플릿 설정
+    variables = Column(JSONB)  # 템플릿 변수 정의
+    is_active = Column(Boolean, default=True)
+    
+    # 메타데이터
+    description = Column(Text)
+    version = Column(String(10), default="1.0")
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 인덱스
+    __table_args__ = (
+        Index("idx_template_type_channel", "type", "channel", "is_active"),
+    )
+
+
+class NotificationLog(Base):
+    """
+    알림 로그 테이블
+    사용처: weather-flick-back
+    설명: 알림 발송 및 처리 로그 관리
+    """
+    __tablename__ = "notification_logs"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    notification_id = Column(UUID(as_uuid=True), ForeignKey("notifications.id"), nullable=False, index=True)
+    
+    # 로그 정보
+    event_type = Column(String(50), nullable=False)  # sent, delivered, read, failed, etc.
+    message = Column(Text)
+    details = Column(JSONB)
+    
+    # 시간 정보
+    timestamp = Column(DateTime, server_default=func.now(), index=True)
+    
+    # 관계 설정
+    notification = relationship("Notification")
+    
+    # 인덱스
+    __table_args__ = (
+        Index("idx_notification_log_event", "notification_id", "event_type"),
+        Index("idx_notification_log_timestamp", "timestamp"),
+    )
+
+
+class NotificationQueue(Base):
+    """
+    알림 큐 테이블
+    사용처: weather-flick-back
+    설명: 알림 발송 큐 관리 (배치 처리용)
+    """
+    __tablename__ = "notification_queue"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    notification_id = Column(UUID(as_uuid=True), ForeignKey("notifications.id"), nullable=False, index=True)
+    
+    # 큐 정보
+    queue_name = Column(String(50), nullable=False, index=True)  # high, normal, low
+    priority = Column(Integer, default=5)
+    
+    # 처리 상태
+    status = Column(String(20), default="pending")  # pending, processing, completed, failed
+    
+    # 스케줄링
+    scheduled_for = Column(DateTime, nullable=False, index=True)
+    processed_at = Column(DateTime)
+    
+    # 재시도 정보
+    attempt_count = Column(Integer, default=0)
+    max_attempts = Column(Integer, default=3)
+    next_retry_at = Column(DateTime)
+    
+    # 처리 결과
+    result = Column(JSONB)
+    error_message = Column(Text)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    notification = relationship("Notification")
+    
+    # 인덱스
+    __table_args__ = (
+        Index("idx_queue_status_scheduled", "status", "scheduled_for"),
+        Index("idx_queue_priority", "queue_name", "priority"),
+        Index("idx_queue_retry", "next_retry_at"),
     )

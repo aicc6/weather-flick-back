@@ -1,6 +1,7 @@
 import random
 import string
 from datetime import UTC, datetime, timedelta
+from typing import Dict, Any, Optional, List
 
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from sqlalchemy.orm import Session
@@ -637,6 +638,307 @@ class EmailVerificationService:
         except Exception as e:
             print(f"이메일 인증 상태 확인 실패: {e}")
             return False
+
+
+    # ===========================================
+    # 알림 관련 메서드
+    # ===========================================
+    
+    async def send_notification_email(
+        self,
+        to_email: str,
+        subject: str,
+        content: str,
+        template_data: Optional[Dict[str, Any]] = None,
+        template_name: Optional[str] = None
+    ) -> bool:
+        """알림 이메일 전송"""
+        try:
+            # 템플릿 사용 시 HTML 생성
+            if template_name:
+                html_content = self._render_notification_template(template_name, template_data or {})
+            else:
+                html_content = self._create_notification_html(subject, content)
+            
+            message = MessageSchema(
+                subject=subject,
+                recipients=[to_email],
+                body=html_content,
+                subtype="html"
+            )
+            
+            fm = FastMail(self.conf)
+            await fm.send_message(message)
+            
+            self.logger.info(f"Notification email sent successfully to {to_email}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to send notification email to {to_email}: {str(e)}")
+            return False
+    
+    async def send_weather_alert_email(
+        self,
+        to_email: str,
+        location: str,
+        weather_condition: str,
+        temperature: int,
+        alert_type: str = "weather_change"
+    ) -> bool:
+        """날씨 알림 이메일 전송"""
+        
+        if alert_type == "weather_change":
+            subject = f"🌤️ {location} 날씨 변화 알림"
+            content = f"현재 {weather_condition}, 기온 {temperature}°C"
+        elif alert_type == "rain_alert":
+            subject = f"🌧️ {location} 비 예보 알림"
+            content = f"비 예보가 있습니다. 우산을 준비하세요! (현재 기온: {temperature}°C)"
+        elif alert_type == "extreme_weather":
+            subject = f"⚠️ {location} 악천후 경보"
+            content = f"악천후 경보: {weather_condition} (기온: {temperature}°C)"
+        else:
+            subject = f"🌤️ {location} 날씨 정보"
+            content = f"날씨: {weather_condition}, 기온: {temperature}°C"
+        
+        template_data = {
+            "location": location,
+            "weather_condition": weather_condition,
+            "temperature": temperature,
+            "alert_type": alert_type
+        }
+        
+        return await self.send_notification_email(
+            to_email=to_email,
+            subject=subject,
+            content=content,
+            template_data=template_data,
+            template_name="weather_alert"
+        )
+    
+    async def send_travel_plan_email(
+        self,
+        to_email: str,
+        plan_title: str,
+        message: str,
+        notification_type: str = "travel_update"
+    ) -> bool:
+        """여행 계획 관련 이메일 전송"""
+        
+        if notification_type == "travel_update":
+            subject = f"✈️ 여행 계획 업데이트: {plan_title}"
+        elif notification_type == "travel_reminder":
+            subject = f"📅 여행 계획 리마인더: {plan_title}"
+        elif notification_type == "travel_recommendation":
+            subject = f"🌟 여행 추천: {plan_title}"
+        else:
+            subject = f"✈️ {plan_title}"
+        
+        template_data = {
+            "plan_title": plan_title,
+            "message": message,
+            "notification_type": notification_type
+        }
+        
+        return await self.send_notification_email(
+            to_email=to_email,
+            subject=subject,
+            content=message,
+            template_data=template_data,
+            template_name="travel_plan"
+        )
+    
+    async def send_marketing_email(
+        self,
+        to_email: str,
+        subject: str,
+        content: str,
+        campaign_id: Optional[str] = None
+    ) -> bool:
+        """마케팅 이메일 전송"""
+        
+        template_data = {
+            "campaign_id": campaign_id or "",
+            "content": content
+        }
+        
+        return await self.send_notification_email(
+            to_email=to_email,
+            subject=subject,
+            content=content,
+            template_data=template_data,
+            template_name="marketing"
+        )
+    
+    def _create_notification_html(self, subject: str, content: str) -> str:
+        """기본 알림 HTML 템플릿 생성"""
+        html_template = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{subject}</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f4f6f9;
+                }}
+                .container {{
+                    background: white;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 40px 30px;
+                    text-align: center;
+                }}
+                .logo {{
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                }}
+                .content {{
+                    padding: 40px 30px;
+                }}
+                .footer {{
+                    text-align: center;
+                    padding: 20px 30px;
+                    border-top: 1px solid #E5E7EB;
+                    color: #6B7280;
+                    font-size: 14px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">Weather Flick</div>
+                    <h1>{subject}</h1>
+                </div>
+                <div class="content">
+                    <div>{content.replace(chr(10), '<br>')}</div>
+                </div>
+                <div class="footer">
+                    <p>이 이메일은 Weather Flick에서 발송되었습니다.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return html_template
+    
+    def _render_notification_template(self, template_name: str, data: Dict[str, Any]) -> str:
+        """알림 템플릿 렌더링"""
+        templates = {
+            "weather_alert": """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>날씨 알림</title>
+                <style>
+                    body {{ font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f6f9; }}
+                    .container {{ background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }}
+                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }}
+                    .weather-card {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+                    .location {{ font-size: 20px; font-weight: bold; color: #2563eb; }}
+                    .weather-info {{ font-size: 18px; margin: 10px 0; }}
+                    .temperature {{ font-size: 24px; font-weight: bold; color: #dc2626; }}
+                    .content {{ padding: 30px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🌤️ 날씨 알림</h1>
+                    </div>
+                    <div class="content">
+                        <div class="weather-card">
+                            <div class="location">📍 {location}</div>
+                            <div class="weather-info">날씨: {weather_condition}</div>
+                            <div class="temperature">🌡️ {temperature}°C</div>
+                        </div>
+                        <p>Weather Flick에서 제공하는 실시간 날씨 정보입니다.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """,
+            "travel_plan": """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>여행 계획 알림</title>
+                <style>
+                    body {{ font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f6f9; }}
+                    .container {{ background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }}
+                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }}
+                    .plan-card {{ background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+                    .plan-title {{ font-size: 20px; font-weight: bold; color: #0ea5e9; }}
+                    .message {{ font-size: 16px; margin: 15px 0; line-height: 1.6; }}
+                    .content {{ padding: 30px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>✈️ 여행 계획 알림</h1>
+                    </div>
+                    <div class="content">
+                        <div class="plan-card">
+                            <div class="plan-title">✈️ {plan_title}</div>
+                            <div class="message">{message}</div>
+                        </div>
+                        <p>더 자세한 정보는 Weather Flick 앱에서 확인하세요.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """,
+            "marketing": """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Weather Flick 소식</title>
+                <style>
+                    body {{ font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f6f9; }}
+                    .container {{ background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }}
+                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }}
+                    .marketing-card {{ background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; }}
+                    .content {{ font-size: 16px; line-height: 1.6; }}
+                    .main-content {{ padding: 30px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>📢 Weather Flick 소식</h1>
+                    </div>
+                    <div class="main-content">
+                        <div class="marketing-card">
+                            <div class="content">{content}</div>
+                        </div>
+                        <p>Weather Flick 팀이 전해드리는 특별한 소식입니다.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+        }
+        
+        template_html = templates.get(template_name, templates["weather_alert"])
+        return template_html.format(**data)
 
 
 # 서비스 인스턴스

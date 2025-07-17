@@ -15,10 +15,12 @@ from app.routers import (
     destinations,
     events,
     kma_weather,
+    leisure_sports,
     likes_recommend,
     local_info,
     location,
     naver_map,
+    notifications,
     plan,
     recommend_reviews,
     regions,
@@ -78,9 +80,11 @@ app.include_router(travel_course_like.router, prefix="/api")
 app.include_router(custom_travel.router, prefix="/api")
 app.include_router(custom_travel_converter.router, prefix="/api")
 app.include_router(attractions.router, prefix="/api")
+app.include_router(leisure_sports.router, prefix="/api")  # 레저 스포츠 API 라우터 추가
 app.include_router(categories.router, prefix="/api")  # 카테고리 API 라우터 추가
 app.include_router(regions.router)  # 지역 API 라우터 (prefix는 라우터에서 정의됨)
 app.include_router(system.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
