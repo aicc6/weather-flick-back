@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.routers import google
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
 from app.routers import (
@@ -85,6 +85,7 @@ app.include_router(categories.router, prefix="/api")  # 카테고리 API 라우�
 app.include_router(regions.router)  # 지역 API 라우터 (prefix는 라우터에서 정의됨)
 app.include_router(system.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(google.router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
