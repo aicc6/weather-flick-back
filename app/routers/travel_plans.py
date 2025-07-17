@@ -316,17 +316,52 @@ async def delete_travel_plan(
 
         logger.info(f"✅ 삭제 대상 계획 발견 - title: {plan.title}, created_at: {plan.created_at}")
 
-        # 관련 경로 데이터 먼저 삭제
-        from app.models import TravelRoute
-        route_count = db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).count()
-        logger.info(f"🛣️ 관련 경로 {route_count}개 삭제 예정")
+        # 관련 데이터 먼저 삭제 (외래키 제약 조건 때문)
+        from app.models import TravelRoute, TravelPlanDestination
         
-        deleted_routes = db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).delete()
+        # 1. 여행 경로 삭제
+        route_count = db.query(TravelRoute).filter(TravelRoute.travel_plan_id == plan_id).count()
+        logger.info(f"🛣️ 관련 경로 {route_count}개 삭제 예정")
+        deleted_routes = db.query(TravelRoute).filter(TravelRoute.travel_plan_id == plan_id).delete()
         logger.info(f"🛣️ 실제 삭제된 경로: {deleted_routes}개")
+        
+        # 2. 여행 계획 목적지 삭제
+        destination_count = db.query(TravelPlanDestination).filter(TravelPlanDestination.plan_id == plan_id).count()
+        logger.info(f"🏛️ 관련 목적지 {destination_count}개 삭제 예정")
+        deleted_destinations = db.query(TravelPlanDestination).filter(TravelPlanDestination.plan_id == plan_id).delete()
+        logger.info(f"🏛️ 실제 삭제된 목적지: {deleted_destinations}개")
+        
+        # 3. 리뷰 삭제 (reviews 테이블이 있다면)
+        try:
+            from sqlalchemy import text
+            reviews_count = db.execute(
+                text("SELECT COUNT(*) FROM reviews WHERE travel_plan_id = :plan_id"), 
+                {"plan_id": plan_id}
+            ).scalar()
+            logger.info(f"💬 관련 리뷰 {reviews_count}개 삭제 예정")
+            
+            deleted_reviews = db.execute(
+                text("DELETE FROM reviews WHERE travel_plan_id = :plan_id"), 
+                {"plan_id": plan_id}
+            ).rowcount
+            logger.info(f"💬 실제 삭제된 리뷰: {deleted_reviews}개")
+        except Exception as e:
+            logger.warning(f"⚠️ 리뷰 삭제 중 오류 (테이블이 없을 수 있음): {str(e)}")
 
-        # 여행 계획 삭제
+        # 여행 계획 삭제 - 안전하게 직접 SQL 사용
         logger.info(f"🗑️ 여행 계획 삭제 시작 - {plan.title}")
-        db.delete(plan)
+        try:
+            # SQLAlchemy ORM 대신 직접 SQL 사용하여 외래키 제약 조건 문제 회피
+            from sqlalchemy import text
+            deleted_plan = db.execute(
+                text("DELETE FROM travel_plans WHERE plan_id = :plan_id"), 
+                {"plan_id": plan_id}
+            ).rowcount
+            logger.info(f"🗑️ 실제 삭제된 여행 계획: {deleted_plan}개")
+        except Exception as e:
+            logger.error(f"❌ 직접 SQL 삭제 실패: {str(e)}")
+            # 대안으로 ORM 사용
+            db.delete(plan)
         db.commit()
         logger.info(f"✅ 삭제 완료 및 커밋 성공 - plan_id: {plan_id}")
 

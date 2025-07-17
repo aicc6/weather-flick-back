@@ -1,6 +1,7 @@
 # app/schema_models/travel_course.py
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
+from datetime import datetime
 
 class TravelCourseResponse(BaseModel):
     content_id: str
@@ -14,7 +15,7 @@ class TravelCourseResponse(BaseModel):
     address: Optional[str]
     overview: Optional[str]
     first_image: Optional[str]
-    created_at: Optional[str]
+    created_at: Optional[datetime]
     place_id: str | None = None
     # 필요에 따라 필드 추가
     class Config:
@@ -44,8 +45,8 @@ class TravelCourseDetailResponse(BaseModel):
     first_image_small: Optional[str]
     latitude: Optional[float]
     longitude: Optional[float]
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     detail_intro_info: Optional[dict]
     detail_additional_info: Optional[dict]
 
