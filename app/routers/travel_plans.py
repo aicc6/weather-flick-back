@@ -1,7 +1,10 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.auth import get_current_user
 from app.database import get_db
@@ -295,7 +298,10 @@ async def delete_travel_plan(
     db: Session = Depends(get_db),
 ):
     """여행 계획 삭제"""
+    logger.info(f"🗑️ 삭제 요청 - plan_id: {plan_id}, user_id: {current_user.id}")
+    
     try:
+        # 삭제 대상 계획 조회
         plan = (
             db.query(TravelPlan)
             .filter(TravelPlan.plan_id == plan_id, TravelPlan.user_id == current_user.id)
@@ -303,23 +309,33 @@ async def delete_travel_plan(
         )
 
         if not plan:
+            logger.warning(f"❌ 여행 계획을 찾을 수 없음 - plan_id: {plan_id}, user_id: {current_user.id}")
             return create_error_response(
                 code="NOT_FOUND", message="여행 계획을 찾을 수 없습니다."
             )
 
+        logger.info(f"✅ 삭제 대상 계획 발견 - title: {plan.title}, created_at: {plan.created_at}")
+
         # 관련 경로 데이터 먼저 삭제
         from app.models import TravelRoute
-        db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).delete()
+        route_count = db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).count()
+        logger.info(f"🛣️ 관련 경로 {route_count}개 삭제 예정")
+        
+        deleted_routes = db.query(TravelRoute).filter(TravelRoute.plan_id == plan_id).delete()
+        logger.info(f"🛣️ 실제 삭제된 경로: {deleted_routes}개")
 
         # 여행 계획 삭제
+        logger.info(f"🗑️ 여행 계획 삭제 시작 - {plan.title}")
         db.delete(plan)
         db.commit()
+        logger.info(f"✅ 삭제 완료 및 커밋 성공 - plan_id: {plan_id}")
 
         return create_standard_response(
             success=True, data={"message": "여행 계획이 삭제되었습니다."}
         )
 
     except Exception as e:
+        logger.error(f"❌ 삭제 실패 - plan_id: {plan_id}, error: {str(e)}")
         db.rollback()
         return create_error_response(
             code="DELETE_ERROR",
