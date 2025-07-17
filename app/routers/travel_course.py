@@ -51,6 +51,7 @@ async def get_travel_course_detail(
     db: Session = Depends(get_db)
 ) -> TravelCourseDetailResponse:
     """여행 코스 상세 정보 조회"""
+    # 복합 기본키 대응: content_id로만 조회하되 첫 번째 결과 사용
     course = db.query(TravelCourse).filter(TravelCourse.content_id == course_id).first()
 
     if not course:

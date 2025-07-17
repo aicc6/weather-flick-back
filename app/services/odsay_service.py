@@ -50,6 +50,16 @@ class OdsayService:
 
             data = response.json()
 
+            # ODsay API가 리스트를 반환하는 경우 처리
+            if isinstance(data, list):
+                if data and len(data) > 0:
+                    data = data[0]
+                else:
+                    return {
+                        "success": False,
+                        "message": "빈 응답을 받았습니다."
+                    }
+
             if data.get("result"):
                 result = data["result"]
                 paths = result.get("path", [])

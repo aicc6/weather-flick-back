@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import TouristAttraction
+from app.models import TouristAttraction, PetTourInfo, Region
 from app.utils import create_error_response, create_standard_response
 
 router = APIRouter(
@@ -81,6 +81,7 @@ async def search_attractions(
 async def get_attractions_by_region(
     region_code: str = Query(..., description="지역 코드"),
     limit: int = Query(100, ge=1, le=500, description="조회할 최대 개수"),
+    pet_friendly: bool = Query(False, description="반려동물 동반 가능 여부 필터"),
     db: Session = Depends(get_db),
 ):
     """
@@ -126,12 +127,23 @@ async def get_attractions_by_region(
             db_region_code = region_code_mapping.get(region_code, region_code)
 
         # 관광지 조회
-        attractions = (
-            db.query(TouristAttraction)
-            .filter(TouristAttraction.region_code == db_region_code)
-            .limit(limit)
-            .all()
+        query = db.query(TouristAttraction).filter(
+            TouristAttraction.region_code == db_region_code
         )
+        
+        # 반려동물 동반 가능 필터 적용
+        if pet_friendly:
+            # pet_tour_info에서 해당 지역의 content_id 목록 조회
+            pet_content_ids = db.query(PetTourInfo.content_id).filter(
+                PetTourInfo.area_code == db_region_code,
+                PetTourInfo.content_id.isnot(None)
+            ).subquery()
+            
+            query = query.filter(
+                TouristAttraction.content_id.in_(pet_content_ids)
+            )
+        
+        attractions = query.limit(limit).all()
 
         # 응답 데이터 구성
         attraction_list = []

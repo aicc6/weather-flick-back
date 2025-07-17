@@ -206,6 +206,7 @@ class TravelPlan(Base):
     user = relationship("User", back_populates="travel_plans")
     reviews = relationship("Review", back_populates="travel_plan")
     routes = relationship("TravelRoute", back_populates="travel_plan")
+    plan_destinations = relationship("TravelPlanDestination", back_populates="travel_plan", cascade="all, delete-orphan")
 
 
 class TravelRoute(Base):
@@ -296,6 +297,7 @@ class Destination(Base):
     # 관계 설정
     weather_data = relationship("WeatherData", back_populates="destination")
     reviews = relationship("Review", back_populates="destination")
+    plan_destinations = relationship("TravelPlanDestination", back_populates="destination", cascade="all, delete-orphan")
 
 
 class TouristAttraction(Base):
@@ -352,6 +354,9 @@ class TouristAttraction(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     last_sync_at = Column(DateTime, server_default=func.now())
+
+    # 관계 설정
+    region = relationship("Region", back_populates="tourist_attractions")
 
 
 class CulturalFacility(Base):
@@ -420,6 +425,9 @@ class CulturalFacility(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     last_sync_at = Column(DateTime, server_default=func.now())
+
+    # 관계 설정
+    region = relationship("Region", back_populates="cultural_facilities")
 
 
 class FestivalEvent(Base):
@@ -495,6 +503,9 @@ class FestivalEvent(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     last_sync_at = Column(DateTime, server_default=func.now())
 
+    # 관계 설정
+    region = relationship("Region", back_populates="festivals_events")
+
 
 class Restaurant(Base):
     """
@@ -557,6 +568,9 @@ class Restaurant(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     last_sync_at = Column(DateTime, server_default=func.now())
 
+    # 관계 설정
+    region = relationship("Region", back_populates="restaurants")
+
 
 class Accommodation(Base):
     """
@@ -596,6 +610,9 @@ class Accommodation(Base):
 
     # 메타데이터
     created_at = Column(DateTime, server_default=func.now())
+
+    # 관계 설정
+    region = relationship("Region", back_populates="accommodations")
 
     # 기존 API 호환성을 위한 프로퍼티
     @property
@@ -1077,6 +1094,13 @@ class Region(Base):
     api_mappings = Column(JSONB)
     coordinate_info = Column(JSONB)
     tour_api_area_code = Column(String, nullable=True, index=True)  # 한국관광공사 API 지역 코드
+
+    # 관계 설정
+    tourist_attractions = relationship("TouristAttraction", back_populates="region")
+    cultural_facilities = relationship("CulturalFacility", back_populates="region")
+    festivals_events = relationship("FestivalEvent", back_populates="region")
+    restaurants = relationship("Restaurant", back_populates="region")
+    accommodations = relationship("Accommodation", back_populates="region")
 
 
 class CategoryCode(Base):
@@ -2377,6 +2401,7 @@ class PlaceRecommendation(BaseModel):
     address: str | None = Field(None, description="주소")
     latitude: float | None = Field(None, description="위도")
     longitude: float | None = Field(None, description="경도")
+    pet_info: dict[str, str] | None = Field(None, description="반려동물 동반 정보")
 
 
 class DayItinerary(BaseModel):
@@ -2402,66 +2427,66 @@ class CustomTravelRecommendationResponse(BaseModel):
 # 데이터베이스에만 존재하는 누락된 테이블 모델들
 # ===========================================
 
-
-class Accommodation(Base):
-    """
-    숙박시설 정보 테이블
-    사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
-    설명: 한국관광공사 API 기반 숙박시설 정보
-    """
-
-    __tablename__ = "accommodations"
-    __table_args__ = {"extend_existing": True, "autoload_replace": False}
-
-    # Primary Key
-    content_id = Column(String(20), primary_key=True, index=True)
-
-    # Foreign Keys
-    region_code = Column(
-        String, ForeignKey("regions.region_code"), nullable=False, index=True
-    )
-    raw_data_id = Column(UUID(as_uuid=True), index=True)
-
-    # 기본 정보
-    accommodation_name = Column(String, nullable=False)
-    accommodation_type = Column(String, nullable=False)
-    address = Column(String, nullable=False)
-    tel = Column(String)
-
-    # 위치 정보
-    latitude = Column(Float)
-    longitude = Column(Float)
-
-    # 카테고리 정보
-    category_code = Column(String(10))
-    sub_category_code = Column(String(10))
-
-    # 시설 정보
-    parking = Column(String)
-
-    # 메타데이터
-    created_at = Column(DateTime, server_default=func.now())
-
-    # 기존 API 호환성을 위한 프로퍼티
-    @property
-    def id(self):
-        """기존 API 호환성을 위한 id 프로퍼티"""
-        return self.content_id
-
-    @property
-    def name(self):
-        """기존 API 호환성을 위한 name 프로퍼티"""
-        return self.accommodation_name
-
-    @property
-    def type(self):
-        """기존 API 호환성을 위한 type 프로퍼티"""
-        return self.accommodation_type
-
-    @property
-    def phone(self):
-        """기존 API 호환성을 위한 phone 프로퍼티"""
-        return self.tel
+# 중복 정의 제거 - 이미 위에 정의되어 있음
+# class Accommodation(Base):
+#     """
+#     숙박시설 정보 테이블
+#     사용처: weather-flick-back, weather-flick-admin-back, weather-flick-batch
+#     설명: 한국관광공사 API 기반 숙박시설 정보
+#     """
+# 
+#     __tablename__ = "accommodations"
+#     __table_args__ = {"extend_existing": True, "autoload_replace": False}
+# 
+#     # Primary Key
+#     content_id = Column(String(20), primary_key=True, index=True)
+# 
+#     # Foreign Keys
+#     region_code = Column(
+#         String, ForeignKey("regions.region_code"), nullable=False, index=True
+#     )
+#     raw_data_id = Column(UUID(as_uuid=True), index=True)
+# 
+#     # 기본 정보
+#     accommodation_name = Column(String, nullable=False)
+#     accommodation_type = Column(String, nullable=False)
+#     address = Column(String, nullable=False)
+#     tel = Column(String)
+# 
+#     # 위치 정보
+#     latitude = Column(Float)
+#     longitude = Column(Float)
+# 
+#     # 카테고리 정보
+#     category_code = Column(String(10))
+#     sub_category_code = Column(String(10))
+# 
+#     # 시설 정보
+#     parking = Column(String)
+# 
+#     # 메타데이터
+#     created_at = Column(DateTime, server_default=func.now())
+# 
+#     # 기존 API 호환성을 위한 프로퍼티
+#     @property
+#     def id(self):
+#         """기존 API 호환성을 위한 id 프로퍼티"""
+#         return self.content_id
+# 
+#     @property
+#     def name(self):
+#         """기존 API 호환성을 위한 name 프로퍼티"""
+#         return self.accommodation_name
+# 
+#     @property
+#     def type(self):
+#         """기존 API 호환성을 위한 type 프로퍼티"""
+#         return self.accommodation_type
+# 
+#     @property
+#     def phone(self):
+#         """기존 API 호환성을 위한 phone 프로퍼티"""
+#         return self.tel
 
 
 class TravelCourseSpot(Base):
@@ -2840,6 +2865,10 @@ class TravelPlanDestination(Base):
     visit_order = Column(Integer)
     notes = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+    # 관계 설정
+    travel_plan = relationship("TravelPlan", back_populates="plan_destinations")
+    destination = relationship("Destination", back_populates="plan_destinations")
 
     # 유니크 제약조건
     __table_args__ = (
@@ -3308,6 +3337,58 @@ class NotificationLog(Base):
         Index("idx_notification_log_event", "notification_id", "event_type"),
         Index("idx_notification_log_timestamp", "timestamp"),
     )
+
+# 중복 정의 제거 - 이미 위에 정의되어 있음
+# class PetTourInfo(Base):
+#     """
+#     반려동물 동반 여행지 테이블
+#     사용처: weather-flick-back, weather-flick-batch
+#     설명: 한국관광공사 API 기반 반려동물 동반 가능 여행지 정보
+#     """
+#     __tablename__ = "pet_tour_info"
+#     
+#     # Primary Key
+#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+#     
+#     # 콘텐츠 정보
+#     content_id = Column(String(20), index=True)
+#     content_type_id = Column(String(10))
+#     title = Column(String(500))
+#     
+#     # 위치 정보
+#     address = Column(String(500))
+#     latitude = Column(DECIMAL(10, 8))
+#     longitude = Column(DECIMAL(11, 8))
+#     area_code = Column(String(10))
+#     sigungu_code = Column(String(10))
+#     
+#     # 연락처 정보
+#     tel = Column(String(100))
+#     homepage = Column(Text)
+#     
+#     # 설명 및 이미지
+#     overview = Column(Text)
+#     first_image = Column(Text)
+#     first_image2 = Column(Text)
+#     
+#     # 반려동물 정보
+#     pet_acpt_abl = Column(String(500))  # 반려동물 동반 가능 정보
+#     pet_info = Column(Text)             # 반려동물 관련 추가 정보
+#     
+#     # 카테고리
+#     cat1 = Column(String(10))
+#     cat2 = Column(String(10))
+#     cat3 = Column(String(10))
+#     
+#     # 원본 데이터 참조
+#     raw_data_id = Column(UUID(as_uuid=True))
+#     
+#     # 메타데이터
+#     data_quality_score = Column(DECIMAL(5, 2))
+#     processing_status = Column(String(20), default="processed")
+#     last_sync_at = Column(DateTime, server_default=func.now())
+#     created_at = Column(DateTime, server_default=func.now())
+#     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class NotificationQueue(Base):

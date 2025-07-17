@@ -1,9 +1,11 @@
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional
 from datetime import datetime
 from enum import Enum
 import uuid
+
+from .validators import CommonValidators
 
 
 class Activity(BaseModel):
@@ -30,8 +32,7 @@ class TravelCourseLikeCreate(BaseModel):
 class TravelCourseLikeResponse(TravelCourseLikeCreate):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================
@@ -125,8 +126,7 @@ class UserNotificationSettingsResponse(UserNotificationSettingsBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserDeviceTokenBase(BaseModel):
@@ -160,8 +160,7 @@ class UserDeviceTokenResponse(UserDeviceTokenBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationBase(BaseModel):
@@ -201,8 +200,7 @@ class NotificationResponse(NotificationBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationListResponse(BaseModel):
@@ -247,8 +245,7 @@ class NotificationTemplateResponse(NotificationTemplateBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationStatsResponse(BaseModel):

@@ -41,8 +41,15 @@ class TmapService:
             url = f"{self.base_url}/routes"
             headers = {
                 "appKey": self.api_key,
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Accept": "application/json"
             }
+            
+            # API 키 확인을 위한 로깅 (키의 일부만 표시)
+            if self.api_key:
+                logger.info(f"TMAP API Key prefix: {self.api_key[:10]}...")
+            else:
+                logger.error("TMAP API Key is missing!")
 
             data = {
                 "startX": str(start_x),
@@ -358,8 +365,15 @@ class TmapService:
             url = f"{self.base_url}/routes"
             headers = {
                 "appKey": self.api_key,
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Accept": "application/json"
             }
+            
+            # API 키 확인을 위한 로깅 (키의 일부만 표시)
+            if self.api_key:
+                logger.info(f"TMAP API Key prefix: {self.api_key[:10]}...")
+            else:
+                logger.error("TMAP API Key is missing!")
 
             # 시간 형식을 TMAP API 형식으로 변환 (YYYYMMDDHHMM)
             if departure_time:

@@ -1,6 +1,8 @@
 """맞춤 여행 추천 라우터"""
 
 import hashlib
+import logging
+import random
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -15,6 +17,7 @@ from app.models import (
     CustomTravelRecommendationRequest,
     CustomTravelRecommendationResponse,
     DayItinerary,
+    PetTourInfo,
     PlaceRecommendation,
     Region,
     Restaurant,
@@ -22,6 +25,8 @@ from app.models import (
     TouristAttraction,
 )
 from app.services.ai_recommendation import AIRecommendationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/custom-travel",
@@ -88,13 +93,13 @@ async def get_custom_travel_recommendations(
     AI가 최적화된 여행 일정을 생성합니다.
     """
     try:
-        # 캐시 확인
-        clean_expired_cache()
-        cache_key = get_cache_key(request)
+        # 캐시 확인 - 개발 중에는 비활성화
+        # clean_expired_cache()
+        # cache_key = get_cache_key(request)
 
-        if cache_key in recommendation_cache:
-            cached_data = recommendation_cache[cache_key]
-            return CustomTravelRecommendationResponse(**cached_data["response"])
+        # if cache_key in recommendation_cache:
+        #     cached_data = recommendation_cache[cache_key]
+        #     return CustomTravelRecommendationResponse(**cached_data["response"])
         # 동행자 유형별 태그 매핑
         who_tags = {
             "solo": ["혼자", "자유로운", "개인적인", "조용한"],
@@ -129,9 +134,12 @@ async def get_custom_travel_recommendations(
                 selected_tags.extend(style_tags[style])
 
         # region_code를 tour_api_area_code로 매핑
+        logger.info(f"Received region_code: {request.region_code}")
+        
         region = db.query(Region).filter(Region.region_code == request.region_code).first()
         if region and region.tour_api_area_code:
             db_region_code = region.tour_api_area_code
+            logger.info(f"Found region in DB: {region.region_name}, using tour_api_area_code: {db_region_code}")
         else:
             # 기존 하드코딩된 매핑 유지 (fallback)
             region_code_mapping = {
@@ -154,10 +162,9 @@ async def get_custom_travel_recommendations(
                 "52": "37",   # 전북
             }
             db_region_code = region_code_mapping.get(request.region_code, request.region_code)
+            logger.info(f"Using hardcoded mapping: {request.region_code} -> {db_region_code}")
 
         # 순차적 DB 쿼리 실행 (안정성 우선)
-        import logging
-        logger = logging.getLogger(__name__)
 
         try:
             # 관광지 조회
@@ -167,7 +174,7 @@ async def get_custom_travel_recommendations(
                 .limit(500)  # 성능 개선을 위해 제한
                 .all()
             )
-            logger.info(f"Found {len(attractions)} attractions")
+            logger.info(f"Found {len(attractions)} attractions for region {db_region_code}")
 
             # 문화시설 조회
             cultural_facilities = (
@@ -176,7 +183,7 @@ async def get_custom_travel_recommendations(
                 .limit(200)
                 .all()
             )
-            logger.info(f"Found {len(cultural_facilities)} cultural facilities")
+            logger.info(f"Found {len(cultural_facilities)} cultural facilities for region {db_region_code}")
 
             # 음식점 조회
             restaurants = (
@@ -185,7 +192,7 @@ async def get_custom_travel_recommendations(
                 .limit(100)
                 .all()
             )
-            logger.info(f"Found {len(restaurants)} restaurants")
+            logger.info(f"Found {len(restaurants)} restaurants for region {db_region_code}")
 
             # 쇼핑 장소 조회
             shopping_places = (
@@ -194,7 +201,7 @@ async def get_custom_travel_recommendations(
                 .limit(300)
                 .all()
             )
-            logger.info(f"Found {len(shopping_places)} shopping places")
+            logger.info(f"Found {len(shopping_places)} shopping places for region {db_region_code}")
 
             # 숙박시설 조회
             accommodations = (
@@ -203,7 +210,40 @@ async def get_custom_travel_recommendations(
                 .limit(50)
                 .all()
             )
-            logger.info(f"Found {len(accommodations)} accommodations")
+            logger.info(f"Found {len(accommodations)} accommodations for region {db_region_code}")
+            
+            # 반려동물 동반 가능한 content_id 목록 조회 (pet 스타일이 포함된 경우)
+            pet_friendly_content_ids = set()
+            if "pet" in request.styles:
+                pet_tour_info = (
+                    db.query(PetTourInfo.content_id, PetTourInfo.pet_acpt_abl, PetTourInfo.pet_info)
+                    .filter(PetTourInfo.area_code == db_region_code)
+                    .all()
+                )
+                pet_friendly_content_ids = {item[0] for item in pet_tour_info if item[0]}
+                logger.info(f"Found {len(pet_friendly_content_ids)} pet-friendly content IDs for region {db_region_code}")
+                
+                # 반려동물 정보를 딕셔너리로 저장
+                pet_info_dict = {
+                    item[0]: {"pet_acpt_abl": item[1], "pet_info": item[2]} 
+                    for item in pet_tour_info if item[0]
+                }
+            
+            # 데이터가 부족한 경우 다른 지역의 샘플 데이터 추가
+            if len(cultural_facilities) == 0 and len(restaurants) == 0 and len(accommodations) == 0:
+                logger.warning(f"No cultural/restaurant/accommodation data found for region {db_region_code}")
+                # 가장 많은 데이터가 있는 지역의 샘플 추가
+                sample_regions = ['1', '31', '6']  # 서울, 경기, 부산
+                for sample_region in sample_regions:
+                    if len(cultural_facilities) < 10:
+                        sample_cultural = db.query(CulturalFacility).filter(CulturalFacility.region_code == sample_region).limit(10).all()
+                        cultural_facilities.extend(sample_cultural)
+                    if len(restaurants) < 10:
+                        sample_restaurants = db.query(Restaurant).filter(Restaurant.region_code == sample_region).limit(10).all()
+                        restaurants.extend(sample_restaurants)
+                    if len(accommodations) < 5:
+                        sample_accommodations = db.query(Accommodation).filter(Accommodation.region_code == sample_region).limit(5).all()
+                        accommodations.extend(sample_accommodations)
 
         except Exception as e:
             logger.error(f"Database query error: {str(e)}")
@@ -238,6 +278,12 @@ async def get_custom_travel_recommendations(
                     print(f"Category code {place.category_code} not converted, using raw code")
             if hasattr(place, "tags") and place.tags:
                 tags.extend(place.tags)
+            
+            # 반려동물 동반 가능 여부 확인
+            pet_info = None
+            if "pet" in request.styles and place.content_id in pet_friendly_content_ids:
+                tags.extend(["반려동물동반가능", "펫프렌들리"])
+                pet_info = pet_info_dict.get(place.content_id)
 
             all_places.append(
                 {
@@ -257,6 +303,7 @@ async def get_custom_travel_recommendations(
                     "address": place.address,
                     "latitude": float(place.latitude) if place.latitude else None,
                     "longitude": float(place.longitude) if place.longitude else None,
+                    "pet_info": pet_info,  # 반려동물 정보 추가
                 }
             )
 
@@ -270,6 +317,12 @@ async def get_custom_travel_recommendations(
                 else:
                     # 카테고리 이름을 찾지 못한 경우 코드를 그대로 추가
                     tags.append(place.category_code)
+            
+            # 반려동물 동반 가능 여부 확인
+            pet_info = None
+            if "pet" in request.styles and place.content_id in pet_friendly_content_ids:
+                tags.extend(["반려동물동반가능", "펫프렌들리"])
+                pet_info = pet_info_dict.get(place.content_id)
 
             all_places.append(
                 {
@@ -289,6 +342,7 @@ async def get_custom_travel_recommendations(
                     "address": place.address,
                     "latitude": float(place.latitude) if place.latitude else None,
                     "longitude": float(place.longitude) if place.longitude else None,
+                    "pet_info": pet_info,
                 }
             )
 
@@ -297,6 +351,12 @@ async def get_custom_travel_recommendations(
             tags = ["맛집", "음식"]
             if place.cuisine_type:
                 tags.append(place.cuisine_type)
+            
+            # 반려동물 동반 가능 여부 확인
+            pet_info = None
+            if "pet" in request.styles and place.content_id in pet_friendly_content_ids:
+                tags.extend(["반려동물동반가능", "펫프렌들리"])
+                pet_info = pet_info_dict.get(place.content_id)
 
             all_places.append(
                 {
@@ -316,6 +376,7 @@ async def get_custom_travel_recommendations(
                     "address": place.address,
                     "latitude": float(place.latitude) if place.latitude else None,
                     "longitude": float(place.longitude) if place.longitude else None,
+                    "pet_info": pet_info,
                 }
             )
 
@@ -329,6 +390,12 @@ async def get_custom_travel_recommendations(
                 else:
                     # 카테고리 이름을 찾지 못한 경우 코드를 그대로 추가
                     tags.append(place.category_code)
+            
+            # 반려동물 동반 가능 여부 확인
+            pet_info = None
+            if "pet" in request.styles and place.content_id in pet_friendly_content_ids:
+                tags.extend(["반려동물동반가능", "펫프렌들리"])
+                pet_info = pet_info_dict.get(place.content_id)
 
             all_places.append(
                 {
@@ -348,6 +415,7 @@ async def get_custom_travel_recommendations(
                     "address": place.address,
                     "latitude": float(place.latitude) if place.latitude else None,
                     "longitude": float(place.longitude) if place.longitude else None,
+                    "pet_info": pet_info,
                 }
             )
 
@@ -376,6 +444,12 @@ async def get_custom_travel_recommendations(
             # 가격대 정보가 있으면 태그에 추가
             if hasattr(place, "price_range") and place.price_range:
                 tags.append(place.price_range)
+            
+            # 반려동물 동반 가능 여부 확인
+            pet_info = None
+            if "pet" in request.styles and place.content_id in pet_friendly_content_ids:
+                tags.extend(["반려동물동반가능", "펫프렌들리"])
+                pet_info = pet_info_dict.get(place.content_id)
 
             all_places.append(
                 {
@@ -403,8 +477,10 @@ async def get_custom_travel_recommendations(
                     "price_range": (
                         place.price_range if hasattr(place, "price_range") else None
                     ),
+                    "pet_info": pet_info,
                 }
             )
+        
 
         # 태그 매칭 점수 계산 (최적화)
         selected_tags_set = set(tag.lower() for tag in selected_tags)
@@ -453,9 +529,20 @@ async def get_custom_travel_recommendations(
                 "cultural",
             ]:
                 place["score"] += 1.0
+            
+            # 반려동물 스타일 선택 시 반려동물 동반 가능 장소에 높은 보너스
+            if "pet" in request.styles:
+                if "반려동물동반가능" in place["tags"] or "펫프렌들리" in place["tags"]:
+                    place["score"] += 5.0  # 매우 높은 보너스
+                elif any(tag in ["공원", "산책", "해변"] for tag in place["tags"]):
+                    place["score"] += 2.0  # 일반적으로 반려동물 친화적인 장소
 
-        # 점수 기준으로 정렬
-        all_places.sort(key=lambda x: x["score"], reverse=True)
+        # 점수 기준으로 정렬 + 랜덤 요소 추가
+        # 점수가 같거나 비슷한 경우 순서를 섞기 위해 작은 랜덤 값 추가
+        for place in all_places:
+            place["final_score"] = place["score"] + random.uniform(0, 0.3)
+        
+        all_places.sort(key=lambda x: x["final_score"], reverse=True)
 
         # 타입별로 최소한의 다양성을 보장하기 위해 재정렬
         # 각 타입별로 상위 N개씩 추출
@@ -472,6 +559,10 @@ async def get_custom_travel_recommendations(
             if place_type in type_top_places and len(type_top_places[place_type]) < 20:
                 type_top_places[place_type].append(place)
 
+        # 타입별 리스트를 각각 섞어서 다양성 추가
+        for place_type, places in type_top_places.items():
+            random.shuffle(places)
+        
         # 라운드 로빈 방식으로 다양한 타입 보장
         diversified_places = []
         max_per_type = max(len(places) for places in type_top_places.values())
@@ -481,8 +572,9 @@ async def get_custom_travel_recommendations(
                 if i < len(type_top_places[place_type]):
                     diversified_places.append(type_top_places[place_type][i])
 
-        # 나머지 장소들 추가
+        # 나머지 장소들도 섞어서 추가
         remaining_places = [p for p in all_places if p not in diversified_places]
+        random.shuffle(remaining_places)
         all_places = diversified_places + remaining_places
 
         # 디버깅: 장소 타입별 개수 확인
@@ -568,11 +660,11 @@ async def get_custom_travel_recommendations(
             recommendation_type="custom_ai" if use_ai else "custom_basic",
         )
 
-        # 응답을 캐시에 저장
-        recommendation_cache[cache_key] = {
-            "response": response.dict(),
-            "timestamp": datetime.now(),
-        }
+        # 응답을 캐시에 저장 - 개발 중에는 비활성화
+        # recommendation_cache[cache_key] = {
+        #     "response": response.dict(),
+        #     "timestamp": datetime.now(),
+        # }
 
         return response
 
@@ -594,6 +686,9 @@ def _generate_basic_itinerary(
     # 숙박시설만 별도로 분리 (매일 사용될 수 있도록)
     accommodations = [p for p in all_places if p["type"] == "accommodation"]
     other_places = [p for p in all_places if p["type"] != "accommodation"]
+    
+    # 숙박시설을 점수 순으로 정렬 (상위 몇개중에서 랜덤 선택하기 위해)
+    accommodations.sort(key=lambda x: x.get("final_score", x.get("score", 0)), reverse=True)
 
     for day in range(1, request.days + 1):
         day_places = []
@@ -619,38 +714,15 @@ def _generate_basic_itinerary(
 
             # 점심시간대에는 음식점 우선
             if i == 1 or (i == 2 and request.schedule == "relaxed"):
-                for place in other_places:
-                    if place["type"] == "restaurant" and place["id"] not in used_places:
-                        place_rec = PlaceRecommendation(
-                            id=place["id"],
-                            name=place["name"],
-                            time=time_slot,
-                            tags=place["tags"][:3],
-                            description=place["description"],
-                            rating=place["rating"],
-                            image=place["image"],
-                            address=place["address"],
-                            latitude=place["latitude"],
-                            longitude=place["longitude"],
-                        )
-                        day_places.append(place_rec)
-                        used_places.add(place["id"])
-                        break
-
-                if len(day_places) > i:
-                    continue
-
-            # 일반 장소 선택 (타입 다양성 고려)
-            # 이미 선택된 타입 확인
-            selected_types = [p.tags[0] for p in day_places if p.tags]
-
-            # 다른 타입 우선 선택
-            for place in other_places:
-                if (
-                    place["id"] not in used_places
-                    and place["score"] > 0
-                    and place["type"] not in selected_types
-                ):
+                # 사용하지 않은 음식점들 중에서 상위 5개 선택
+                available_restaurants = [
+                    p for p in other_places 
+                    if p["type"] == "restaurant" and p["id"] not in used_places
+                ][:5]
+                
+                if available_restaurants:
+                    # 상위 5개 중에서 랜덤 선택
+                    place = random.choice(available_restaurants)
                     place_rec = PlaceRecommendation(
                         id=place["id"],
                         name=place["name"],
@@ -662,11 +734,48 @@ def _generate_basic_itinerary(
                         address=place["address"],
                         latitude=place["latitude"],
                         longitude=place["longitude"],
+                        pet_info=place.get("pet_info"),
                     )
                     day_places.append(place_rec)
                     used_places.add(place["id"])
-                    selected_types.append(place["type"])
-                    break
+
+                if len(day_places) > i:
+                    continue
+
+            # 일반 장소 선택 (타입 다양성 고려)
+            # 이미 선택된 타입 확인
+            selected_types = [p.tags[0] for p in day_places if p.tags]
+
+            # 다른 타입 우선 선택 (상위 후보 중 랜덤 선택)
+            candidates = []
+            for place in other_places[:30]:  # 상위 30개 중에서 선택
+                if (
+                    place["id"] not in used_places
+                    and place["score"] > 0
+                    and place["type"] not in selected_types
+                ):
+                    candidates.append(place)
+                    if len(candidates) >= 5:  # 최대 5개 후보
+                        break
+            
+            if candidates:
+                place = random.choice(candidates)
+                place_rec = PlaceRecommendation(
+                    id=place["id"],
+                    name=place["name"],
+                    time=time_slot,
+                    tags=place["tags"][:3],
+                    description=place["description"],
+                    rating=place["rating"],
+                    image=place["image"],
+                    address=place["address"],
+                    latitude=place["latitude"],
+                    longitude=place["longitude"],
+                    pet_info=place.get("pet_info"),
+                )
+                day_places.append(place_rec)
+                used_places.add(place["id"])
+                selected_types.append(place["type"])
 
             # 다른 타입이 없으면 점수 순으로 선택
             if len(day_places) <= i:
@@ -683,6 +792,7 @@ def _generate_basic_itinerary(
                             address=place["address"],
                             latitude=place["latitude"],
                             longitude=place["longitude"],
+                            pet_info=place.get("pet_info"),
                         )
                         day_places.append(place_rec)
                         used_places.add(place["id"])
@@ -715,6 +825,7 @@ def _generate_basic_itinerary(
                         address=place["address"],
                         latitude=place["latitude"],
                         longitude=place["longitude"],
+                        pet_info=place.get("pet_info"),
                     )
                     day_places.append(place_rec)
                     used_places.add(place["id"])
@@ -726,16 +837,10 @@ def _generate_basic_itinerary(
 
         # 마지막에 숙박시설 추가
         if accommodations:
-            # 가장 평점이 높은 숙박시설 선택 (중복 가능)
-            best_accommodation = None
-            for place in accommodations:
-                if (
-                    best_accommodation is None
-                    or place["score"] > best_accommodation["score"]
-                ):
-                    best_accommodation = place
-
-            if best_accommodation:
+            # 상위 3개 숙박시설 중에서 랜덤 선택
+            top_accommodations = accommodations[:3] if len(accommodations) >= 3 else accommodations
+            if top_accommodations:
+                best_accommodation = random.choice(top_accommodations)
                 place_rec = PlaceRecommendation(
                     id=best_accommodation["id"],
                     name=best_accommodation["name"],
@@ -747,13 +852,22 @@ def _generate_basic_itinerary(
                     address=best_accommodation["address"],
                     latitude=best_accommodation["latitude"],
                     longitude=best_accommodation["longitude"],
+                    pet_info=best_accommodation.get("pet_info"),
                 )
                 day_places.append(place_rec)
 
+        # 날씨 정보 랜덤 생성
+        weather_options = [
+            {"status": "맑음", "temperature": "18-25°C"},
+            {"status": "구름조금", "temperature": "16-23°C"},
+            {"status": "흐림", "temperature": "15-22°C"},
+            {"status": "맑음", "temperature": "20-27°C"},
+        ]
+        
         day_itinerary = DayItinerary(
             day=day,
             places=day_places,
-            weather={"status": "맑음", "temperature": "15-22°C"},
+            weather=random.choice(weather_options),
         )
         days.append(day_itinerary)
 
