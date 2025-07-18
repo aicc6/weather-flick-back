@@ -45,6 +45,7 @@ from app.models import (
     WithdrawResponse,
 )
 from app.schemas import RefreshTokenRequest, RefreshTokenResponse, Token
+from app.schemas.auth import LoginRequest
 from app.services.email_service import email_service, email_verification_service
 from app.services.google_oauth_service import google_oauth_service
 
@@ -110,10 +111,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         # 이메일 중복 확인 (활성 사용자만)
         existing_email = (
             db.query(User)
-            .filter(
-                User.email == user.email,
-                User.is_active == True
-            )
+            .filter(User.email == user.email, User.is_active == True)
             .first()
         )
 
@@ -122,18 +120,17 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             raise ValidationError(
                 message="이미 등록된 이메일입니다.",
                 code="EMAIL_ALREADY_EXISTS",
-                details=[
-                    {"field": "email", "message": "이미 사용 중인 이메일입니다."}
-                ],
+                details=[{"field": "email", "message": "이미 사용 중인 이메일입니다."}],
             )
 
         # 닉네임 중복 확인 (대소문자 무시, 활성 사용자만)
         from sqlalchemy import func
+
         existing_nickname = (
             db.query(User)
             .filter(
                 func.lower(User.nickname) == func.lower(user.nickname),
-                User.is_active == True
+                User.is_active == True,
             )
             .first()
         )
@@ -173,7 +170,10 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
                     message="이메일 인증이 필요합니다.",
                     code="EMAIL_NOT_VERIFIED",
                     details=[
-                        {"field": "email", "message": "먼저 이메일 인증을 완료해주세요."}
+                        {
+                            "field": "email",
+                            "message": "먼저 이메일 인증을 완료해주세요.",
+                        }
                     ],
                 )
         else:
@@ -217,12 +217,12 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    login_data: LoginRequest,
     db: Session = Depends(get_db),
     request: Request = None,
 ):
     """로그인"""
-    user = authenticate_user(db, form_data.username, form_data.password)
+    user = authenticate_user(db, login_data.email, login_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -234,6 +234,24 @@ async def login(
     if request:
         update_user_login_info(db, user, request)
 
+    # FCM 토큰 처리 (optional)
+    if login_data.fcm_token:
+        try:
+            from app.services.fcm_service import FCMService
+
+            FCMService.upsert_device_token(
+                db=db,
+                user_id=user.user_id,
+                fcm_token=login_data.fcm_token,
+                device_type=login_data.device_type,
+                device_id=login_data.device_id,
+                device_name=login_data.device_name,
+                user_agent=request.headers.get("User-Agent") if request else None,
+            )
+        except Exception as e:
+            logger.error(f"FCM token registration failed during login: {str(e)}")
+            # FCM 토큰 등록 실패해도 로그인은 계속 진행
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role.value},
@@ -241,9 +259,7 @@ async def login(
     )
 
     # refresh token 생성
-    refresh_token = create_refresh_token(
-        data={"sub": user.email}
-    )
+    refresh_token = create_refresh_token(data={"sub": user.email})
 
     return {
         "access_token": access_token,
@@ -291,6 +307,7 @@ async def refresh_token(
     try:
         # refresh token 검증
         from app.auth import ALGORITHM, SECRET_KEY
+
         payload = jwt.decode(request.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         token_type: str = payload.get("type")
@@ -310,10 +327,7 @@ async def refresh_token(
             expires_delta=access_token_expires,
         )
 
-        return {
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
+        return {"access_token": access_token, "token_type": "bearer"}
 
     except JWTError:
         raise credentials_exception
@@ -334,30 +348,43 @@ async def update_user_profile(
     """사용자 프로필 업데이트"""
     if user_update.nickname and user_update.nickname.strip():
         user_update.nickname = user_update.nickname.strip()  # 공백 제거
-        logger.info(f"닉네임 업데이트 시도: {current_user.email} -> {user_update.nickname}")
-        logger.info(f"현재 사용자 ID: {current_user.id} (type: {type(current_user.id)})")
-        logger.info(f"현재 사용자 user_id: {current_user.user_id} (type: {type(current_user.user_id)})")
+        logger.info(
+            f"닉네임 업데이트 시도: {current_user.email} -> {user_update.nickname}"
+        )
+        logger.info(
+            f"현재 사용자 ID: {current_user.id} (type: {type(current_user.id)})"
+        )
+        logger.info(
+            f"현재 사용자 user_id: {current_user.user_id} (type: {type(current_user.user_id)})"
+        )
 
         # 현재 닉네임과 동일한 경우 스킵
-        if current_user.nickname and current_user.nickname.lower() == user_update.nickname.lower():
+        if (
+            current_user.nickname
+            and current_user.nickname.lower() == user_update.nickname.lower()
+        ):
             logger.info(f"동일한 닉네임으로 변경 시도, 스킵: {user_update.nickname}")
         else:
             # 사용자명 중복 확인 (활성 사용자만, 대소문자 구분 없이)
             from sqlalchemy import func
+
             existing_user = (
                 db.query(User)
                 .filter(
                     func.lower(User.nickname) == func.lower(user_update.nickname),
                     User.user_id != current_user.user_id,  # user_id 사용으로 변경
-                    User.is_active == True  # 활성 사용자만 중복 체크
+                    User.is_active == True,  # 활성 사용자만 중복 체크
                 )
                 .first()
             )
 
             if existing_user:
-                logger.warning(f"닉네임 중복 발견: {user_update.nickname} - 기존 사용자 ID: {existing_user.user_id}")
+                logger.warning(
+                    f"닉네임 중복 발견: {user_update.nickname} - 기존 사용자 ID: {existing_user.user_id}"
+                )
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already taken",
                 )
 
             logger.info(f"닉네임 중복 체크 통과: {user_update.nickname}")
@@ -454,9 +481,29 @@ async def google_login(
         access_token = google_oauth_service.create_access_token_for_user(user)
 
         # refresh token 생성
-        refresh_token = create_refresh_token(
-            data={"sub": user.email}
-        )
+        refresh_token = create_refresh_token(data={"sub": user.email})
+
+        # FCM 토큰 처리 (optional)
+        if request.fcm_token:
+            try:
+                from app.services.fcm_service import FCMService
+
+                FCMService.upsert_device_token(
+                    db=db,
+                    user_id=user.user_id,
+                    fcm_token=request.fcm_token,
+                    device_type=request.device_type,
+                    device_id=request.device_id,
+                    device_name=request.device_name,
+                    user_agent=(
+                        http_request.headers.get("User-Agent") if http_request else None
+                    ),
+                )
+            except Exception as e:
+                logger.error(
+                    f"FCM token registration failed during Google login: {str(e)}"
+                )
+                # FCM 토큰 등록 실패해도 로그인은 계속 진행
 
         # 새 사용자 여부 확인
         is_new_user = user.created_at == user.updated_at
@@ -600,9 +647,7 @@ async def exchange_google_auth_code(
         jwt_token = google_oauth_service.create_access_token_for_user(user)
 
         # refresh token 생성
-        refresh_token = create_refresh_token(
-            data={"sub": user.email}
-        )
+        refresh_token = create_refresh_token(data={"sub": user.email})
 
         # 새 사용자 여부 확인
         is_new_user = user.created_at == user.updated_at
@@ -662,6 +707,25 @@ async def link_google_account(
             "picture", current_user.profile_image
         )
 
+        # FCM 토큰 처리 (optional)
+        if request.fcm_token:
+            try:
+                from app.services.fcm_service import FCMService
+
+                FCMService.upsert_device_token(
+                    db=db,
+                    user_id=current_user.user_id,
+                    fcm_token=request.fcm_token,
+                    device_type=request.device_type,
+                    device_id=request.device_id,
+                    device_name=request.device_name,
+                )
+            except Exception as e:
+                logger.error(
+                    f"FCM token registration failed during Google account linking: {str(e)}"
+                )
+                # FCM 토큰 등록 실패해도 계정 연결은 계속 진행
+
         db.commit()
         db.refresh(current_user)
 
@@ -684,10 +748,14 @@ async def send_email_verification(
     """이메일 인증 코드 발송"""
     try:
         # 이미 가입된 이메일인지 확인 (활성 사용자만)
-        existing_user = db.query(User.email).filter(
-            User.email == request.email,
-            User.is_active == True  # 활성 사용자만 확인
-        ).first()
+        existing_user = (
+            db.query(User.email)
+            .filter(
+                User.email == request.email,
+                User.is_active == True,  # 활성 사용자만 확인
+            )
+            .first()
+        )
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -755,10 +823,14 @@ async def resend_verification(
     """인증 코드 재발송"""
     try:
         # 이미 가입된 이메일인지 확인 (활성 사용자만)
-        existing_user = db.query(User.email).filter(
-            User.email == request.email,
-            User.is_active == True  # 활성 사용자만 확인
-        ).first()
+        existing_user = (
+            db.query(User.email)
+            .filter(
+                User.email == request.email,
+                User.is_active == True,  # 활성 사용자만 확인
+            )
+            .first()
+        )
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -802,7 +874,9 @@ async def forgot_password(
         # 이메일로 사용자 조회
         user = db.query(User).filter(User.email == request.email).first()
         if not user:
-            logger.warning(f"존재하지 않는 이메일로 비밀번호 찾기 시도: {request.email}")
+            logger.warning(
+                f"존재하지 않는 이메일로 비밀번호 찾기 시도: {request.email}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="해당 이메일로 등록된 계정을 찾을 수 없습니다.",
@@ -838,7 +912,7 @@ async def forgot_password(
             await email_service.send_temporary_password_email(
                 email=request.email,
                 temporary_password=temp_password,
-                nickname=user.nickname
+                nickname=user.nickname,
             )
 
             logger.info(f"임시 비밀번호 이메일 발송 완료: {request.email}")
@@ -850,30 +924,38 @@ async def forgot_password(
                     user_id=user.id,
                     activity_type="password_reset",
                     description="Temporary password issued",
-                    ip_address=http_request.client.host if http_request.client else None,
-                    user_agent=http_request.headers.get("User-Agent") if http_request else None,
+                    ip_address=(
+                        http_request.client.host if http_request.client else None
+                    ),
+                    user_agent=(
+                        http_request.headers.get("User-Agent") if http_request else None
+                    ),
                 )
 
             return ForgotPasswordResponse(
                 message="임시 비밀번호가 이메일로 전송되었습니다. 로그인 후 새로운 비밀번호로 변경해주세요.",
-                success=True
+                success=True,
             )
 
         except Exception as email_error:
-            logger.error(f"임시 비밀번호 이메일 발송 실패: {request.email}, 오류: {str(email_error)}")
+            logger.error(
+                f"임시 비밀번호 이메일 발송 실패: {request.email}, 오류: {str(email_error)}"
+            )
 
             # 이메일 발송 실패 시에도 임시 비밀번호는 이미 설정되었으므로
             # 사용자에게 알림 (실제 서비스에서는 다른 방식으로 전달)
             return ForgotPasswordResponse(
                 message="임시 비밀번호가 발급되었으나 이메일 전송에 실패했습니다. 고객센터에 문의하세요.",
-                success=False
+                success=False,
             )
 
     except HTTPException:
         # HTTPException은 그대로 전파
         raise
     except Exception as e:
-        logger.error(f"비밀번호 찾기 중 예상치 못한 오류 발생: {request.email}, 오류: {str(e)}")
+        logger.error(
+            f"비밀번호 찾기 중 예상치 못한 오류 발생: {request.email}, 오류: {str(e)}"
+        )
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -926,7 +1008,9 @@ async def withdraw_user(
                 activity_type="account_withdrawal",
                 description=f"Account withdrawn. Reason: {request.reason or 'No reason provided'}",
                 ip_address=http_request.client.host if http_request.client else None,
-                user_agent=http_request.headers.get("User-Agent") if http_request else None,
+                user_agent=(
+                    http_request.headers.get("User-Agent") if http_request else None
+                ),
             )
 
         db.commit()
@@ -935,14 +1019,16 @@ async def withdraw_user(
 
         return WithdrawResponse(
             message="회원탈퇴가 완료되었습니다. 그동안 서비스를 이용해주셔서 감사합니다.",
-            success=True
+            success=True,
         )
 
     except HTTPException:
         # HTTPException은 그대로 전파
         raise
     except Exception as e:
-        logger.error(f"회원탈퇴 중 예상치 못한 오류 발생: {current_user.email}, 오류: {str(e)}")
+        logger.error(
+            f"회원탈퇴 중 예상치 못한 오류 발생: {current_user.email}, 오류: {str(e)}"
+        )
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
