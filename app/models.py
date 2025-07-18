@@ -1745,6 +1745,12 @@ class GoogleAuthCodeRequest(BaseModel):
     """구글 인증 코드 요청 스키마"""
 
     auth_code: str
+    fcm_token: Optional[str] = Field(None, description="FCM 푸시 알림 토큰")
+    device_type: Optional[str] = Field(
+        None, description="디바이스 타입 (android, ios, web)"
+    )
+    device_id: Optional[str] = Field(None, description="디바이스 고유 식별자")
+    device_name: Optional[str] = Field(None, description="디바이스 이름")
 
 
 class EmailVerificationRequest(BaseModel):

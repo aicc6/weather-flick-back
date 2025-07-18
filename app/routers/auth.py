@@ -643,6 +643,26 @@ async def exchange_google_auth_code(
         # 사용자 생성 또는 업데이트
         user = await google_oauth_service.create_or_update_user(db, user_info, request)
 
+        # FCM 토큰 처리 (optional)
+        if request_data.fcm_token:
+            try:
+                from app.services.fcm_service import FCMService
+
+                FCMService.upsert_device_token(
+                    db=db,
+                    user_id=user.user_id,
+                    fcm_token=request_data.fcm_token,
+                    device_type=request_data.device_type,
+                    device_id=request_data.device_id,
+                    device_name=request_data.device_name,
+                    user_agent=request.headers.get("User-Agent") if request else None,
+                )
+            except Exception as e:
+                logger.error(
+                    f"FCM token registration failed during Google auth exchange: {str(e)}"
+                )
+                # FCM 토큰 등록 실패해도 로그인은 계속 진행
+
         # JWT 토큰 생성
         jwt_token = google_oauth_service.create_access_token_for_user(user)
 

@@ -10,18 +10,18 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 async def get_google_reviews(place_id: str = Query(...)):
     if not GOOGLE_API_KEY:
         raise HTTPException(status_code=500, detail="Google API Key not set")
-    
+
     url = (
         f"https://maps.googleapis.com/maps/api/place/details/json"
         f"?place_id={place_id}&fields=rating,reviews&language=ko&key={GOOGLE_API_KEY}"
     )
-    
+
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(url)
             data = resp.json()
             print("구글 API 응답:", data)  # 디버깅용 로그
-            
+
             status = data.get("status")
             if status != "OK":
                 # 다양한 에러 상태에 따른 적절한 HTTP 상태 코드와 메시지
@@ -57,13 +57,13 @@ async def get_google_reviews(place_id: str = Query(...)):
                         status_code=500,
                         detail=f"Google Places API error: {status} - {data.get('error_message', 'Unknown error')}"
                     )
-            
+
             result = data.get("result", {})
             return {
                 "rating": result.get("rating"),
                 "reviews": result.get("reviews", []),
             }
-    
+
     except httpx.HTTPError as e:
         raise HTTPException(
             status_code=503,
