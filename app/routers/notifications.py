@@ -36,7 +36,7 @@ from app.schemas import (
 from app.auth import get_current_active_user
 from app.services.fcm_service import FCMService
 from app.services.notification_service import NotificationService
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -217,27 +217,59 @@ async def send_test_notification(
                 detail="활성 디바이스 토큰을 찾을 수 없습니다."
             )
         
+        # 알림 데이터 준비
+        notification_title = "Weather Flick 테스트 알림"
+        notification_body = "FCM 푸시 알림이 정상적으로 작동하고 있습니다!"
+        notification_data = {
+            "type": "test",
+            "user_id": str(current_user.user_id),
+            "timestamp": str(datetime.now())
+        }
+        
+        # 데이터베이스에 알림 기록 저장 (fcm_notification_logs 테이블 사용)
+        import json
+        notification_id = str(uuid.uuid4())
+        
+        # 직접 SQL 실행
+        db.execute(
+            text("""
+            INSERT INTO fcm_notification_logs 
+            (log_id, user_id, notification_type, title, body, data, status, created_at)
+            VALUES 
+            (:log_id, :user_id, :notification_type, :title, :body, :data, :status, :created_at)
+            """),
+            {
+                "log_id": notification_id,
+                "user_id": str(current_user.user_id),
+                "notification_type": "test",
+                "title": notification_title,
+                "body": notification_body,
+                "data": json.dumps(notification_data),
+                "status": "pending",
+                "created_at": datetime.now()
+            }
+        )
+        db.commit()
+        
         # FCM 서비스를 통해 테스트 알림 발송
         fcm_service = FCMService()
         results = []
+        success_count = 0
         
         for token in device_tokens:
             try:
                 result = await fcm_service.send_notification(
                     token=token.device_token,
-                    title="Weather Flick 테스트 알림",
-                    body="FCM 푸시 알림이 정상적으로 작동하고 있습니다!",
-                    data={
-                        "type": "test",
-                        "user_id": str(current_user.user_id),
-                        "timestamp": str(datetime.now())
-                    }
+                    title=notification_title,
+                    body=notification_body,
+                    data=notification_data
                 )
                 results.append({
                     "token_id": str(token.id),
                     "success": True,
                     "result": result
                 })
+                success_count += 1
             except Exception as e:
                 results.append({
                     "token_id": str(token.id),
@@ -245,8 +277,37 @@ async def send_test_notification(
                     "error": str(e)
                 })
         
+        # 알림 상태 업데이트
+        if success_count > 0:
+            db.execute(
+                text("""
+                UPDATE fcm_notification_logs 
+                SET status = :status, sent_at = :sent_at
+                WHERE log_id = :log_id
+                """),
+                {
+                    "status": "sent",
+                    "sent_at": datetime.now(),
+                    "log_id": notification_id
+                }
+            )
+        else:
+            db.execute(
+                text("""
+                UPDATE fcm_notification_logs 
+                SET status = :status
+                WHERE log_id = :log_id
+                """),
+                {
+                    "status": "failed",
+                    "log_id": notification_id
+                }
+            )
+        db.commit()
+        
         return {
             "message": "테스트 알림 발송 완료",
+            "notification_id": notification_id,
             "results": results
         }
         

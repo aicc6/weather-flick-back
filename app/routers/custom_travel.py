@@ -229,21 +229,10 @@ async def get_custom_travel_recommendations(
                     for item in pet_tour_info if item[0]
                 }
             
-            # 데이터가 부족한 경우 다른 지역의 샘플 데이터 추가
+            # 데이터가 부족한 경우 로그만 남기고 다른 지역 데이터를 섞지 않음
             if len(cultural_facilities) == 0 and len(restaurants) == 0 and len(accommodations) == 0:
                 logger.warning(f"No cultural/restaurant/accommodation data found for region {db_region_code}")
-                # 가장 많은 데이터가 있는 지역의 샘플 추가
-                sample_regions = ['1', '31', '6']  # 서울, 경기, 부산
-                for sample_region in sample_regions:
-                    if len(cultural_facilities) < 10:
-                        sample_cultural = db.query(CulturalFacility).filter(CulturalFacility.region_code == sample_region).limit(10).all()
-                        cultural_facilities.extend(sample_cultural)
-                    if len(restaurants) < 10:
-                        sample_restaurants = db.query(Restaurant).filter(Restaurant.region_code == sample_region).limit(10).all()
-                        restaurants.extend(sample_restaurants)
-                    if len(accommodations) < 5:
-                        sample_accommodations = db.query(Accommodation).filter(Accommodation.region_code == sample_region).limit(5).all()
-                        accommodations.extend(sample_accommodations)
+                # 다른 지역의 데이터를 섞지 않고, 있는 데이터만 사용
 
         except Exception as e:
             logger.error(f"Database query error: {str(e)}")
