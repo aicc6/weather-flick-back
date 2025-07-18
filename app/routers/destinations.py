@@ -14,6 +14,9 @@ GOOGLE_API_KEY = settings.google_api_key
 
 @router.get("/search")
 async def search_destination(query: str = Query(...)):
+    print(f"🔍 목적지 검색 요청: {query}")
+    print(f"🔑 Google API Key 확인: {GOOGLE_API_KEY[:10]}..." if GOOGLE_API_KEY else "❌ API Key 없음")
+    
     url = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -25,6 +28,11 @@ async def search_destination(query: str = Query(...)):
             },
         )
         data = resp.json()
+        print(f"📍 Google API 응답 상태: {data.get('status', 'NO_STATUS')}")
+        if data.get('status') != 'OK':
+            print(f"❌ Google API 오류: {data.get('error_message', 'Unknown error')}")
+        else:
+            print(f"✅ 예측 결과 수: {len(data.get('predictions', []))}")
 
         # 각 prediction에서 place_id 추출 후, Details API로 대표 사진 얻기
         suggestions = []
