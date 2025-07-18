@@ -1,31 +1,50 @@
 """
-FCM (Firebase Cloud Messaging) 서비스
-푸시 알림 전송을 담당하는 서비스 클래스
+FCM (Firebase Cloud Messaging) 서비스 v2
+Firebase Admin SDK를 사용하여 FCM HTTP v1 API로 푸시 알림 전송
 """
 
 import json
 import logging
-from typing import Dict, Any, Optional
-import asyncio
-import aiohttp
+import os
+from typing import Dict, Any, Optional, List
 from datetime import datetime
+import firebase_admin
+from firebase_admin import credentials, messaging
+from firebase_admin.messaging import Message, Notification, AndroidConfig, APNSConfig, WebpushConfig
 
 logger = logging.getLogger(__name__)
 
 
 class FCMService:
-    """FCM 푸시 알림 서비스"""
+    """FCM 푸시 알림 서비스 (HTTP v1 API)"""
 
     def __init__(self):
-        self.server_key = self._get_server_key()
-        self.fcm_url = "https://fcm.googleapis.com/fcm/send"
+        # Firebase Admin SDK 초기화
+        self._initialize_firebase()
 
-    def _get_server_key(self) -> str:
-        """FCM 서버 키 조회"""
-        # 환경 변수 또는 설정 파일에서 FCM 서버 키를 가져옴
-        import os
-
-        return os.getenv("FCM_SERVER_KEY", "")
+    def _initialize_firebase(self):
+        """Firebase Admin SDK 초기화"""
+        try:
+            # 이미 초기화되어 있는지 확인
+            if not firebase_admin._apps:
+                # 서비스 계정 키 파일 경로
+                cred_path = os.path.join(
+                    os.path.dirname(__file__), 
+                    "..", "..", "config", "firebase-service-account.json"
+                )
+                
+                if not os.path.exists(cred_path):
+                    logger.error(f"Firebase service account file not found: {cred_path}")
+                    raise FileNotFoundError(f"Firebase service account file not found: {cred_path}")
+                
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                logger.info("Firebase Admin SDK initialized successfully")
+            else:
+                logger.info("Firebase Admin SDK already initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Firebase Admin SDK: {str(e)}")
+            raise
 
     async def send_notification(
         self,
@@ -33,137 +52,157 @@ class FCMService:
         title: str,
         body: str,
         data: Optional[Dict[str, Any]] = None,
-        click_action: Optional[str] = None,
-        icon: Optional[str] = None,
-        sound: str = "default",
+        image: Optional[str] = None,
         badge: Optional[int] = None,
+        sound: str = "default",
         priority: str = "high",
     ) -> bool:
         """단일 디바이스에 푸시 알림 전송"""
-
-        if not self.server_key:
-            logger.error("FCM server key not configured")
-            return False
-
-        payload = {
-            "to": token,
-            "notification": {
-                "title": title,
-                "body": body,
-                "sound": sound,
-                "priority": priority,
-            },
-            "data": data or {},
-        }
-
-        # 선택적 속성 추가
-        if click_action:
-            payload["notification"]["click_action"] = click_action
-        if icon:
-            payload["notification"]["icon"] = icon
-        if badge:
-            payload["notification"]["badge"] = badge
-
-        headers = {
-            "Authorization": f"key={self.server_key}",
-            "Content-Type": "application/json",
-        }
-
+        
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.fcm_url, json=payload, headers=headers
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
+            # 데이터 페이로드 준비 (모든 값은 문자열이어야 함)
+            if data:
+                data_payload = {k: str(v) for k, v in data.items()}
+            else:
+                data_payload = {}
 
-                        if result.get("success", 0) > 0:
-                            logger.info(
-                                f"FCM notification sent successfully to {token[:20]}..."
-                            )
-                            return True
-                        else:
-                            error = result.get("results", [{}])[0].get(
-                                "error", "Unknown error"
-                            )
-                            logger.error(f"FCM notification failed: {error}")
-                            return False
-                    else:
-                        logger.error(f"FCM API error: {response.status}")
-                        return False
+            # FCM 메시지 생성
+            message = Message(
+                token=token,
+                notification=Notification(
+                    title=title,
+                    body=body,
+                    image=image
+                ),
+                data=data_payload,
+                android=AndroidConfig(
+                    priority=priority,
+                    notification=messaging.AndroidNotification(
+                        sound=sound,
+                        notification_count=badge
+                    )
+                ),
+                apns=APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound=sound,
+                            badge=badge
+                        )
+                    )
+                ),
+                webpush=WebpushConfig(
+                    notification=messaging.WebpushNotification(
+                        title=title,
+                        body=body,
+                        icon=image,
+                        badge=str(badge) if badge else None
+                    )
+                )
+            )
 
+            # 메시지 전송
+            response = messaging.send(message)
+            logger.info(f"FCM notification sent successfully: {response}")
+            return True
+
+        except messaging.UnregisteredError:
+            logger.error(f"FCM token is not registered: {token[:20]}...")
+            return False
+        except ValueError as e:
+            logger.error(f"Invalid FCM message arguments: {str(e)}")
+            return False
         except Exception as e:
             logger.error(f"Error sending FCM notification: {str(e)}")
             return False
 
     async def send_multicast_notification(
         self,
-        tokens: list[str],
+        tokens: List[str],
         title: str,
         body: str,
         data: Optional[Dict[str, Any]] = None,
-        click_action: Optional[str] = None,
-        icon: Optional[str] = None,
-        sound: str = "default",
+        image: Optional[str] = None,
         badge: Optional[int] = None,
+        sound: str = "default",
         priority: str = "high",
     ) -> Dict[str, Any]:
         """다중 디바이스에 푸시 알림 전송"""
-
-        if not self.server_key:
-            logger.error("FCM server key not configured")
-            return {"success": 0, "failure": len(tokens), "results": []}
-
+        
         if not tokens:
             return {"success": 0, "failure": 0, "results": []}
 
-        payload = {
-            "registration_ids": tokens,
-            "notification": {
-                "title": title,
-                "body": body,
-                "sound": sound,
-                "priority": priority,
-            },
-            "data": data or {},
-        }
-
-        # 선택적 속성 추가
-        if click_action:
-            payload["notification"]["click_action"] = click_action
-        if icon:
-            payload["notification"]["icon"] = icon
-        if badge:
-            payload["notification"]["badge"] = badge
-
-        headers = {
-            "Authorization": f"key={self.server_key}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.fcm_url, json=payload, headers=headers
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
+            # 데이터 페이로드 준비
+            if data:
+                data_payload = {k: str(v) for k, v in data.items()}
+            else:
+                data_payload = {}
 
-                        success_count = result.get("success", 0)
-                        failure_count = result.get("failure", 0)
-
-                        logger.info(
-                            f"FCM multicast sent: {success_count} success, {failure_count} failure"
+            # MulticastMessage 생성
+            message = messaging.MulticastMessage(
+                tokens=tokens,
+                notification=Notification(
+                    title=title,
+                    body=body,
+                    image=image
+                ),
+                data=data_payload,
+                android=AndroidConfig(
+                    priority=priority,
+                    notification=messaging.AndroidNotification(
+                        sound=sound,
+                        notification_count=badge
+                    )
+                ),
+                apns=APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound=sound,
+                            badge=badge
                         )
+                    )
+                ),
+                webpush=WebpushConfig(
+                    notification=messaging.WebpushNotification(
+                        title=title,
+                        body=body,
+                        icon=image,
+                        badge=str(badge) if badge else None
+                    )
+                )
+            )
 
-                        return {
-                            "success": success_count,
-                            "failure": failure_count,
-                            "results": result.get("results", []),
-                        }
-                    else:
-                        logger.error(f"FCM API error: {response.status}")
-                        return {"success": 0, "failure": len(tokens), "results": []}
+            # 멀티캐스트 메시지 전송
+            batch_response = messaging.send_each_for_multicast(message)
+            
+            success_count = batch_response.success_count
+            failure_count = batch_response.failure_count
+            
+            # 결과 처리
+            results = []
+            for i, response in enumerate(batch_response.responses):
+                if response.success:
+                    results.append({
+                        "token": tokens[i][:20] + "...",
+                        "success": True,
+                        "message_id": response.message_id
+                    })
+                else:
+                    results.append({
+                        "token": tokens[i][:20] + "...",
+                        "success": False,
+                        "error": str(response.exception)
+                    })
+            
+            logger.info(
+                f"FCM multicast sent: {success_count} success, {failure_count} failure"
+            )
+            
+            return {
+                "success": success_count,
+                "failure": failure_count,
+                "results": results
+            }
 
         except Exception as e:
             logger.error(f"Error sending FCM multicast notification: {str(e)}")
@@ -175,134 +214,116 @@ class FCMService:
         title: str,
         body: str,
         data: Optional[Dict[str, Any]] = None,
-        click_action: Optional[str] = None,
-        icon: Optional[str] = None,
-        sound: str = "default",
+        image: Optional[str] = None,
         badge: Optional[int] = None,
+        sound: str = "default",
         priority: str = "high",
     ) -> bool:
         """토픽 구독자들에게 푸시 알림 전송"""
-
-        if not self.server_key:
-            logger.error("FCM server key not configured")
-            return False
-
-        payload = {
-            "to": f"/topics/{topic}",
-            "notification": {
-                "title": title,
-                "body": body,
-                "sound": sound,
-                "priority": priority,
-            },
-            "data": data or {},
-        }
-
-        # 선택적 속성 추가
-        if click_action:
-            payload["notification"]["click_action"] = click_action
-        if icon:
-            payload["notification"]["icon"] = icon
-        if badge:
-            payload["notification"]["badge"] = badge
-
-        headers = {
-            "Authorization": f"key={self.server_key}",
-            "Content-Type": "application/json",
-        }
-
+        
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.fcm_url, json=payload, headers=headers
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
+            # 데이터 페이로드 준비
+            if data:
+                data_payload = {k: str(v) for k, v in data.items()}
+            else:
+                data_payload = {}
 
-                        if result.get("message_id"):
-                            logger.info(
-                                f"FCM topic notification sent successfully to {topic}"
-                            )
-                            return True
-                        else:
-                            logger.error(f"FCM topic notification failed: {result}")
-                            return False
-                    else:
-                        logger.error(f"FCM API error: {response.status}")
-                        return False
+            # 토픽 메시지 생성
+            message = Message(
+                topic=topic,
+                notification=Notification(
+                    title=title,
+                    body=body,
+                    image=image
+                ),
+                data=data_payload,
+                android=AndroidConfig(
+                    priority=priority,
+                    notification=messaging.AndroidNotification(
+                        sound=sound,
+                        notification_count=badge
+                    )
+                ),
+                apns=APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound=sound,
+                            badge=badge
+                        )
+                    )
+                ),
+                webpush=WebpushConfig(
+                    notification=messaging.WebpushNotification(
+                        title=title,
+                        body=body,
+                        icon=image,
+                        badge=str(badge) if badge else None
+                    )
+                )
+            )
+
+            # 메시지 전송
+            response = messaging.send(message)
+            logger.info(f"FCM topic notification sent successfully to {topic}: {response}")
+            return True
 
         except Exception as e:
             logger.error(f"Error sending FCM topic notification: {str(e)}")
             return False
 
-    async def subscribe_to_topic(self, tokens: list[str], topic: str) -> Dict[str, Any]:
+    async def subscribe_to_topic(self, tokens: List[str], topic: str) -> Dict[str, Any]:
         """토픽 구독"""
-        if not self.server_key:
-            logger.error("FCM server key not configured")
-            return {"success": False, "error": "Server key not configured"}
-
-        url = f"https://iid.googleapis.com/iid/v1:batchAdd"
-
-        payload = {"to": f"/topics/{topic}", "registration_tokens": tokens}
-
-        headers = {
-            "Authorization": f"key={self.server_key}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, headers=headers) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        logger.info(
-                            f"Successfully subscribed {len(tokens)} tokens to topic {topic}"
-                        )
-                        return {"success": True, "result": result}
-                    else:
-                        logger.error(f"FCM topic subscription error: {response.status}")
-                        return {"success": False, "error": f"HTTP {response.status}"}
-
+            response = messaging.subscribe_to_topic(tokens, topic)
+            
+            success_count = response.success_count
+            failure_count = response.failure_count
+            
+            logger.info(
+                f"Topic subscription: {success_count} success, {failure_count} failure for topic {topic}"
+            )
+            
+            return {
+                "success": True,
+                "success_count": success_count,
+                "failure_count": failure_count,
+                "errors": response.errors if hasattr(response, 'errors') else []
+            }
+            
         except Exception as e:
             logger.error(f"Error subscribing to FCM topic: {str(e)}")
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
-    async def unsubscribe_from_topic(
-        self, tokens: list[str], topic: str
-    ) -> Dict[str, Any]:
+    async def unsubscribe_from_topic(self, tokens: List[str], topic: str) -> Dict[str, Any]:
         """토픽 구독 해제"""
-        if not self.server_key:
-            logger.error("FCM server key not configured")
-            return {"success": False, "error": "Server key not configured"}
-
-        url = f"https://iid.googleapis.com/iid/v1:batchRemove"
-
-        payload = {"to": f"/topics/{topic}", "registration_tokens": tokens}
-
-        headers = {
-            "Authorization": f"key={self.server_key}",
-            "Content-Type": "application/json",
-        }
-
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, headers=headers) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        logger.info(
-                            f"Successfully unsubscribed {len(tokens)} tokens from topic {topic}"
-                        )
-                        return {"success": True, "result": result}
-                    else:
-                        logger.error(
-                            f"FCM topic unsubscription error: {response.status}"
-                        )
-                        return {"success": False, "error": f"HTTP {response.status}"}
-
+            response = messaging.unsubscribe_from_topic(tokens, topic)
+            
+            success_count = response.success_count
+            failure_count = response.failure_count
+            
+            logger.info(
+                f"Topic unsubscription: {success_count} success, {failure_count} failure for topic {topic}"
+            )
+            
+            return {
+                "success": True,
+                "success_count": success_count,
+                "failure_count": failure_count,
+                "errors": response.errors if hasattr(response, 'errors') else []
+            }
+            
         except Exception as e:
             logger.error(f"Error unsubscribing from FCM topic: {str(e)}")
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
+    # 기존 헬퍼 메서드들은 그대로 유지
     def create_weather_notification(
         self,
         location: str,
