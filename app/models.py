@@ -125,6 +125,21 @@ class User(Base):
         "UserActivityLog", back_populates="user", cascade="all, delete-orphan"
     )
     chat_messages = relationship("ChatMessage", back_populates="user")
+    created_shares = relationship(
+        "TravelPlanShare", back_populates="creator", cascade="all, delete-orphan"
+    )
+    plan_versions = relationship(
+        "TravelPlanVersion", back_populates="creator", cascade="all, delete-orphan"
+    )
+    plan_comments = relationship(
+        "TravelPlanComment", back_populates="user", cascade="all, delete-orphan"
+    )
+    collaborated_plans = relationship(
+        "TravelPlanCollaborator", 
+        foreign_keys="TravelPlanCollaborator.user_id",
+        back_populates="user", 
+        cascade="all, delete-orphan"
+    )
 
     # 알림 관련 관계
     notification_settings = relationship(
@@ -217,6 +232,26 @@ class TravelPlan(Base):
     routes = relationship("TravelRoute", back_populates="travel_plan")
     plan_destinations = relationship(
         "TravelPlanDestination",
+        back_populates="travel_plan",
+        cascade="all, delete-orphan",
+    )
+    shares = relationship(
+        "TravelPlanShare",
+        back_populates="travel_plan",
+        cascade="all, delete-orphan",
+    )
+    versions = relationship(
+        "TravelPlanVersion",
+        back_populates="travel_plan",
+        cascade="all, delete-orphan",
+    )
+    comments = relationship(
+        "TravelPlanComment",
+        back_populates="travel_plan",
+        cascade="all, delete-orphan",
+    )
+    collaborators = relationship(
+        "TravelPlanCollaborator",
         back_populates="travel_plan",
         cascade="all, delete-orphan",
     )
@@ -2284,6 +2319,78 @@ class RouteCalculationResponse(BaseModel):
     message: str | None = None
 
 
+class TravelPlanShareCreate(BaseModel):
+    """여행 계획 공유 생성 스키마"""
+    permission: str = "view"  # 'view' or 'edit'
+    expires_at: datetime | None = None
+    max_uses: int | None = None
+
+
+class TravelPlanShareResponse(BaseModel):
+    """여행 계획 공유 응답 스키마"""
+    share_id: uuid.UUID
+    plan_id: uuid.UUID
+    share_token: str
+    share_link: str  # 전체 공유 링크
+    permission: str
+    expires_at: datetime | None = None
+    max_uses: int | None = None
+    use_count: int
+    is_active: bool
+    created_by: uuid.UUID
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class TravelPlanCommentCreate(BaseModel):
+    """여행 계획 댓글 생성 스키마"""
+    content: str
+    parent_comment_id: uuid.UUID | None = None
+    day_number: int | None = None
+    place_index: int | None = None
+
+
+class TravelPlanCommentResponse(BaseModel):
+    """여행 계획 댓글 응답 스키마"""
+    comment_id: uuid.UUID
+    plan_id: uuid.UUID
+    user_id: uuid.UUID
+    user_name: str | None = None  # Join으로 가져올 사용자 이름
+    content: str
+    parent_comment_id: uuid.UUID | None = None
+    day_number: int | None = None
+    place_index: int | None = None
+    is_deleted: bool
+    created_at: datetime
+    updated_at: datetime
+    replies: list["TravelPlanCommentResponse"] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class TravelPlanCollaboratorAdd(BaseModel):
+    """여행 계획 협업자 추가 스키마"""
+    user_email: str  # 이메일로 사용자 찾기
+    permission: str = "edit"  # 'view' or 'edit'
+
+
+class TravelPlanCollaboratorResponse(BaseModel):
+    """여행 계획 협업자 응답 스키마"""
+    user_id: uuid.UUID
+    user_name: str | None = None
+    user_email: str | None = None
+    permission: str
+    invited_by: uuid.UUID
+    joined_at: datetime
+    last_viewed_at: datetime | None = None
+    
+    class Config:
+        from_attributes = True
+
+
 class RecommendReviewCreate(BaseModel):
     """추천 코스 리뷰 생성 스키마"""
 
@@ -2875,6 +2982,106 @@ class SystemConfiguration(Base):
             "config_category", "config_key", name="uq_config_category_key"
         ),
         Index("idx_config_category", "config_category", "is_active"),
+    )
+
+
+class TravelPlanShare(Base):
+    """
+    여행 계획 공유 테이블
+    사용처: weather-flick-back
+    설명: 여행 계획 공유 링크 및 권한 관리
+    """
+    __tablename__ = "travel_plan_shares"
+    
+    share_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    share_token = Column(String(100), unique=True, nullable=False, index=True)
+    permission = Column(String(20), default="view")  # 'view', 'edit'
+    expires_at = Column(DateTime, nullable=True)
+    max_uses = Column(Integer, nullable=True)  # 최대 사용 횟수
+    use_count = Column(Integer, default=0)  # 현재 사용 횟수
+    is_active = Column(Boolean, default=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    travel_plan = relationship("TravelPlan", back_populates="shares")
+    creator = relationship("User", back_populates="created_shares")
+
+
+class TravelPlanVersion(Base):
+    """
+    여행 계획 버전 관리 테이블
+    사용처: weather-flick-back
+    설명: 여행 계획의 수정 이력 및 버전 관리
+    """
+    __tablename__ = "travel_plan_versions"
+    
+    version_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    title = Column(String(200))
+    description = Column(Text)
+    itinerary = Column(JSONB)
+    change_description = Column(String(500))  # 변경 사항 설명
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # 관계 설정
+    travel_plan = relationship("TravelPlan", back_populates="versions")
+    creator = relationship("User", back_populates="plan_versions")
+
+
+class TravelPlanComment(Base):
+    """
+    여행 계획 댓글 테이블
+    사용처: weather-flick-back
+    설명: 여행 계획에 대한 댓글 및 토론
+    """
+    __tablename__ = "travel_plan_comments"
+    
+    comment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    parent_comment_id = Column(UUID(as_uuid=True), ForeignKey("travel_plan_comments.comment_id"), nullable=True)
+    content = Column(Text, nullable=False)
+    day_number = Column(Integer, nullable=True)  # 특정 일차에 대한 댓글
+    place_index = Column(Integer, nullable=True)  # 특정 장소에 대한 댓글
+    is_deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # 관계 설정
+    travel_plan = relationship("TravelPlan", back_populates="comments")
+    user = relationship("User", back_populates="plan_comments")
+    parent_comment = relationship("TravelPlanComment", remote_side=[comment_id], backref="replies")
+
+
+class TravelPlanCollaborator(Base):
+    """
+    여행 계획 협업자 테이블
+    사용처: weather-flick-back
+    설명: 여행 계획 협업자 및 권한 관리
+    """
+    __tablename__ = "travel_plan_collaborators"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    permission = Column(String(20), default="edit")  # 'view', 'edit'
+    invited_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    joined_at = Column(DateTime, server_default=func.now())
+    last_viewed_at = Column(DateTime, nullable=True)
+    
+    # 관계 설정
+    travel_plan = relationship("TravelPlan", back_populates="collaborators")
+    user = relationship("User", foreign_keys=[user_id], back_populates="collaborated_plans")
+    inviter = relationship("User", foreign_keys=[invited_by])
+    
+    # 유니크 제약조건
+    __table_args__ = (
+        UniqueConstraint("plan_id", "user_id", name="uq_plan_collaborator"),
     )
 
 

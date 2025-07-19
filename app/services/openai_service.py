@@ -20,10 +20,12 @@ class OpenAIService:
         else:
             # Python 3.13 호환성 문제 해결을 위해 프록시 환경 변수 제거
             import os
-            for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']:
+            for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy']:
                 os.environ.pop(proxy_var, None)
             
             try:
+                # OpenAI v1.x에서는 proxies 파라미터를 지원하지 않음
+                # 환경 변수로 설정된 proxy는 이미 제거했으므로 기본 설정으로 초기화
                 self.client = OpenAI(api_key=settings.openai_api_key)
                 logger.info("OpenAI client initialized successfully")
             except Exception as e:

@@ -1,8 +1,12 @@
 """
 알림 관련 API 라우터
 사용자 알림 설정, 디바이스 토큰, 알림 발송 등을 관리하는 엔드포인트들
+
+[비활성화 날짜: 2025-07-19]
+[비활성화 사유: 알림 시스템 기능 일시 중단, 향후 재활성화 가능]
 """
 
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -50,7 +54,7 @@ async def get_notification_settings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """사용자 알림 설정 조회"""
+    "사용자 알림 설정 조회"
     settings = db.query(UserNotificationSettings).filter(
         UserNotificationSettings.user_id == current_user.user_id
     ).first()
@@ -73,7 +77,7 @@ async def update_notification_settings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """사용자 알림 설정 업데이트"""
+    "사용자 알림 설정 업데이트"
     settings = db.query(UserNotificationSettings).filter(
         UserNotificationSettings.user_id == current_user.user_id
     ).first()
@@ -106,7 +110,7 @@ async def register_device_token(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """FCM 디바이스 토큰 등록"""
+    "FCM 디바이스 토큰 등록"
     # 기존 토큰 확인
     existing_token = db.query(UserDeviceToken).filter(
         UserDeviceToken.device_token == token_data.device_token
@@ -139,7 +143,7 @@ async def get_device_tokens(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """사용자 디바이스 토큰 목록 조회"""
+    "사용자 디바이스 토큰 목록 조회"
     tokens = db.query(UserDeviceToken).filter(
         UserDeviceToken.user_id == current_user.user_id,
         UserDeviceToken.is_active == True
@@ -155,7 +159,7 @@ async def update_device_token(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """디바이스 토큰 업데이트"""
+    "디바이스 토큰 업데이트"
     token = db.query(UserDeviceToken).filter(
         UserDeviceToken.id == token_id,
         UserDeviceToken.user_id == current_user.user_id
@@ -179,7 +183,7 @@ async def delete_device_token(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """디바이스 토큰 삭제"""
+    "디바이스 토큰 삭제"
     token = db.query(UserDeviceToken).filter(
         UserDeviceToken.id == token_id,
         UserDeviceToken.user_id == current_user.user_id
@@ -198,125 +202,6 @@ async def delete_device_token(
 # 알림 조회 관련 엔드포인트
 # ===========================================
 
-@router.post("/test")
-async def send_test_notification(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """테스트 FCM 알림 발송"""
-    try:
-        # 사용자의 활성 디바이스 토큰 조회
-        device_tokens = db.query(UserDeviceToken).filter(
-            UserDeviceToken.user_id == current_user.user_id,
-            UserDeviceToken.is_active == True
-        ).all()
-        
-        if not device_tokens:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="활성 디바이스 토큰을 찾을 수 없습니다."
-            )
-        
-        # 알림 데이터 준비
-        notification_title = "Weather Flick 테스트 알림"
-        notification_body = "FCM 푸시 알림이 정상적으로 작동하고 있습니다!"
-        notification_data = {
-            "type": "test",
-            "user_id": str(current_user.user_id),
-            "timestamp": str(datetime.now())
-        }
-        
-        # 데이터베이스에 알림 기록 저장 (fcm_notification_logs 테이블 사용)
-        import json
-        notification_id = str(uuid.uuid4())
-        
-        # 직접 SQL 실행
-        db.execute(
-            text("""
-            INSERT INTO fcm_notification_logs 
-            (log_id, user_id, notification_type, title, body, data, status, created_at)
-            VALUES 
-            (:log_id, :user_id, :notification_type, :title, :body, :data, :status, :created_at)
-            """),
-            {
-                "log_id": notification_id,
-                "user_id": str(current_user.user_id),
-                "notification_type": "test",
-                "title": notification_title,
-                "body": notification_body,
-                "data": json.dumps(notification_data),
-                "status": "pending",
-                "created_at": datetime.now()
-            }
-        )
-        db.commit()
-        
-        # FCM 서비스를 통해 테스트 알림 발송
-        fcm_service = FCMService()
-        results = []
-        success_count = 0
-        
-        for token in device_tokens:
-            try:
-                result = await fcm_service.send_notification(
-                    token=token.device_token,
-                    title=notification_title,
-                    body=notification_body,
-                    data=notification_data
-                )
-                results.append({
-                    "token_id": str(token.id),
-                    "success": True,
-                    "result": result
-                })
-                success_count += 1
-            except Exception as e:
-                results.append({
-                    "token_id": str(token.id),
-                    "success": False,
-                    "error": str(e)
-                })
-        
-        # 알림 상태 업데이트
-        if success_count > 0:
-            db.execute(
-                text("""
-                UPDATE fcm_notification_logs 
-                SET status = :status, sent_at = :sent_at
-                WHERE log_id = :log_id
-                """),
-                {
-                    "status": "sent",
-                    "sent_at": datetime.now(),
-                    "log_id": notification_id
-                }
-            )
-        else:
-            db.execute(
-                text("""
-                UPDATE fcm_notification_logs 
-                SET status = :status
-                WHERE log_id = :log_id
-                """),
-                {
-                    "status": "failed",
-                    "log_id": notification_id
-                }
-            )
-        db.commit()
-        
-        return {
-            "message": "테스트 알림 발송 완료",
-            "notification_id": notification_id,
-            "results": results
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"테스트 알림 발송 실패: {str(e)}"
-        )
-
 @router.get("/", response_model=NotificationListResponse)
 async def get_notifications(
     page: int = Query(1, ge=1),
@@ -326,7 +211,7 @@ async def get_notifications(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """사용자 알림 목록 조회"""
+    "사용자 알림 목록 조회"
     query = db.query(Notification).filter(
         Notification.user_id == current_user.user_id
     )
@@ -360,7 +245,7 @@ async def get_notification(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """특정 알림 조회"""
+    "특정 알림 조회"
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
         Notification.user_id == current_user.user_id
@@ -378,7 +263,7 @@ async def mark_notification_read(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """알림 읽음 처리"""
+    "알림 읽음 처리"
     notification = db.query(Notification).filter(
         Notification.id == notification_id,
         Notification.user_id == current_user.user_id
@@ -399,7 +284,7 @@ async def mark_all_notifications_read(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """모든 알림 읽음 처리"""
+    "모든 알림 읽음 처리"
     db.query(Notification).filter(
         Notification.user_id == current_user.user_id,
         Notification.status != NotificationStatus.READ
@@ -417,7 +302,7 @@ async def get_notification_stats(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """알림 통계 조회"""
+    "알림 통계 조회"
     # 전체 알림 수
     total_notifications = db.query(Notification).filter(
         Notification.user_id == current_user.user_id
@@ -471,7 +356,7 @@ async def send_notifications(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """대량 알림 발송 (관리자용)"""
+    "대량 알림 발송 (관리자용)"
     # 관리자 권한 확인
     if current_user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -506,41 +391,6 @@ async def send_notifications(
             failed_count=len(request.user_ids),
             notification_ids=[]
         )
+"""
 
 
-# ===========================================
-# 테스트용 엔드포인트
-# ===========================================
-
-@router.post("/test/push")
-async def test_push_notification(
-    message: str = "Test push notification",
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """푸시 알림 테스트"""
-    # 사용자 디바이스 토큰 조회
-    tokens = db.query(UserDeviceToken).filter(
-        UserDeviceToken.user_id == current_user.user_id,
-        UserDeviceToken.is_active == True
-    ).all()
-    
-    if not tokens:
-        raise HTTPException(status_code=404, detail="No active device tokens found")
-    
-    fcm_service = FCMService()
-    results = []
-    
-    for token in tokens:
-        try:
-            result = await fcm_service.send_notification(
-                token=token.device_token,
-                title="테스트 알림",
-                body=message,
-                data={"test": "true"}
-            )
-            results.append({"token_id": str(token.id), "success": True, "result": result})
-        except Exception as e:
-            results.append({"token_id": str(token.id), "success": False, "error": str(e)})
-    
-    return {"results": results}

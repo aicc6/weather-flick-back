@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import User
 from app.services.destination_service import destination_service
 from app.services.tour_api_service import get_festivals_from_tour_api
-from app.utils.kma_utils import get_area_code_for_city
+# KMA utils removed - area code feature temporarily disabled
 
 # 날씨 상태와 관련 태그 매핑
 weather_to_tags_map = {
@@ -35,8 +35,10 @@ async def get_weather_based_recommendations(
     # 2. 날씨가 "맑음"일 경우, 현재 진행중인 축제/이벤트 정보 추가
     events_recommendations = []
     if weather_status == "맑음":
-        area_code = get_area_code_for_city(city)
-        if area_code:
+        # Area code feature temporarily disabled
+        # area_code = get_area_code_for_city(city)
+        area_code = None  # Default to None until alternative solution is implemented
+        if False:  # Temporarily disable festival recommendations
             today_str = datetime.now().strftime("%Y%m%d")
             try:
                 festivals = await get_festivals_from_tour_api(
@@ -66,7 +68,7 @@ async def get_weather_based_recommendations(
     )
     recommended_destinations = []
     for dest in destinations:
-        dest_tags = set(dest.tags)
+        dest_tags = set(dest.tags if dest.tags else [])
 
         weather_score = len(set(recommended_tags).intersection(dest_tags))
         personalization_score = len(user_preferences.intersection(dest_tags)) * 2
@@ -75,11 +77,11 @@ async def get_weather_based_recommendations(
         if total_score > 0:
             recommended_destinations.append(
                 {
-                    "id": dest.id,
+                    "id": str(dest.destination_id),
                     "name": dest.name,
-                    "description": dest.description,
+                    "description": f"{dest.province} {dest.region or ''}",  # province와 region을 조합하여 설명으로 사용
                     "province": dest.province,
-                    "tags": dest.tags,
+                    "tags": dest.tags if dest.tags else [],
                     "is_indoor": dest.is_indoor,
                     "recommendation_score": total_score,
                 }

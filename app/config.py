@@ -51,6 +51,9 @@ class Settings(BaseSettings):
 
     # Redis 설정
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+    redis_host: str = os.getenv("REDIS_HOST", "localhost")
+    redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
+    redis_ttl: int = int(os.getenv("REDIS_TTL", "3600"))  # 1시간 기본 캐시
 
     # 외부 API 설정
     weather_api_key: str = os.getenv("WEATHER_API_KEY", "")
@@ -84,6 +87,12 @@ class Settings(BaseSettings):
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     openai_max_tokens: int = int(os.getenv("OPENAI_MAX_TOKENS", "1500"))
     openai_temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
+    
+    # AI 모델 전략 설정
+    ai_model_simple: str = os.getenv("AI_MODEL_SIMPLE", "gpt-3.5-turbo")
+    ai_model_standard: str = os.getenv("AI_MODEL_STANDARD", "gpt-4o-mini")
+    ai_model_complex: str = os.getenv("AI_MODEL_COMPLEX", "gpt-4-turbo")
+    ai_model_premium: str = os.getenv("AI_MODEL_PREMIUM", "gpt-4o")
 
     # 교통정보 API 설정
     odsay_api_key: str = os.getenv("ODsay_API_KEY", "")

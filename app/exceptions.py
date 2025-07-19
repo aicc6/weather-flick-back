@@ -163,14 +163,3 @@ class LocalInfoServiceError(ExternalAPIError):
     ):
         super().__init__(message, code, details)
 
-
-class NaverMapServiceError(ExternalAPIError):
-    """네이버 지도 서비스 예외"""
-
-    def __init__(
-        self,
-        message: str = "지도 정보를 가져올 수 없습니다.",
-        code: str = "NAVER_MAP_SERVICE_ERROR",
-        details: list[dict[str, str]] | None = None,
-    ):
-        super().__init__(message, code, details)

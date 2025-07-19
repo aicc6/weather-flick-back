@@ -25,6 +25,8 @@ from app.models import (
     TouristAttraction,
 )
 from app.services.ai_recommendation import AIRecommendationService
+from app.services.enhanced_ai_recommendation import get_enhanced_ai_recommendation_service
+from app.auth import get_current_user_optional
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,7 @@ def clean_expired_cache():
 async def get_custom_travel_recommendations(
     request: CustomTravelRecommendationRequest,
     db: Session = Depends(get_db),
+    current_user = Depends(get_current_user_optional),
 ):
     """
     맞춤형 여행 일정 추천 API
@@ -581,13 +584,19 @@ async def get_custom_travel_recommendations(
                 )
 
         # AI 추천 사용 여부 확인
-        use_ai = False  # 임시로 AI 비활성화 (폴백 로직 사용)
+        use_ai = True  # AI 활성화
 
         if use_ai:
             try:
-                # AI 추천 서비스 사용
-                ai_service = AIRecommendationService(db)
-                days = await ai_service.generate_travel_itinerary(request, all_places)
+                # 개선된 AI 추천 서비스 사용
+                if current_user:
+                    # 로그인한 사용자는 개인화된 추천
+                    ai_service = get_enhanced_ai_recommendation_service(db)
+                    days = await ai_service.generate_travel_itinerary(request, all_places, current_user)
+                else:
+                    # 비로그인 사용자는 기본 AI 추천
+                    ai_service = AIRecommendationService(db)
+                    days = await ai_service.generate_travel_itinerary(request, all_places)
             except Exception as e:
                 print(f"AI 추천 실패, 폴백 사용: {str(e)}")
                 # 폴백: 기존 로직 사용

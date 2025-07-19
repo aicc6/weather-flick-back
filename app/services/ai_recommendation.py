@@ -13,15 +13,17 @@ from app.models import (
     DayItinerary,
     PlaceRecommendation,
 )
-from app.services.kma_weather_service import KMAWeatherService
-from app.utils.kma_utils import get_city_coordinates
+from app.services.route_optimizer import RouteOptimizer, Place, RouteConstraints
+# KMA Weather Service removed - weather features temporarily disabled
 
 # OpenAI 클라이언트 초기화
 # Python 3.13 호환성 문제 해결을 위해 프록시 환경 변수 제거
-for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']:
+for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy']:
     os.environ.pop(proxy_var, None)
 
 try:
+    # OpenAI v1.x에서는 proxies 파라미터를 지원하지 않음
+    # 환경 변수로 설정된 proxy는 이미 제거했으므로 기본 설정으로 초기화
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 except Exception as e:
     print(f"Failed to initialize OpenAI client: {e}")
@@ -33,7 +35,9 @@ class AIRecommendationService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.weather_service = KMAWeatherService()
+        self.route_optimizer = RouteOptimizer()
+        # Weather service temporarily disabled
+        # self.weather_service = KMAWeatherService()
 
     async def generate_travel_itinerary(
         self, request: CustomTravelRecommendationRequest, places: list[dict[str, Any]]
@@ -269,8 +273,10 @@ JSON만:
                 day_weather = {"status": "맑음", "temperature": "15-22°C"}
 
             if day_places:
+                # 경로 최적화 적용
+                optimized_places = self._optimize_route(day_places, request.schedule)
                 day_itinerary = DayItinerary(
-                    day=day_num, places=day_places, weather=day_weather
+                    day=day_num, places=optimized_places, weather=day_weather
                 )
                 days.append(day_itinerary)
 
@@ -417,16 +423,29 @@ JSON만:
     async def get_weather_forecast(self, region_name: str, days: int) -> dict[str, Any]:
         """지역의 날씨 예보 가져오기"""
         try:
-            # 지역명을 좌표로 변환
-            coords = get_city_coordinates(region_name)
-            if not coords:
-                # 기본값 (서울)
-                coords = get_city_coordinates("서울")
-
-            # 단기 예보 가져오기 (3일)
-            weather_data = await self.weather_service.get_short_forecast(
-                nx=coords["nx"], ny=coords["ny"]
-            )
+            # Weather service temporarily disabled - returning default weather data
+            weather_data = {
+                "forecast": "대체로 맑음",
+                "average_temperature": "15-22°C",
+                "recommendation": "야외 활동하기 좋은 날씨입니다.",
+                "daily_forecast": []
+            }
+            
+            # Generate default daily forecast
+            daily_weather = []
+            for i in range(min(days, 3)):
+                date = datetime.now() + timedelta(days=i)
+                date_str = date.strftime("%Y%m%d")
+                day_weather = {
+                    "date": date_str,
+                    "temperature_min": 15,
+                    "temperature_max": 25,
+                    "sky": "맑음",
+                    "rain_probability": 0,
+                }
+                daily_weather.append(day_weather)
+            
+            weather_data["daily_forecast"] = daily_weather
 
             # 일별 날씨 정보 추출
             daily_weather = []
@@ -525,3 +544,81 @@ JSON만:
             return "구름많음"
         else:
             return "맑음"
+    
+    def _optimize_route(self, places: list[PlaceRecommendation], schedule: str) -> list[PlaceRecommendation]:
+        """경로 최적화 적용"""
+        try:
+            # 숙박시설 분리 (항상 마지막)
+            accommodation = None
+            other_places = []
+            
+            for place in places:
+                if "숙박" in place.tags or place.time == "20:00-다음날":
+                    accommodation = place
+                else:
+                    other_places.append(place)
+            
+            if len(other_places) <= 1:
+                return places  # 최적화할 장소가 부족함
+            
+            # Place 객체로 변환
+            optimizer_places = []
+            for place in other_places:
+                if place.latitude and place.longitude:
+                    optimizer_place = Place(
+                        id=place.id,
+                        name=place.name,
+                        latitude=place.latitude,
+                        longitude=place.longitude,
+                        visit_duration=120 if "음식" in place.tags else 90,  # 음식점은 2시간, 나머지는 1.5시간
+                        priority=1.0,
+                        opening_time=None,  # 실시간 정보가 통합되면 추가
+                        closing_time=None
+                    )
+                    optimizer_places.append(optimizer_place)
+            
+            # 경로 최적화 수행
+            constraints = RouteConstraints(
+                start_time="09:00" if schedule == "packed" else "10:00",
+                end_time="18:00" if schedule == "packed" else "19:00",
+                lunch_time=("11:30", "13:30") if schedule == "packed" else ("12:00", "14:00"),
+                travel_mode="driving",  # 기본값, 추후 사용자 선택 가능
+                max_walking_distance=1000  # 1km
+            )
+            
+            optimized_route = self.route_optimizer.optimize_route(optimizer_places, constraints)
+            
+            # 최적화된 순서대로 재배열
+            optimized_result = []
+            time_slots = self._get_time_slots(schedule, len(other_places))
+            
+            for i, opt_place in enumerate(optimized_route):
+                # 원본 PlaceRecommendation 찾기
+                for original in other_places:
+                    if original.id == opt_place.id:
+                        # 시간 업데이트
+                        original.time = time_slots[i] if i < len(time_slots) else original.time
+                        optimized_result.append(original)
+                        break
+            
+            # 숙박시설 추가
+            if accommodation:
+                optimized_result.append(accommodation)
+            
+            return optimized_result
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"경로 최적화 실패, 원본 순서 유지: {str(e)}")
+            return places
+    
+    def _get_time_slots(self, schedule: str, num_places: int) -> list[str]:
+        """장소 수에 따른 시간대 생성"""
+        if schedule == "packed":
+            base_slots = ["09:00-11:00", "11:30-13:30", "14:00-16:00", "16:30-18:30"]
+        else:
+            base_slots = ["10:00-12:00", "14:00-16:00", "17:00-19:00"]
+        
+        # 필요한 만큼만 반환
+        return base_slots[:num_places]

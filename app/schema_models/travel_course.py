@@ -18,8 +18,7 @@ class TravelCourseResponse(BaseModel):
     created_at: Optional[datetime]
     place_id: str | None = None
     # 필요에 따라 필드 추가
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TravelCourseListResponse(BaseModel):
     courses: List[TravelCourseResponse]

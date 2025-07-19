@@ -6,7 +6,7 @@ pydantic==2.8.2
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 requests==2.32.3
-httpx==0.24.1
+httpx>=0.28.1
 python-multipart==0.0.9
 psycopg2-binary==2.9.9
 gunicorn==22.0.0
@@ -16,7 +16,7 @@ google-auth==2.32.0
 google-auth-oauthlib==1.2.1
 python-dotenv==1.0.1
 python-json-logger==2.0.7
-openai==1.35.0
+openai>=1.97.0
 redis>=4.5.0
 aiohttp==3.12.14
 firebase-admin==6.5.0
