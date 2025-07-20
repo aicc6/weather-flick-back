@@ -36,7 +36,7 @@ from app.schemas import (
     BulkNotificationResponse
 )
 from app.auth import get_current_active_user
-from app.services.fcm_service import FCMService
+# from app.services.fcm_service import FCMService  # 임시 비활성화
 from app.services.notification_service import NotificationService
 from sqlalchemy.sql import func, text
 

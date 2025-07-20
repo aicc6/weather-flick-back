@@ -577,12 +577,19 @@ async def auto_generate_routes(
                                 recommended = route_result['recommended']
 
                                 # 경로 정보 저장
+                                # 출발지→첫 번째 목적지는 route_order=0으로 이미 저장되었으므로
+                                # 일차 내 경로는 route_order=1부터 시작
+                                route_order = i + 1
+                                # 1일차의 첫 번째 구간(출발지→첫 번째 목적지)은 이미 생성되었으므로 제외
+                                if day_num == 1 and i == 0:
+                                    continue
+                                    
                                 new_route = TravelRoute(
                                     id=uuid.uuid4(),
                                     travel_plan_id=plan_id,
                                     origin_place_id=current_coords['name'],
                                     destination_place_id=next_coords['name'],
-                                    route_order=i + 1,
+                                    route_order=route_order,
                                     transport_mode=recommended.get('transport_type'),
                                     duration_minutes=recommended.get('duration'),
                                     distance_km=recommended.get('distance'),
@@ -1009,10 +1016,10 @@ async def get_detailed_route_info(
 
             detailed_info["enhanced_guide"] = enhanced_guide
 
-        # 실시간 교통 정보 및 예상 도착 시간
+        # 예상 도착 시간
         current_time = {
             "requested_at": "현재 시각",
-            "estimated_arrival": f"약 {detailed_info.get('real_time_route', {}).get('duration', route.duration)}분 후 도착 예정"
+            "estimated_arrival": f"약 {route.duration}분 후 도착 예정"
         }
 
         detailed_info["timing_info"] = current_time
@@ -1371,7 +1378,6 @@ async def get_enhanced_multi_route(
                     "availability": "주차장 확인 필요",
                     "estimated_cost": f"{int(car_data.get('distance', 0) * 100)}원"
                 },
-                "real_time_traffic": True
             }
 
             # 타임머신 기능 추가
@@ -1596,8 +1602,7 @@ async def get_enhanced_multi_route_batch(
                             "availability": "주차장 확인 필요",
                             "estimated_cost": f"{int(car_data.get('distance', 0) * 100)}원"
                         },
-                        "real_time_traffic": True
-                    }
+                            }
                 
                 # 거리 계산 및 추천 로직
                 distance = route_service._calculate_distance(

@@ -242,7 +242,7 @@ class RouteService:
                 google_result["cost"] = 0
                 return google_result
 
-            # 3. 기본 계산
+            # 3. TMAP과 구글 API 모두 실패한 경우에도 기본 도보 계산 제공 (도보는 기본 지원)
             distance = self._estimate_road_distance(departure_lat, departure_lng,
                                                    destination_lat, destination_lng)
             duration = int(distance * 12)  # 평균 도보 속도 5km/h
@@ -259,7 +259,7 @@ class RouteService:
                     "departure": {"lat": departure_lat, "lng": departure_lng},
                     "destination": {"lat": destination_lat, "lng": destination_lng}
                 },
-                "message": "직선 거리 기반 도보 경로 계산"
+                "message": "직선 거리 기반 도보 경로 계산 (API 연동 실패)"
             }
 
         except Exception as e:
@@ -310,57 +310,19 @@ class RouteService:
                 google_result["cost"] = fuel_cost
                 return google_result
 
-            # 3. 기본 계산 (더 상세한 mock 데이터)
-            distance = self._estimate_road_distance(departure_lat, departure_lng,
-                                                   destination_lat, destination_lng)
-            duration = int(distance * 1.5)  # 자동차 평균 속도 고려
-            fuel_cost = distance * 150
-
-            # 거리에 따른 mock 경로 안내점 생성 (지역 특성 반영)
-            guide_points = []
-            
-            # 좌표로 지역 판단 (제주도: 33.1-33.6도, 126.1-126.9도)
-            is_jeju = (33.1 <= departure_lat <= 33.6 and 126.1 <= departure_lng <= 126.9) or \
-                      (33.1 <= destination_lat <= 33.6 and 126.1 <= destination_lng <= 126.9)
-            
-            if distance > 5:  # 5km 이상인 경우
-                if is_jeju:
-                    guide_points = [
-                        {"description": "출발지에서 주요 도로로 진입", "distance": 500, "time": 2},
-                        {"description": "제주도 내 주요 도로 이용 (1100번도 또는 1132번도)", "distance": int(distance * 800), "time": int(duration * 0.7)},
-                        {"description": "목적지 근처 도로로 진입", "distance": 300, "time": 1}
-                    ]
-                else:
-                    guide_points = [
-                        {"description": "출발지에서 주요 도로로 진입", "distance": 500, "time": 2},
-                        {"description": "고속도로 또는 간선도로 이용", "distance": int(distance * 800), "time": int(duration * 0.7)},
-                        {"description": "목적지 근처 도로로 진입", "distance": 300, "time": 1}
-                    ]
-            elif distance > 1:  # 1km 이상인 경우
-                road_type = "지역 도로" if is_jeju else "일반 도로"
-                guide_points = [
-                    {"description": "출발지에서 도로로 진입", "distance": 200, "time": 1},
-                    {"description": f"{road_type}를 통해 목적지까지 이동", "distance": int(distance * 800), "time": int(duration * 0.8)},
-                    {"description": "목적지 도착", "distance": 100, "time": 1}
-                ]
-
+            # 3. TMAP과 구글 API 모두 실패한 경우 자동차 경로 없음으로 응답
             return {
-                "success": True,
-                "duration": duration,
-                "distance": distance,
-                "cost": fuel_cost,
+                "success": False,
+                "message": "자동차 경로 정보를 제공할 수 없습니다. TMAP 또는 Google API 응답이 필요합니다.",
+                "reason": "no_driving_data",
                 "transport_type": "car",
-                "source": "calculation",
+                "source": "api_required",
                 "route_data": {
-                    "method": "estimated_calculation",
+                    "method": "api_only",
                     "departure": {"lat": departure_lat, "lng": departure_lng},
                     "destination": {"lat": destination_lat, "lng": destination_lng},
-                    "guide_points": guide_points if guide_points else [],
-                    "toll_fee": max(0, int(distance * 100 - 500)) if distance > 5 else 0,  # 5km 초과 시 통행료
-                    "taxi_fee": int(distance * 1000 + 3000),  # 택시 기본요금 + 거리요금
-                    "source": "calculation"
-                },
-                "message": "추정 계산 기반 자동차 경로"
+                    "note": "실제 자동차 경로 API 응답만 사용하도록 설정됨"
+                }
             }
 
         except Exception as e:
@@ -414,26 +376,19 @@ class RouteService:
                 google_result["message"] = "구글 API 기반 대중교통 경로 (제한적)"
                 return google_result
 
-            # 3. 기본 추정
-            distance = self._estimate_road_distance(departure_lat, departure_lng,
-                                                   destination_lat, destination_lng)
-            duration = int(distance * 3)  # 대중교통은 환승 시간 포함
-            cost = 1500 + max(0, (distance - 10) * 100)
-
+            # 3. ODsay API와 구글 API 모두 실패한 경우 대중교통 경로 없음으로 응답
             return {
-                "success": True,
-                "duration": duration,
-                "distance": distance,
-                "cost": cost,
+                "success": False,
+                "message": "대중교통 경로 정보를 제공할 수 없습니다. ODsay API 응답이 필요합니다.",
+                "reason": "no_public_transit_data",
                 "transport_type": "transit",
-                "source": "calculation",
+                "source": "api_required",
                 "route_data": {
-                    "method": "estimated_calculation",
+                    "method": "api_only",
                     "departure": {"lat": departure_lat, "lng": departure_lng},
                     "destination": {"lat": destination_lat, "lng": destination_lng},
-                    "note": "ODsay API 연동 실패로 추정 계산 사용"
-                },
-                "message": "추정 계산 기반 대중교통 경로"
+                    "note": "실제 대중교통 API 응답만 사용하도록 설정됨"
+                }
             }
 
         except Exception as e:
