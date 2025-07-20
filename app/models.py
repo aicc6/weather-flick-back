@@ -12,7 +12,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import (
@@ -2525,7 +2525,7 @@ class CustomTravelRecommendationRequest(BaseModel):
         ...,
         description="여행 스타일 (activity, hotplace, nature, landmark, healing, culture, local, shopping, food, pet)",
     )
-    schedule: str = Field(..., description="일정 유형 (packed, relaxed)")
+    schedule: Literal["packed", "relaxed"] = Field(..., description="일정 유형 (packed, relaxed)")
 
 
 class PlaceRecommendation(BaseModel):

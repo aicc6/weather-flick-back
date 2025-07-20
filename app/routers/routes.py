@@ -1498,6 +1498,180 @@ async def get_enhanced_multi_route(
         )
 
 
+@router.post("/enhanced-multi-route/batch")
+async def get_enhanced_multi_route_batch(
+    routes: list[RouteCalculationRequest],
+    include_timemachine: bool = True,
+    departure_time: str | None = None,
+    current_user: User = Depends(get_current_user)
+):
+    """여러 경로에 대한 배치 처리 API"""
+    try:
+        if not routes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="최소 1개 이상의 경로를 제공해야 합니다."
+            )
+        
+        if len(routes) > 20:  # 배치 크기 제한
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="한 번에 처리할 수 있는 경로는 최대 20개입니다."
+            )
+        
+        # 각 경로를 병렬로 처리
+        import asyncio
+        
+        async def process_single_route(route_request):
+            try:
+                # 기존의 enhanced-multi-route 로직 재사용
+                result = await route_service.get_multiple_routes(
+                    route_request.departure_lat,
+                    route_request.departure_lng,
+                    route_request.destination_lat,
+                    route_request.destination_lng
+                )
+                
+                if not result.get("success"):
+                    return {
+                        "success": False,
+                        "route_request": route_request.dict(),
+                        "error": result.get("message", "경로 계산 실패")
+                    }
+                
+                # 각 경로별 세부 정보 추가 (기존 로직 활용)
+                enhanced_routes = {}
+                routes_data = result["routes"]
+                
+                # 도보 경로 개선
+                if routes_data.get("walk", {}).get("success"):
+                    walk_data = routes_data["walk"]
+                    enhanced_routes["walk"] = {
+                        **walk_data,
+                        "icon": "👣",
+                        "display_name": "도보",
+                        "environmental_impact": "친환경",
+                        "calories_burned": int(walk_data.get("distance", 0) * 50),
+                        "weather_dependent": True,
+                        "accessibility": {
+                            "wheelchair_accessible": True,
+                            "difficulty_level": "쉬움" if walk_data.get("distance", 0) < 2 else "보통"
+                        }
+                    }
+                
+                # 대중교통 경로 개선
+                if routes_data.get("transit", {}).get("success"):
+                    transit_data = routes_data["transit"]
+                    enhanced_routes["transit"] = {
+                        **transit_data,
+                        "icon": "🚇",
+                        "display_name": "대중교통",
+                        "environmental_impact": "저탄소",
+                        "real_time_info": {
+                            "last_updated": "실시간",
+                            "service_status": "정상 운행",
+                            "delays": None
+                        },
+                        "accessibility": {
+                            "wheelchair_accessible": True,
+                            "elderly_friendly": True
+                        },
+                        "card_payment": True,
+                        "mobile_payment": True
+                    }
+                
+                # 자동차 경로 개선
+                if routes_data.get("car", {}).get("success"):
+                    car_data = routes_data["car"]
+                    enhanced_routes["car"] = {
+                        **car_data,
+                        "icon": "🚗",
+                        "display_name": "자동차",
+                        "environmental_impact": "일반",
+                        "fuel_efficiency": {
+                            "estimated_fuel_usage": f"{car_data.get('distance', 0) / 10:.1f}L",
+                            "co2_emission": f"{car_data.get('distance', 0) * 0.18:.1f}kg"
+                        },
+                        "parking_info": {
+                            "availability": "주차장 확인 필요",
+                            "estimated_cost": f"{int(car_data.get('distance', 0) * 100)}원"
+                        },
+                        "real_time_traffic": True
+                    }
+                
+                # 거리 계산 및 추천 로직
+                distance = route_service._calculate_distance(
+                    route_request.departure_lat, route_request.departure_lng,
+                    route_request.destination_lat, route_request.destination_lng
+                )
+                
+                recommendations = {
+                    "primary": None,
+                    "alternatives": [],
+                    "context": {}
+                }
+                
+                # 거리별 추천
+                if distance <= 1.0:
+                    if enhanced_routes.get("walk"):
+                        recommendations["primary"] = {"type": "walk", "reason": "짧은 거리로 도보 이동이 최적"}
+                elif distance <= 10.0:
+                    if enhanced_routes.get("transit"):
+                        recommendations["primary"] = {"type": "transit", "reason": "중거리 이동으로 대중교통이 경제적"}
+                else:
+                    if enhanced_routes.get("car"):
+                        recommendations["primary"] = {"type": "car", "reason": "장거리 이동으로 자동차가 효율적"}
+                
+                return {
+                    "success": True,
+                    "route_request": route_request.dict(),
+                    "routes": enhanced_routes,
+                    "recommendations": recommendations,
+                    "context_info": {
+                        "distance": distance,
+                        "departure_time": departure_time,
+                        "last_updated": "방금 전"
+                    }
+                }
+                
+            except Exception as e:
+                logger.error(f"경로 처리 중 오류: {e}")
+                return {
+                    "success": False,
+                    "route_request": route_request.dict(),
+                    "error": str(e)
+                }
+        
+        # 모든 경로를 병렬로 처리
+        results = await asyncio.gather(*[process_single_route(route) for route in routes])
+        
+        # 결과 정리
+        successful_results = [r for r in results if r.get("success")]
+        failed_results = [r for r in results if not r.get("success")]
+        
+        return {
+            "success": True,
+            "total_routes": len(routes),
+            "successful_routes": len(successful_results),
+            "failed_routes": len(failed_results),
+            "results": results,
+            "batch_info": {
+                "departure_time": departure_time,
+                "include_timemachine": include_timemachine,
+                "processed_at": "방금 전"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"배치 처리 중 오류: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"배치 처리 중 오류 발생: {str(e)}"
+        )
+
+
 @router.post("/timemachine-comparison")
 async def get_timemachine_comparison(
     request: RouteCalculationRequest,
