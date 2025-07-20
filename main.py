@@ -34,7 +34,6 @@ from app.routers import (
     routes,
     system,
     travel_course,
-    travel_course_like,
     travel_plans,
     travel_plan_share,
     weather,
@@ -114,7 +113,6 @@ app.include_router(travel_course.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(likes_recommend.router, prefix="/api")
 app.include_router(review_likes.router, prefix="/api")
-app.include_router(travel_course_like.router, prefix="/api")
 app.include_router(custom_travel.router, prefix="/api")
 app.include_router(advanced_travel.router, prefix="/api")  # 고급 AI 여행 추천 API
 app.include_router(custom_travel_converter.router, prefix="/api")

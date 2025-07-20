@@ -1,48 +1,79 @@
 # app/routers/travel_courses.py
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from typing import Optional
 from app.database import get_db
-from app.models import TravelCourse
+from app.models import TravelCourse, TravelCourseLike, User
 from app.schema_models.travel_course import TravelCourseListResponse, TravelCourseDetailResponse
 from app.schema_models.travel_course import TravelCourseResponse
+from app.schemas.travel_course_like import TravelCourseLikeCreate, TravelCourseLikeResponse
+from app.auth import get_current_user_optional, get_current_user
 
 router = APIRouter(prefix="/travel-courses", tags=["travel-courses"])
 
 @router.get("/", response_model=TravelCourseListResponse)
 async def get_travel_courses(
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     page: int = Query(1, ge=1, description="페이지 번호 (1부터 시작)"),
     limit: int = Query(10, ge=1, le=50, description="페이지당 항목 수 (최대 50)"),
-    regionCode: str = Query(None, description="광역시도 코드(예: seoul, busan 등)")
+    region_code: Optional[int] = Query(None, description="지역 코드 (숫자 ID, 예: 1=서울, 6=부산)"),
+    liked_only: Optional[bool] = Query(False, description="좋아요한 코스만 조회 (로그인 필요)")
 ) -> TravelCourseListResponse:
     offset = (page - 1) * limit
     query = db.query(TravelCourse)
-    if regionCode:
-        # 지역명 매핑 (예: 'seoul' -> '서울', 'busan' -> '부산')
-        region_name_map = {
-            'seoul': ('서울', 1), 'busan': ('부산', 6), 'daegu': ('대구', 4), 'incheon': ('인천', 2),
-            'gwangju': ('광주', 5), 'daejeon': ('대전', 3), 'ulsan': ('울산', 7), 'sejong': ('세종', 8),
-            'gyeonggi': ('경기', 31), 'gangwon': ('강원', 32), 'chungbuk': ('충청북도', 33), 'chungnam': ('충청남도', 34),
-            'gyeongbuk': ('경상북도', 35), 'gyeongnam': ('경상남도', 36), 'jeonbuk': ('전라북도', 37), 'jeonnam': ('전라남도', 38), 'jeju': ('제주', 39)
-        }
-        region_info = region_name_map.get(regionCode, (regionCode, None))
-        region_name, region_code = region_info
-        print('regionCode:', regionCode, 'region_name:', region_name, 'region_code:', region_code)
-        if region_code is not None:
-            query = query.filter(TravelCourse.region_code == str(region_code))
-        else:
-            query = query.filter(TravelCourse.address.contains(region_name))
+    
+    # 좋아요 필터링 (로그인된 사용자만)
+    if liked_only:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="좋아요 필터를 사용하려면 로그인이 필요합니다."
+            )
+        # JOIN을 사용하여 좋아요한 코스만 조회
+        query = query.join(TravelCourseLike).filter(
+            TravelCourseLike.user_id == current_user.user_id
+        )
+    
+    # 지역 필터링 (숫자 ID 기반)
+    if region_code:
+        query = query.filter(TravelCourse.region_code == str(region_code))
+    
     total_count = query.count()  # 전체 개수
     courses = query.offset(offset).limit(limit).all()
-    # ORM 객체를 Pydantic 모델로 변환
+    
+    # 로그인된 사용자가 있는 경우 좋아요 정보 조회
+    user_likes = set()
+    if current_user:
+        liked_course_ids = db.query(TravelCourseLike.content_id).filter(
+            TravelCourseLike.user_id == current_user.user_id
+        ).all()
+        user_likes = {like.content_id for like in liked_course_ids}
+    
+    # ORM 객체를 Pydantic 모델로 변환 (좋아요 정보 포함)
     course_models = []
     for course in courses:
         try:
-            course_models.append(TravelCourseResponse.model_validate(course, from_attributes=True))
+            course_dict = TravelCourseResponse.model_validate(course, from_attributes=True).model_dump()
+            
+            # 좋아요 정보 추가 (로그인된 사용자만)
+            if current_user:
+                course_dict['is_liked'] = course.content_id in user_likes
+                # 해당 코스의 총 좋아요 수도 추가
+                total_likes = db.query(TravelCourseLike).filter(
+                    TravelCourseLike.content_id == course.content_id
+                ).count()
+                course_dict['total_likes'] = total_likes
+            else:
+                course_dict['is_liked'] = None  # 비로그인 사용자
+                course_dict['total_likes'] = None
+                
+            course_models.append(course_dict)
         except Exception as e:
-            print('Pydantic 변환 에러:', e)
-            print('문제 course:', course.__dict__)
-            raise
+            # 로그는 운영 환경에서는 적절한 로깅 시스템으로 대체 필요
+            raise HTTPException(status_code=500, detail="데이터 변환 중 오류가 발생했습니다")
+    
     return TravelCourseListResponse(courses=course_models, totalCount=total_count)
 
 @router.get("/{course_id}", response_model=TravelCourseDetailResponse)
@@ -68,3 +99,68 @@ async def get_google_review_for_course(course_id: str, db: Session = Depends(get
     from app.services.google_places_service import GooglePlacesService
     service = GooglePlacesService()
     return await service.get_place_reviews_and_rating(course.place_id)
+
+@router.put("/{course_id}/likes", response_model=dict)
+async def toggle_travel_course_like(
+    course_id: str,
+    course_data: TravelCourseLikeCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """여행 코스 좋아요 토글 (추가/삭제)"""
+    
+    # 기존 좋아요 확인
+    existing_like = db.query(TravelCourseLike).filter(
+        TravelCourseLike.user_id == current_user.user_id,
+        TravelCourseLike.content_id == course_id
+    ).first()
+    
+    if existing_like:
+        # 좋아요 취소
+        db.delete(existing_like)
+        db.commit()
+        
+        # 총 좋아요 수 계산
+        total_likes = db.query(TravelCourseLike).filter(
+            TravelCourseLike.content_id == course_id
+        ).count()
+        
+        return {
+            "message": "좋아요가 취소되었습니다.",
+            "liked": False,
+            "total_likes": total_likes
+        }
+    else:
+        # 좋아요 추가
+        try:
+            course_like_data = course_data.model_dump()
+            course_like_data['user_id'] = current_user.user_id
+            course_like_data['content_id'] = course_id  # URL 파라미터 사용
+            
+            db_like = TravelCourseLike(**course_like_data)
+            db.add(db_like)
+            db.commit()
+            db.refresh(db_like)
+            
+            # 총 좋아요 수 계산
+            total_likes = db.query(TravelCourseLike).filter(
+                TravelCourseLike.content_id == course_id
+            ).count()
+            
+            return {
+                "message": "좋아요가 추가되었습니다.",
+                "liked": True,
+                "total_likes": total_likes
+            }
+            
+        except IntegrityError as e:
+            db.rollback()
+            if "uq_user_content_like" in str(e):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 해당 코스에 좋아요를 눌렀습니다."
+                )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="데이터베이스 제약조건 오류가 발생했습니다."
+            )

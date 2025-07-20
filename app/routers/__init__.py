@@ -1,5 +1,5 @@
 # routers package
-from . import recommend_reviews, travel_course, travel_course_like
+from . import recommend_reviews, travel_course
 
 __all__ = [
     "travel_course",

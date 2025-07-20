@@ -17,7 +17,9 @@ class TravelCourseResponse(BaseModel):
     first_image: Optional[str]
     created_at: Optional[datetime]
     place_id: str | None = None
-    # 필요에 따라 필드 추가
+    # 좋아요 정보 추가
+    is_liked: Optional[bool] = None  # 로그인된 사용자의 좋아요 여부
+    total_likes: Optional[int] = None  # 총 좋아요 수
     model_config = ConfigDict(from_attributes=True)
 
 class TravelCourseListResponse(BaseModel):
