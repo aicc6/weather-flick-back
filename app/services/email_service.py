@@ -1,7 +1,7 @@
 import random
 import string
 from datetime import UTC, datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Any
 
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from sqlalchemy.orm import Session
@@ -340,7 +340,9 @@ class EmailService:
                 code="WELCOME_EMAIL_SEND_FAILED",
             )
 
-    async def send_temporary_password_email(self, email: str, temporary_password: str, nickname: str = None):
+    async def send_temporary_password_email(
+        self, email: str, temporary_password: str, nickname: str = None
+    ):
         """임시 비밀번호 이메일 발송"""
         try:
             html_content = f"""
@@ -639,91 +641,96 @@ class EmailVerificationService:
             print(f"이메일 인증 상태 확인 실패: {e}")
             return False
 
-
     # ===========================================
     # 알림 관련 메서드
     # ===========================================
-    
+
     async def send_notification_email(
         self,
         to_email: str,
         subject: str,
         content: str,
-        template_data: Optional[Dict[str, Any]] = None,
-        template_name: Optional[str] = None
+        template_data: dict[str, Any] | None = None,
+        template_name: str | None = None,
     ) -> bool:
         """알림 이메일 전송"""
         try:
             # 템플릿 사용 시 HTML 생성
             if template_name:
-                html_content = self._render_notification_template(template_name, template_data or {})
+                html_content = self._render_notification_template(
+                    template_name, template_data or {}
+                )
             else:
                 html_content = self._create_notification_html(subject, content)
-            
+
             message = MessageSchema(
                 subject=subject,
                 recipients=[to_email],
                 body=html_content,
-                subtype="html"
+                subtype="html",
             )
-            
+
             fm = FastMail(self.conf)
             await fm.send_message(message)
-            
+
             self.logger.info(f"Notification email sent successfully to {to_email}")
             return True
-            
+
         except Exception as e:
-            self.logger.error(f"Failed to send notification email to {to_email}: {str(e)}")
+            self.logger.error(
+                f"Failed to send notification email to {to_email}: {str(e)}"
+            )
             return False
-    
+
     async def send_weather_alert_email(
         self,
         to_email: str,
         location: str,
         weather_condition: str,
         temperature: int,
-        alert_type: str = "weather_change"
+        alert_type: str = "weather_change",
     ) -> bool:
         """날씨 알림 이메일 전송"""
-        
+
         if alert_type == "weather_change":
             subject = f"🌤️ {location} 날씨 변화 알림"
             content = f"현재 {weather_condition}, 기온 {temperature}°C"
         elif alert_type == "rain_alert":
             subject = f"🌧️ {location} 비 예보 알림"
-            content = f"비 예보가 있습니다. 우산을 준비하세요! (현재 기온: {temperature}°C)"
+            content = (
+                f"비 예보가 있습니다. 우산을 준비하세요! (현재 기온: {temperature}°C)"
+            )
         elif alert_type == "extreme_weather":
             subject = f"⚠️ {location} 악천후 경보"
             content = f"악천후 경보: {weather_condition} (기온: {temperature}°C)"
         else:
             subject = f"🌤️ {location} 날씨 정보"
             content = f"날씨: {weather_condition}, 기온: {temperature}°C"
-        
+
         template_data = {
             "location": location,
             "weather_condition": weather_condition,
             "temperature": temperature,
-            "alert_type": alert_type
+            "alert_type": alert_type,
         }
-        
+
         return await self.send_notification_email(
             to_email=to_email,
             subject=subject,
             content=content,
             template_data=template_data,
-            template_name="weather_alert"
+            template_name="weather_alert",
         )
-    
+
     async def send_travel_plan_email(
         self,
         to_email: str,
         plan_title: str,
         message: str,
-        notification_type: str = "travel_update"
+        notification_type: str = "travel_update",
     ) -> bool:
         """여행 계획 관련 이메일 전송"""
-        
+
         if notification_type == "travel_update":
             subject = f"✈️ 여행 계획 업데이트: {plan_title}"
         elif notification_type == "travel_reminder":
@@ -732,60 +739,43 @@ class EmailVerificationService:
             subject = f"🌟 여행 추천: {plan_title}"
         else:
             subject = f"✈️ {plan_title}"
-        
+
         template_data = {
             "plan_title": plan_title,
             "message": message,
-            "notification_type": notification_type
+            "notification_type": notification_type,
         }
-        
+
         return await self.send_notification_email(
             to_email=to_email,
             subject=subject,
             content=message,
             template_data=template_data,
-            template_name="travel_plan"
+            template_name="travel_plan",
         )
-    
+
     async def send_marketing_email(
-        self,
-        to_email: str,
-        subject: str,
-        content: str,
-        campaign_id: Optional[str] = None
+        self, to_email: str, subject: str, content: str, campaign_id: str | None = None
     ) -> bool:
         """마케팅 이메일 전송"""
-        
-        template_data = {
-            "campaign_id": campaign_id or "",
-            "content": content
-        }
-        
+
+        template_data = {"campaign_id": campaign_id or "", "content": content}
+
         return await self.send_notification_email(
             to_email=to_email,
             subject=subject,
             content=content,
             template_data=template_data,
-            template_name="marketing"
+            template_name="marketing",
         )
-    
+
     async def send_contact_answer_email(
-        self,
-        to_email: str,
-        contact_title: str,
-        answer_content: str,
-        contact_id: int
+        self, to_email: str, contact_title: str, answer_content: str, contact_id: int
     ) -> bool:
         """문의 답변 이메일 전송"""
-        
+
         subject = "문의하신 내용에 답변이 등록되었습니다"
-        
-        template_data = {
-            "contact_title": contact_title,
-            "answer_content": answer_content,
-            "contact_id": contact_id
-        }
-        
+
         # HTML 템플릿 생성
         html_content = f"""
         <!DOCTYPE html>
@@ -795,72 +785,72 @@ class EmailVerificationService:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{subject}</title>
             <style>
-                body {{ 
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
-                    line-height: 1.6; 
-                    margin: 0; 
-                    padding: 0; 
-                    background-color: #f5f5f5; 
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 0;
+                    background-color: #f5f5f5;
                 }}
-                .container {{ 
-                    max-width: 600px; 
-                    margin: 40px auto; 
-                    background: #ffffff; 
-                    border-radius: 16px; 
-                    overflow: hidden; 
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+                .container {{
+                    max-width: 600px;
+                    margin: 40px auto;
+                    background: #ffffff;
+                    border-radius: 16px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
                 }}
-                .header {{ 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    color: white; 
-                    padding: 40px 30px; 
-                    text-align: center; 
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 40px 30px;
+                    text-align: center;
                 }}
-                .header h1 {{ 
-                    margin: 0; 
-                    font-size: 28px; 
-                    font-weight: 600; 
+                .header h1 {{
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
                 }}
-                .content {{ 
-                    padding: 40px 30px; 
+                .content {{
+                    padding: 40px 30px;
                 }}
-                .message-box {{ 
-                    background: #f0f9ff; 
-                    border-left: 4px solid #3b82f6; 
-                    padding: 20px; 
-                    margin: 20px 0; 
-                    border-radius: 8px; 
+                .message-box {{
+                    background: #f0f9ff;
+                    border-left: 4px solid #3b82f6;
+                    padding: 20px;
+                    margin: 20px 0;
+                    border-radius: 8px;
                 }}
-                .inquiry-title {{ 
-                    font-size: 18px; 
-                    font-weight: bold; 
-                    color: #1e40af; 
-                    margin-bottom: 10px; 
+                .inquiry-title {{
+                    font-size: 18px;
+                    font-weight: bold;
+                    color: #1e40af;
+                    margin-bottom: 10px;
                 }}
-                .answer-content {{ 
-                    background: #f8fafc; 
-                    padding: 20px; 
-                    border-radius: 8px; 
-                    margin: 20px 0; 
-                    white-space: pre-wrap; 
+                .answer-content {{
+                    background: #f8fafc;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    white-space: pre-wrap;
                 }}
-                .cta-button {{ 
-                    display: inline-block; 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    color: white; 
-                    padding: 12px 24px; 
-                    text-decoration: none; 
-                    border-radius: 8px; 
-                    font-weight: 600; 
-                    margin-top: 20px; 
+                .cta-button {{
+                    display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    margin-top: 20px;
                 }}
-                .footer {{ 
-                    text-align: center; 
-                    padding: 30px; 
-                    background: #f8fafc; 
-                    color: #64748b; 
-                    font-size: 14px; 
-                    border-top: 1px solid #e2e8f0; 
+                .footer {{
+                    text-align: center;
+                    padding: 30px;
+                    background: #f8fafc;
+                    color: #64748b;
+                    font-size: 14px;
+                    border-top: 1px solid #e2e8f0;
                 }}
             </style>
         </head>
@@ -873,18 +863,18 @@ class EmailVerificationService:
                 <div class="content">
                     <h2 style="color: #1e293b;">안녕하세요!</h2>
                     <p>문의하신 내용에 대한 답변이 등록되었습니다.</p>
-                    
+
                     <div class="message-box">
                         <div class="inquiry-title">📝 문의 제목</div>
                         <div>{contact_title}</div>
                     </div>
-                    
+
                     <h3 style="color: #1e293b; margin-top: 30px;">💬 답변 내용</h3>
                     <div class="answer-content">{answer_content}</div>
-                    
+
                     <p style="margin-top: 30px;">자세한 내용은 Weather Flick 웹사이트에서 확인하실 수 있습니다.</p>
-                    
-                    <a href="https://weatherflick.com/contact" class="cta-button">답변 확인하기</a>
+
+                    <a href="https://wf-dev.seongjunlee.dev/contact" class="cta-button">답변 확인하기</a>
                 </div>
                 <div class="footer">
                     <p>이 이메일은 Weather Flick에서 발송되었습니다.</p>
@@ -894,14 +884,11 @@ class EmailVerificationService:
         </body>
         </html>
         """
-        
+
         message = MessageSchema(
-            subject=subject,
-            recipients=[to_email],
-            body=html_content,
-            subtype="html"
+            subject=subject, recipients=[to_email], body=html_content, subtype="html"
         )
-        
+
         try:
             await self.fastmail.send_message(message)
             self.logger.info(f"Contact answer email sent to {to_email}")
@@ -909,7 +896,7 @@ class EmailVerificationService:
         except Exception as e:
             self.logger.error(f"Failed to send contact answer email: {str(e)}")
             return False
-    
+
     def _create_notification_html(self, subject: str, content: str) -> str:
         """기본 알림 HTML 템플릿 생성"""
         html_template = f"""
@@ -974,10 +961,12 @@ class EmailVerificationService:
         </body>
         </html>
         """
-        
+
         return html_template
-    
-    def _render_notification_template(self, template_name: str, data: Dict[str, Any]) -> str:
+
+    def _render_notification_template(
+        self, template_name: str, data: dict[str, Any]
+    ) -> str:
         """알림 템플릿 렌더링"""
         templates = {
             "weather_alert": """
@@ -1075,9 +1064,9 @@ class EmailVerificationService:
                 </div>
             </body>
             </html>
-            """
+            """,
         }
-        
+
         template_html = templates.get(template_name, templates["weather_alert"])
         return template_html.format(**data)
 
