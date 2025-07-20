@@ -20,19 +20,7 @@ class DayItinerary(BaseModel):
     title: str
     activities: list[Activity]
 
-class TravelCourseLikeCreate(BaseModel):
-    user_id: int
-    title: str
-    subtitle: str | None = None
-    summary: str | None = None
-    description: str | None = None
-    region: str | None = None
-    itinerary: list[DayItinerary]
-
-class TravelCourseLikeResponse(TravelCourseLikeCreate):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
+# TravelCourseLike 스키마는 app/schemas/travel_course_like.py에서 관리됩니다.
 
 
 # ===========================================

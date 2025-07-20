@@ -1294,12 +1294,21 @@ class TravelCourseLike(Base):
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True
     )
+    content_id = Column(
+        String, ForeignKey("travel_courses.content_id"), nullable=False, index=True
+    )
     title = Column(String(255), nullable=False)
     subtitle = Column(String(255))
     summary = Column(Text)
     description = Column(Text)
     region = Column(String(50))
     itinerary = Column(JSONB)
+    created_at = Column(DateTime, server_default=func.now())
+
+    # 유니크 제약조건: 한 사용자가 같은 코스에 중복 좋아요 방지
+    __table_args__ = (
+        UniqueConstraint("user_id", "content_id", name="uq_user_content_like"),
+    )
 
 
 class DestinationLike(Base):

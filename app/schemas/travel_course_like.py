@@ -1,5 +1,7 @@
 
+from datetime import datetime
 from pydantic import BaseModel
+from uuid import UUID
 
 
 class Activity(BaseModel):
@@ -15,7 +17,7 @@ class DayItinerary(BaseModel):
     activities: list[Activity]
 
 class TravelCourseLikeCreate(BaseModel):
-    user_id: int
+    content_id: str
     title: str
     subtitle: str | None = None
     summary: str | None = None
@@ -25,6 +27,8 @@ class TravelCourseLikeCreate(BaseModel):
 
 class TravelCourseLikeResponse(TravelCourseLikeCreate):
     id: int
+    user_id: UUID
+    created_at: datetime
 
     class Config:
         from_attributes = True
