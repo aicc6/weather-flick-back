@@ -368,6 +368,7 @@ class TouristAttraction(Base):
     region_code = Column(
         String, ForeignKey("regions.region_code"), nullable=False, index=True
     )
+    tour_api_area_code = Column(String, nullable=True, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -427,6 +428,7 @@ class CulturalFacility(Base):
     region_code = Column(
         String, ForeignKey("regions.region_code"), nullable=False, index=True
     )
+    tour_api_area_code = Column(String, nullable=True, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -498,6 +500,7 @@ class FestivalEvent(Base):
     region_code = Column(
         String, ForeignKey("regions.region_code"), nullable=False, index=True
     )
+    tour_api_area_code = Column(String, nullable=True, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -574,6 +577,7 @@ class Restaurant(Base):
     region_code = Column(String, ForeignKey("regions.region_code"), primary_key=True)
 
     # Foreign Keys
+    tour_api_area_code = Column(String, nullable=True, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -632,7 +636,7 @@ class Accommodation(Base):
     """
 
     __tablename__ = "accommodations"
-    __table_args__ = {"extend_existing": True, "autoload_replace": False}
+    __table_args__ = {"extend_existing": True}
 
     # Primary Key
     content_id = Column(String(20), primary_key=True, index=True)
@@ -704,6 +708,7 @@ class Shopping(Base):
     region_code = Column(
         String, ForeignKey("regions.region_code"), nullable=False, index=True
     )
+    tour_api_area_code = Column(String, nullable=True, index=True)
     raw_data_id = Column(UUID(as_uuid=True), index=True)
 
     # 기본 정보
@@ -1311,6 +1316,39 @@ class TravelCourseLike(Base):
     )
 
 
+class TravelCourseSave(Base):
+    """
+    여행 코스 저장 테이블
+    사용처: weather-flick-back
+    설명: 사용자가 저장한 여행 코스
+    """
+
+    __tablename__ = "travel_course_saves"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False, index=True
+    )
+    content_id = Column(
+        String, ForeignKey("travel_courses.content_id"), nullable=False, index=True
+    )
+    note = Column(Text)  # 사용자 메모
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # 관계 설정
+    user = relationship("User", backref="travel_course_saves")
+    # travel_course = relationship("TravelCourse", backref="saves")  # TravelCourse에 backref가 없어서 주석 처리
+
+    # 유니크 제약조건: 한 사용자가 같은 코스에 중복 저장 방지
+    __table_args__ = (
+        UniqueConstraint("user_id", "content_id", name="uq_user_content_save"),
+        Index("idx_travel_course_saves_user", "user_id"),
+        Index("idx_travel_course_saves_content", "content_id"),
+        Index("idx_travel_course_saves_created", "created_at"),
+    )
+
+
 class DestinationLike(Base):
     """
     여행지 좋아요 테이블
@@ -1644,27 +1682,26 @@ Index("idx_review_user_rating", Review.user_id, Review.rating)
 # 지역별 시설 정보 인덱스
 Index(
     "idx_tourist_attractions_region_category",
-    TouristAttraction.region_code,
+    TouristAttraction.tour_api_area_code,
     TouristAttraction.category_code,
 )
 Index(
     "idx_cultural_facilities_region_type",
-    CulturalFacility.region_code,
+    CulturalFacility.tour_api_area_code,
     CulturalFacility.facility_type,
 )
 Index(
     "idx_festivals_events_region_dates",
-    FestivalEvent.region_code,
+    FestivalEvent.tour_api_area_code,
     FestivalEvent.event_start_date,
     FestivalEvent.event_end_date,
 )
-Index("idx_restaurants_region_cuisine", Restaurant.region_code, Restaurant.cuisine_type)
+Index("idx_restaurants_region_cuisine", Restaurant.tour_api_area_code, Restaurant.cuisine_type)
 Index(
     "idx_accommodations_region_type",
     Accommodation.region_code,
     Accommodation.accommodation_type,
 )
-Index("idx_shopping_region_type", Shopping.region_code, Shopping.shop_type)
 Index("idx_pet_tour_info_content_id", PetTourInfo.content_id)
 
 
@@ -2559,7 +2596,7 @@ class DestinationResponse(BaseModel):
     region: Optional[str]
     category: Optional[str]
     is_indoor: bool
-    tags: Optional[dict]
+    tags: Optional[list]
     latitude: Optional[float]
     longitude: Optional[float]
     image_url: Optional[str]
@@ -2568,6 +2605,35 @@ class DestinationResponse(BaseModel):
     is_saved: Optional[bool] = False  # 현재 사용자가 저장했는지
     likes_count: Optional[int] = 0  # 전체 좋아요 수
     saves_count: Optional[int] = 0  # 전체 저장 수
+
+    class Config:
+        from_attributes = True
+
+
+# Travel Course Save 관련 스키마
+class TravelCourseSaveCreate(BaseModel):
+    """여행 코스 저장 생성 요청 스키마"""
+    content_id: str
+    note: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "content_id": "126508",
+                "note": "나중에 가보고 싶은 코스"
+            }
+        }
+
+
+class TravelCourseSaveResponse(BaseModel):
+    """여행 코스 저장 응답 스키마"""
+    id: uuid.UUID
+    user_id: uuid.UUID
+    content_id: str
+    note: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    travel_course: Optional[dict] = None  # TravelCourse 정보
 
     class Config:
         from_attributes = True

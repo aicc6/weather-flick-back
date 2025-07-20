@@ -95,8 +95,8 @@ async def get_attractions_by_region(
         해당 지역의 관광지 목록
     """
     try:
-        # region_code 매핑 (프론트엔드 코드와 DB 코드 차이 해결)
-        region_code_mapping = {
+        # region_code를 tour_api_area_code로 매핑
+        region_to_tour_api_mapping = {
             "11": "1",    # 서울
             "26": "6",    # 부산
             "27": "4",    # 대구
@@ -122,20 +122,22 @@ async def get_attractions_by_region(
         # 긴 형태의 region_code를 짧은 형태로 변환
         if len(region_code) > 2:
             short_code = region_code[:2]
-            db_region_code = region_code_mapping.get(short_code, region_code)
+            tour_api_area_code = region_to_tour_api_mapping.get(short_code, region_code)
         else:
-            db_region_code = region_code_mapping.get(region_code, region_code)
+            tour_api_area_code = region_to_tour_api_mapping.get(region_code, region_code)
 
-        # 관광지 조회
-        query = db.query(TouristAttraction).filter(
-            TouristAttraction.region_code == db_region_code
+        # TouristAttraction과 Region 테이블을 조인하여 tour_api_area_code로 조회
+        query = db.query(TouristAttraction).join(
+            Region, TouristAttraction.region_code == Region.region_code
+        ).filter(
+            Region.tour_api_area_code == tour_api_area_code
         )
         
         # 반려동물 동반 가능 필터 적용
         if pet_friendly:
             # pet_tour_info에서 해당 지역의 content_id 목록 조회
             pet_content_ids = db.query(PetTourInfo.content_id).filter(
-                PetTourInfo.area_code == db_region_code,
+                PetTourInfo.area_code == tour_api_area_code,
                 PetTourInfo.content_id.isnot(None)
             ).subquery()
             
@@ -166,7 +168,7 @@ async def get_attractions_by_region(
                 "attractions": attraction_list,
                 "total": len(attraction_list),
                 "region_code": region_code,
-                "db_region_code": db_region_code
+                "tour_api_area_code": tour_api_area_code
             }
         )
 

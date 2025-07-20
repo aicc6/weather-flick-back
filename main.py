@@ -34,6 +34,7 @@ from app.routers import (
     routes,
     system,
     travel_course,
+    travel_course_saves,
     travel_plans,
     travel_plan_share,
     weather,
@@ -110,6 +111,7 @@ app.include_router(location.router, prefix="/api")
 app.include_router(plan.router, prefix="/api")
 app.include_router(chatbot.router, prefix="/api")
 app.include_router(travel_course.router, prefix="/api")
+app.include_router(travel_course_saves.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(likes_recommend.router, prefix="/api")
 app.include_router(review_likes.router, prefix="/api")

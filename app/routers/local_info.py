@@ -10,6 +10,7 @@ from app.database import get_db
 # Pydantic 모델은 필요할 때만 별도로 import
 from app.models import (
     Accommodation,
+    Region,
     Restaurant,
     ReviewCreate,
     SearchRequest,
@@ -86,9 +87,41 @@ async def get_all_restaurants(
         # 쿼리 시작
         query = db.query(Restaurant)
 
-        # 필터 적용
+        # 필터 적용 - region_code를 tour_api_area_code로 매핑
         if region_code:
-            query = query.filter(Restaurant.region_code == region_code)
+            # region_code를 tour_api_area_code로 매핑
+            region_to_tour_api_mapping = {
+                "11": "1",    # 서울
+                "26": "6",    # 부산
+                "27": "4",    # 대구
+                "28": "2",    # 인천
+                "29": "5",    # 광주
+                "30": "3",    # 대전
+                "31": "7",    # 울산
+                "36": "8",    # 세종
+                "41": "31",   # 경기
+                "43": "33",   # 충북
+                "44": "34",   # 충남
+                "46": "36",   # 전남
+                "47": "35",   # 경북
+                "48": "38",   # 경남
+                "50": "39",   # 제주
+                "51": "32",   # 강원
+                "52": "37",   # 전북
+                # 긴 코드 형태 처리
+                "11000000": "1",  # 서울
+                "42000000": "31", # 경기도
+            }
+
+            # 긴 형태의 region_code를 짧은 형태로 변환
+            if len(region_code) > 2:
+                short_code = region_code[:2]
+                tour_api_area_code = region_to_tour_api_mapping.get(short_code, region_code)
+            else:
+                tour_api_area_code = region_to_tour_api_mapping.get(region_code, region_code)
+            
+            # Restaurant과 Region 테이블을 조인하여 tour_api_area_code로 조회
+            query = query.join(Region, Restaurant.region_code == Region.region_code).filter(Region.tour_api_area_code == tour_api_area_code)
 
         if category_code:
             query = query.filter(Restaurant.category_code == category_code)
@@ -224,9 +257,41 @@ async def get_all_accommodations(
         # 쿼리 시작
         query = db.query(Accommodation)
 
-        # 필터 적용
+        # 필터 적용 - region_code를 tour_api_area_code로 매핑
         if region_code:
-            query = query.filter(Accommodation.region_code == region_code)
+            # region_code를 tour_api_area_code로 매핑
+            region_to_tour_api_mapping = {
+                "11": "1",    # 서울
+                "26": "6",    # 부산
+                "27": "4",    # 대구
+                "28": "2",    # 인천
+                "29": "5",    # 광주
+                "30": "3",    # 대전
+                "31": "7",    # 울산
+                "36": "8",    # 세종
+                "41": "31",   # 경기
+                "43": "33",   # 충북
+                "44": "34",   # 충남
+                "46": "36",   # 전남
+                "47": "35",   # 경북
+                "48": "38",   # 경남
+                "50": "39",   # 제주
+                "51": "32",   # 강원
+                "52": "37",   # 전북
+                # 긴 코드 형태 처리
+                "11000000": "1",  # 서울
+                "42000000": "31", # 경기도
+            }
+
+            # 긴 형태의 region_code를 짧은 형태로 변환
+            if len(region_code) > 2:
+                short_code = region_code[:2]
+                tour_api_area_code = region_to_tour_api_mapping.get(short_code, region_code)
+            else:
+                tour_api_area_code = region_to_tour_api_mapping.get(region_code, region_code)
+            
+            # accommodations 테이블에 tour_api_area_code 컬럼이 없으므로 Regions 테이블과 조인
+            query = query.join(Region, Accommodation.region_code == Region.region_code).filter(Region.tour_api_area_code == tour_api_area_code)
 
         # category_code와 accommodation_type 필터는 실제 DB에 해당 컬럼이 없으므로 제거
         # if category_code:
@@ -311,9 +376,41 @@ async def get_all_tourist_attractions(
         # 쿼리 시작
         query = db.query(TouristAttraction)
 
-        # 필터 적용
+        # 필터 적용 - region_code를 tour_api_area_code로 매핑
         if region_code:
-            query = query.filter(TouristAttraction.region_code == region_code)
+            # region_code를 tour_api_area_code로 매핑
+            region_to_tour_api_mapping = {
+                "11": "1",    # 서울
+                "26": "6",    # 부산
+                "27": "4",    # 대구
+                "28": "2",    # 인천
+                "29": "5",    # 광주
+                "30": "3",    # 대전
+                "31": "7",    # 울산
+                "36": "8",    # 세종
+                "41": "31",   # 경기
+                "43": "33",   # 충북
+                "44": "34",   # 충남
+                "46": "36",   # 전남
+                "47": "35",   # 경북
+                "48": "38",   # 경남
+                "50": "39",   # 제주
+                "51": "32",   # 강원
+                "52": "37",   # 전북
+                # 긴 코드 형태 처리
+                "11000000": "1",  # 서울
+                "42000000": "31", # 경기도
+            }
+
+            # 긴 형태의 region_code를 짧은 형태로 변환
+            if len(region_code) > 2:
+                short_code = region_code[:2]
+                tour_api_area_code = region_to_tour_api_mapping.get(short_code, region_code)
+            else:
+                tour_api_area_code = region_to_tour_api_mapping.get(region_code, region_code)
+            
+            # TouristAttraction과 Region 테이블을 조인하여 tour_api_area_code로 조회
+            query = query.join(Region, TouristAttraction.region_code == Region.region_code).filter(Region.tour_api_area_code == tour_api_area_code)
 
         if category_code:
             query = query.filter(TouristAttraction.category_code == category_code)

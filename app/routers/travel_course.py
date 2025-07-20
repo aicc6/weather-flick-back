@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from app.database import get_db
-from app.models import TravelCourse, TravelCourseLike, User
+from app.models import TravelCourse, TravelCourseLike, TravelCourseSave, User
 from app.schema_models.travel_course import TravelCourseListResponse, TravelCourseDetailResponse
 from app.schema_models.travel_course import TravelCourseResponse
 from app.schemas.travel_course_like import TravelCourseLikeCreate, TravelCourseLikeResponse
@@ -43,13 +43,19 @@ async def get_travel_courses(
     total_count = query.count()  # 전체 개수
     courses = query.offset(offset).limit(limit).all()
     
-    # 로그인된 사용자가 있는 경우 좋아요 정보 조회
+    # 로그인된 사용자가 있는 경우 좋아요 및 저장 정보 조회
     user_likes = set()
+    user_saves = set()
     if current_user:
         liked_course_ids = db.query(TravelCourseLike.content_id).filter(
             TravelCourseLike.user_id == current_user.user_id
         ).all()
         user_likes = {like.content_id for like in liked_course_ids}
+        
+        saved_course_ids = db.query(TravelCourseSave.content_id).filter(
+            TravelCourseSave.user_id == current_user.user_id
+        ).all()
+        user_saves = {save.content_id for save in saved_course_ids}
     
     # ORM 객체를 Pydantic 모델로 변환 (좋아요 정보 포함)
     course_models = []
@@ -57,9 +63,10 @@ async def get_travel_courses(
         try:
             course_dict = TravelCourseResponse.model_validate(course, from_attributes=True).model_dump()
             
-            # 좋아요 정보 추가 (로그인된 사용자만)
+            # 좋아요 및 저장 정보 추가 (로그인된 사용자만)
             if current_user:
                 course_dict['is_liked'] = course.content_id in user_likes
+                course_dict['is_saved'] = course.content_id in user_saves
                 # 해당 코스의 총 좋아요 수도 추가
                 total_likes = db.query(TravelCourseLike).filter(
                     TravelCourseLike.content_id == course.content_id
@@ -67,6 +74,7 @@ async def get_travel_courses(
                 course_dict['total_likes'] = total_likes
             else:
                 course_dict['is_liked'] = None  # 비로그인 사용자
+                course_dict['is_saved'] = None  # 비로그인 사용자
                 course_dict['total_likes'] = None
                 
             course_models.append(course_dict)
@@ -79,7 +87,8 @@ async def get_travel_courses(
 @router.get("/{course_id}", response_model=TravelCourseDetailResponse)
 async def get_travel_course_detail(
     course_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ) -> TravelCourseDetailResponse:
     """여행 코스 상세 정보 조회"""
     # 복합 기본키 대응: content_id로만 조회하되 첫 번째 결과 사용
@@ -89,7 +98,36 @@ async def get_travel_course_detail(
         raise HTTPException(status_code=404, detail="여행 코스를 찾을 수 없습니다")
 
     # ORM 객체를 Pydantic 모델로 변환
-    return TravelCourseDetailResponse.model_validate(course, from_attributes=True)
+    course_dict = TravelCourseDetailResponse.model_validate(course, from_attributes=True).model_dump()
+    
+    # 로그인된 사용자의 경우 좋아요 및 저장 정보 추가
+    if current_user:
+        # 좋아요 여부 확인
+        is_liked = db.query(TravelCourseLike).filter(
+            TravelCourseLike.user_id == current_user.user_id,
+            TravelCourseLike.content_id == course_id
+        ).first() is not None
+        
+        # 저장 여부 확인
+        is_saved = db.query(TravelCourseSave).filter(
+            TravelCourseSave.user_id == current_user.user_id,
+            TravelCourseSave.content_id == course_id
+        ).first() is not None
+        
+        # 총 좋아요 수
+        total_likes = db.query(TravelCourseLike).filter(
+            TravelCourseLike.content_id == course_id
+        ).count()
+        
+        course_dict['is_liked'] = is_liked
+        course_dict['is_saved'] = is_saved
+        course_dict['total_likes'] = total_likes
+    else:
+        course_dict['is_liked'] = None
+        course_dict['is_saved'] = None
+        course_dict['total_likes'] = None
+    
+    return course_dict
 
 @router.get("/{course_id}/google-review")
 async def get_google_review_for_course(course_id: str, db: Session = Depends(get_db)):
@@ -164,3 +202,48 @@ async def toggle_travel_course_like(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="데이터베이스 제약조건 오류가 발생했습니다."
             )
+
+
+@router.get("/likes/user/{user_id}")
+async def get_user_travel_course_likes(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100)
+):
+    """사용자별 좋아요한 여행 코스 목록 조회"""
+    
+    # 자신의 좋아요 목록만 조회 가능 (또는 관리자)
+    if str(current_user.user_id) != user_id and current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="본인의 좋아요 목록만 조회할 수 있습니다."
+        )
+    
+    # 사용자의 좋아요한 여행 코스 조회
+    likes = db.query(TravelCourseLike).filter(
+        TravelCourseLike.user_id == user_id
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for like in likes:
+        # 여행 코스 정보 조회
+        travel_course = db.query(TravelCourse).filter(
+            TravelCourse.content_id == like.content_id
+        ).first()
+        
+        if travel_course:
+            result.append({
+                "id": like.id,
+                "content_id": like.content_id,
+                "title": travel_course.course_name,
+                "subtitle": travel_course.course_theme or "",
+                "summary": "",
+                "description": travel_course.overview or "",
+                "region": travel_course.region_code or "",
+                "itinerary": [],
+                "created_at": like.created_at
+            })
+    
+    return result

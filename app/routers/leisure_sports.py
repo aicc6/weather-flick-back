@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import LeisureSports
+from app.models import LeisureSports, Region
 from app.utils import create_error_response, create_standard_response
 
 router = APIRouter(
@@ -94,8 +94,8 @@ async def get_leisure_sports_by_region(
         해당 지역의 레저 스포츠 목록
     """
     try:
-        # region_code 매핑 (프론트엔드 코드와 DB 코드 차이 해결)
-        region_code_mapping = {
+        # region_code를 tour_api_area_code로 매핑
+        region_to_tour_api_mapping = {
             "11": "1",    # 서울
             "26": "6",    # 부산
             "27": "4",    # 대구
@@ -121,14 +121,15 @@ async def get_leisure_sports_by_region(
         # 긴 형태의 region_code를 짧은 형태로 변환
         if len(region_code) > 2:
             short_code = region_code[:2]
-            db_region_code = region_code_mapping.get(short_code, region_code)
+            tour_api_area_code = region_to_tour_api_mapping.get(short_code, region_code)
         else:
-            db_region_code = region_code_mapping.get(region_code, region_code)
+            tour_api_area_code = region_to_tour_api_mapping.get(region_code, region_code)
 
-        # 레저 스포츠 조회
+        # Regions 테이블과 조인하여 tour_api_area_code로 레저 스포츠 조회
         leisure_sports = (
             db.query(LeisureSports)
-            .filter(LeisureSports.region_code == db_region_code)
+            .join(Region, LeisureSports.region_code == Region.region_code)
+            .filter(Region.tour_api_area_code == tour_api_area_code)
             .limit(limit)
             .all()
         )
@@ -157,7 +158,7 @@ async def get_leisure_sports_by_region(
                 "leisure_sports": sports_list,
                 "total": len(sports_list),
                 "region_code": region_code,
-                "db_region_code": db_region_code
+                "tour_api_area_code": tour_api_area_code
             }
         )
 
