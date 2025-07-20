@@ -344,12 +344,22 @@ class NotificationService:
             return False
         
         try:
-            return await self.email_service.send_notification_email(
-                to_email=user.email,
-                subject=notification.title,
-                content=notification.message,
-                template_data=notification.data
-            )
+            # 문의 답변 알림인 경우 특별 처리
+            if notification.type == NotificationType.CONTACT_ANSWER:
+                return await self.email_service.send_contact_answer_email(
+                    to_email=user.email,
+                    contact_title=notification.data.get('contact_title', ''),
+                    answer_content=notification.message,
+                    contact_id=notification.data.get('contact_id', 0)
+                )
+            else:
+                # 일반 알림 이메일 전송
+                return await self.email_service.send_notification_email(
+                    to_email=user.email,
+                    subject=notification.title,
+                    content=notification.message,
+                    template_data=notification.data
+                )
         except Exception as e:
             logger.error(f"Error sending email notification: {str(e)}")
             return False

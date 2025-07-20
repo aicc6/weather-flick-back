@@ -16,12 +16,13 @@ from app.routers import (
     custom_travel,
     custom_travel_converter,
     destinations,
+    destination_likes_saves,
     events,
     leisure_sports,
     likes_recommend,
     local_info,
     location,
-    # notifications,  # 2025-07-19: 알림 시스템 일시 중단
+    notifications,  # 2025-07-20: 알림 시스템 재활성화 - 문의 답변 알림 기능 추가
     personalized_recommendations,
     plan,
     realtime_travel,
@@ -103,6 +104,7 @@ app.include_router(travel_plans.router, prefix="/api")
 app.include_router(personalized_recommendations.router, prefix="/api")
 app.include_router(recommend_reviews.router, prefix="/api")
 app.include_router(destinations.router, prefix="/api")
+app.include_router(destination_likes_saves.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
 app.include_router(location.router, prefix="/api")
@@ -122,7 +124,7 @@ app.include_router(categories.router, prefix="/api")  # 카테고리 API 라우�
 app.include_router(regions.router)  # 지역 API 라우터 (prefix는 라우터에서 정의됨)
 app.include_router(system.router, prefix="/api")
 app.include_router(route_optimization.router, prefix="/api")  # 경로 최적화 API 라우터 추가
-# app.include_router(notifications.router, prefix="/api")  # 2025-07-19: 알림 시스템 일시 중단
+app.include_router(notifications.router, prefix="/api")  # 2025-07-20: 알림 시스템 재활성화
 app.include_router(google.router, prefix="/api")
 app.include_router(realtime_travel.router, prefix="/api")  # 실시간 여행 정보 API 라우터 추가
 app.include_router(travel_plan_share.router, prefix="/api")  # 여행 계획 공유 API 라우터

@@ -1302,6 +1302,55 @@ class TravelCourseLike(Base):
     itinerary = Column(JSONB)
 
 
+class DestinationLike(Base):
+    """
+    여행지 좋아요 테이블
+    사용처: weather-flick-back
+    설명: 사용자가 좋아요한 여행지
+    """
+    __tablename__ = "destination_likes"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    destination_id = Column(UUID(as_uuid=True), ForeignKey("destinations.destination_id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # 관계 설정
+    user = relationship("User", backref="destination_likes")
+    destination = relationship("Destination", backref="likes")
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", "destination_id", name="uq_destination_like_user"),
+        Index("idx_destination_likes_user", "user_id"),
+        Index("idx_destination_likes_destination", "destination_id"),
+    )
+
+
+class DestinationSave(Base):
+    """
+    여행지 저장(북마크) 테이블
+    사용처: weather-flick-back
+    설명: 사용자가 저장한 여행지
+    """
+    __tablename__ = "destination_saves"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    destination_id = Column(UUID(as_uuid=True), ForeignKey("destinations.destination_id", ondelete="CASCADE"), nullable=False)
+    note = Column(Text, nullable=True)  # 사용자 메모
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # 관계 설정
+    user = relationship("User", backref="destination_saves")
+    destination = relationship("Destination", backref="saves")
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", "destination_id", name="uq_destination_save_user"),
+        Index("idx_destination_saves_user", "user_id"),
+        Index("idx_destination_saves_destination", "destination_id"),
+    )
+
+
 # ===========================================
 # 기타 기능 테이블
 # ===========================================
@@ -2456,6 +2505,65 @@ class ReviewLikeResponse(BaseModel):
         from_attributes = True
 
 
+# 여행지 좋아요/저장 관련 스키마
+class DestinationLikeCreate(BaseModel):
+    """여행지 좋아요 생성 스키마"""
+    destination_id: uuid.UUID
+
+
+class DestinationLikeResponse(BaseModel):
+    """여행지 좋아요 응답 스키마"""
+    id: uuid.UUID
+    destination_id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    destination: Optional["DestinationResponse"] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DestinationSaveCreate(BaseModel):
+    """여행지 저장 생성 스키마"""
+    destination_id: uuid.UUID
+    note: Optional[str] = None
+
+
+class DestinationSaveResponse(BaseModel):
+    """여행지 저장 응답 스키마"""
+    id: uuid.UUID
+    destination_id: uuid.UUID
+    user_id: uuid.UUID
+    note: Optional[str]
+    created_at: datetime
+    destination: Optional["DestinationResponse"] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DestinationResponse(BaseModel):
+    """여행지 응답 스키마"""
+    destination_id: uuid.UUID
+    name: str
+    province: str
+    region: Optional[str]
+    category: Optional[str]
+    is_indoor: bool
+    tags: Optional[dict]
+    latitude: Optional[float]
+    longitude: Optional[float]
+    image_url: Optional[str]
+    rating: Optional[float]
+    is_liked: Optional[bool] = False  # 현재 사용자가 좋아요했는지
+    is_saved: Optional[bool] = False  # 현재 사용자가 저장했는지
+    likes_count: Optional[int] = 0  # 전체 좋아요 수
+    saves_count: Optional[int] = 0  # 전체 저장 수
+
+    class Config:
+        from_attributes = True
+
+
 # 임시 비밀번호 관련 스키마
 class ForgotPasswordRequest(BaseModel):
     """비밀번호 찾기 요청"""
@@ -3364,6 +3472,7 @@ class NotificationType(enum.Enum):
     MARKETING = "MARKETING"  # 마케팅 알림
     SYSTEM = "SYSTEM"  # 시스템 알림
     EMERGENCY = "EMERGENCY"  # 긴급 알림
+    CONTACT_ANSWER = "CONTACT_ANSWER"  # 문의 답변 알림
 
 
 class NotificationChannel(enum.Enum):

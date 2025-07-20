@@ -2,10 +2,8 @@
 알림 관련 API 라우터
 사용자 알림 설정, 디바이스 토큰, 알림 발송 등을 관리하는 엔드포인트들
 
-[비활성화 날짜: 2025-07-19]
-[비활성화 사유: 알림 시스템 기능 일시 중단, 향후 재활성화 가능]
-"""
-
+[재활성화 날짜: 2025-07-20]
+[재활성화 사유: 문의 답변 알림 기능 추가를 위해 재활성화]
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -391,6 +389,3 @@ async def send_notifications(
             failed_count=len(request.user_ids),
             notification_ids=[]
         )
-"""
-
-

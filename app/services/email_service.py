@@ -769,6 +769,147 @@ class EmailVerificationService:
             template_name="marketing"
         )
     
+    async def send_contact_answer_email(
+        self,
+        to_email: str,
+        contact_title: str,
+        answer_content: str,
+        contact_id: int
+    ) -> bool:
+        """문의 답변 이메일 전송"""
+        
+        subject = "문의하신 내용에 답변이 등록되었습니다"
+        
+        template_data = {
+            "contact_title": contact_title,
+            "answer_content": answer_content,
+            "contact_id": contact_id
+        }
+        
+        # HTML 템플릿 생성
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{subject}</title>
+            <style>
+                body {{ 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+                    line-height: 1.6; 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: #f5f5f5; 
+                }}
+                .container {{ 
+                    max-width: 600px; 
+                    margin: 40px auto; 
+                    background: #ffffff; 
+                    border-radius: 16px; 
+                    overflow: hidden; 
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+                }}
+                .header {{ 
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; 
+                    padding: 40px 30px; 
+                    text-align: center; 
+                }}
+                .header h1 {{ 
+                    margin: 0; 
+                    font-size: 28px; 
+                    font-weight: 600; 
+                }}
+                .content {{ 
+                    padding: 40px 30px; 
+                }}
+                .message-box {{ 
+                    background: #f0f9ff; 
+                    border-left: 4px solid #3b82f6; 
+                    padding: 20px; 
+                    margin: 20px 0; 
+                    border-radius: 8px; 
+                }}
+                .inquiry-title {{ 
+                    font-size: 18px; 
+                    font-weight: bold; 
+                    color: #1e40af; 
+                    margin-bottom: 10px; 
+                }}
+                .answer-content {{ 
+                    background: #f8fafc; 
+                    padding: 20px; 
+                    border-radius: 8px; 
+                    margin: 20px 0; 
+                    white-space: pre-wrap; 
+                }}
+                .cta-button {{ 
+                    display: inline-block; 
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; 
+                    padding: 12px 24px; 
+                    text-decoration: none; 
+                    border-radius: 8px; 
+                    font-weight: 600; 
+                    margin-top: 20px; 
+                }}
+                .footer {{ 
+                    text-align: center; 
+                    padding: 30px; 
+                    background: #f8fafc; 
+                    color: #64748b; 
+                    font-size: 14px; 
+                    border-top: 1px solid #e2e8f0; 
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Weather Flick</h1>
+                    <p style="margin-top: 10px; font-size: 18px;">문의 답변 알림</p>
+                </div>
+                <div class="content">
+                    <h2 style="color: #1e293b;">안녕하세요!</h2>
+                    <p>문의하신 내용에 대한 답변이 등록되었습니다.</p>
+                    
+                    <div class="message-box">
+                        <div class="inquiry-title">📝 문의 제목</div>
+                        <div>{contact_title}</div>
+                    </div>
+                    
+                    <h3 style="color: #1e293b; margin-top: 30px;">💬 답변 내용</h3>
+                    <div class="answer-content">{answer_content}</div>
+                    
+                    <p style="margin-top: 30px;">자세한 내용은 Weather Flick 웹사이트에서 확인하실 수 있습니다.</p>
+                    
+                    <a href="https://weatherflick.com/contact" class="cta-button">답변 확인하기</a>
+                </div>
+                <div class="footer">
+                    <p>이 이메일은 Weather Flick에서 발송되었습니다.</p>
+                    <p>궁금하신 점이 있으시면 언제든지 문의해주세요.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        message = MessageSchema(
+            subject=subject,
+            recipients=[to_email],
+            body=html_content,
+            subtype="html"
+        )
+        
+        try:
+            await self.fastmail.send_message(message)
+            self.logger.info(f"Contact answer email sent to {to_email}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to send contact answer email: {str(e)}")
+            return False
+    
     def _create_notification_html(self, subject: str, content: str) -> str:
         """기본 알림 HTML 템플릿 생성"""
         html_template = f"""
