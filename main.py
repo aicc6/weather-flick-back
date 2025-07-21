@@ -35,7 +35,7 @@ from app.routers import (
     likes_recommend,
     local_info,
     location,
-    # notifications,  # 2025-07-20: Notification system reactivation - Added inquiry response notification feature (temporarily disabled)
+    notifications,  # 2025-07-20: Notification system reactivation - Added inquiry response notification feature
     personalized_recommendations,
     plan,
     realtime_travel,
@@ -231,7 +231,7 @@ app.include_router(system.router, prefix="/api")
 app.include_router(
     route_optimization.router, prefix="/api"
 )  # 경로 최적화 API 라우터 추가
-# app.include_router(notifications.router, prefix="/api")  # 2025-07-20: 알림 시스템 재활성화 (임시 비활성화)
+app.include_router(notifications.router, prefix="/api")  # 2025-07-20: 알림 시스템 재활성화
 app.include_router(auth.router, prefix="/api")  # 인증 API 라우터
 app.include_router(google.router, prefix="/api")
 app.include_router(

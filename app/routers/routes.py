@@ -415,6 +415,7 @@ async def auto_generate_routes(
             db.commit()
 
         generated_routes = []
+        route_counter = 1  # 순차적인 경로 번호
 
         # Itinerary JSON 파싱
         import json
@@ -500,13 +501,13 @@ async def auto_generate_routes(
                         if route_result.get('success') and route_result.get('recommended'):
                             recommended = route_result['recommended']
 
-                            # 출발지 → 첫 번째 목적지 경로 저장 (sequence = 0)
+                            # 출발지 → 첫 번째 목적지 경로 저장
                             start_route = TravelRoute(
                                 id=uuid.uuid4(),
                                 travel_plan_id=plan_id,
                                 origin_place_id=start_coords['name'],
                                 destination_place_id=first_coords['name'],
-                                route_order=0,
+                                route_order=route_counter,
                                 transport_mode=recommended.get('transport_type'),
                                 duration_minutes=recommended.get('duration'),
                                 distance_km=recommended.get('distance'),
@@ -515,6 +516,7 @@ async def auto_generate_routes(
 
                             db.add(start_route)
                             generated_routes.append(start_route)
+                            route_counter += 1
 
                     except Exception as route_error:
                         logger.warning(f"출발지 경로 계산 중 오류: {str(route_error)}")
@@ -577,12 +579,9 @@ async def auto_generate_routes(
                                 recommended = route_result['recommended']
 
                                 # 경로 정보 저장
-                                # 출발지→첫 번째 목적지는 route_order=0으로 이미 저장되었으므로
-                                # 일차 내 경로는 route_order=1부터 시작
-                                route_order = i + 1
-                                # 1일차의 첫 번째 구간(출발지→첫 번째 목적지)은 이미 생성되었으므로 제외
-                                if day_num == 1 and i == 0:
-                                    continue
+                                # 일차 내 모든 연속된 장소 간 경로 생성
+                                route_order = route_counter
+                                route_counter += 1
                                     
                                 new_route = TravelRoute(
                                     id=uuid.uuid4(),
@@ -672,13 +671,15 @@ async def auto_generate_routes(
                     if route_result.get('success') and route_result.get('recommended'):
                         recommended = route_result['recommended']
 
-                        # 일차 간 경로 정보 저장 (다음 일차에 속하도록 설정)
+                        # 일차 간 경로 정보 저장 (다음 일차 시작 전 경로)
+                        route_order = route_counter
+                        route_counter += 1
                         new_route = TravelRoute(
                             id=uuid.uuid4(),
                             travel_plan_id=plan_id,
                             origin_place_id=last_coords['name'],
                             destination_place_id=first_coords['name'],
-                            route_order=0,
+                            route_order=route_order,
                             transport_mode=recommended.get('transport_type'),
                             duration_minutes=recommended.get('duration'),
                             distance_km=recommended.get('distance'),
