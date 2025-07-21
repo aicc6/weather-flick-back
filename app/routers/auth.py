@@ -217,12 +217,31 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 async def login(
-    login_data: LoginRequest,
+    login_data: LoginRequest = None,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    """로그인"""
-    user = authenticate_user(db, login_data.email, login_data.password)
+    """로그인 (JSON 및 폼 데이터 모두 지원)"""
+    # 폼 데이터와 JSON 데이터 중 하나를 선택
+    if login_data:
+        # JSON 요청
+        email = login_data.email
+        password = login_data.password
+        fcm_token = getattr(login_data, 'fcm_token', None)
+        device_type = getattr(login_data, 'device_type', None)
+        device_id = getattr(login_data, 'device_id', None)
+        device_name = getattr(login_data, 'device_name', None)
+    else:
+        # 폼 데이터 요청
+        email = form_data.username  # OAuth2PasswordRequestForm에서는 username 필드를 email로 사용
+        password = form_data.password
+        fcm_token = None
+        device_type = None
+        device_id = None
+        device_name = None
+    
+    user = authenticate_user(db, email, password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -235,17 +254,17 @@ async def login(
         update_user_login_info(db, user, request)
 
     # FCM 토큰 처리 (optional)
-    if login_data.fcm_token:
+    if fcm_token:
         try:
             from app.services.fcm_service import FCMService
 
             FCMService.upsert_device_token(
                 db=db,
                 user_id=user.user_id,
-                fcm_token=login_data.fcm_token,
-                device_type=login_data.device_type,
-                device_id=login_data.device_id,
-                device_name=login_data.device_name,
+                fcm_token=fcm_token,
+                device_type=device_type,
+                device_id=device_id,
+                device_name=device_name,
                 user_agent=request.headers.get("User-Agent") if request else None,
             )
         except Exception as e:
@@ -337,6 +356,44 @@ async def refresh_token(
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     """현재 사용자 정보 조회"""
     return current_user
+
+
+@router.get("/me/stats")
+async def get_user_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """사용자 통계 정보 조회"""
+    from app.models import TravelPlan, TravelPlanDestination, Destination, TravelCourseLike
+    
+    # 생성한 여행 플랜 수
+    travel_plans_count = db.query(TravelPlan).filter(
+        TravelPlan.user_id == current_user.user_id
+    ).count()
+    
+    # 좋아요한 여행지 수 (travel_course_likes)
+    liked_courses_count = db.query(TravelCourseLike).filter(
+        TravelCourseLike.user_id == current_user.user_id
+    ).count()
+    
+    # 방문한 고유 지역 수 (여행 플랜의 목적지 기반)
+    visited_regions_query = db.query(Destination.region).distinct().join(
+        TravelPlanDestination, TravelPlanDestination.destination_id == Destination.destination_id
+    ).join(
+        TravelPlan, TravelPlan.plan_id == TravelPlanDestination.plan_id
+    ).filter(
+        TravelPlan.user_id == current_user.user_id,
+        Destination.region.is_not(None),
+        Destination.region != ''
+    )
+    
+    visited_regions_count = visited_regions_query.count()
+    
+    return {
+        "travel_plans_count": travel_plans_count,
+        "liked_courses_count": liked_courses_count,
+        "visited_regions_count": visited_regions_count,
+    }
 
 
 @router.put("/me", response_model=UserResponse)

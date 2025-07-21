@@ -104,10 +104,10 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.USER)
     google_id = Column(String, unique=True, nullable=True)  # 구글 OAuth ID
     auth_provider = Column(String, default="local")  # 인증 제공자 (local, google 등)
-    last_login = Column(DateTime)
+    last_login = Column(DateTime(timezone=True))
     login_count = Column(Integer, default=0)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # id 속성을 user_id의 별칭으로 추가
     @property
@@ -172,8 +172,8 @@ class Admin(Base):
     phone = Column(String)
     status = Column(Enum(AdminStatus), default=AdminStatus.ACTIVE)
     is_superuser = Column(Boolean, default=False)  # 슈퍼관리자 여부
-    last_login_at = Column(DateTime)
-    created_at = Column(DateTime, server_default=func.now())
+    last_login_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class EmailVerification(Base):
@@ -189,8 +189,8 @@ class EmailVerification(Base):
     email = Column(String, nullable=False, index=True)
     code = Column(String, nullable=False)
     is_used = Column(Boolean, default=False)
-    expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 # ===========================================
@@ -223,8 +223,8 @@ class TravelPlan(Base):
     start_location = Column(String, nullable=True)  # 출발지
     weather_info = Column(JSONB, nullable=True)  # 날씨 정보
     plan_type = Column(String(50), default="manual")  # 'manual' 또는 'custom'
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="travel_plans")
@@ -278,8 +278,8 @@ class TravelRoute(Base):
     distance_km = Column(Float)
     route_data = Column(JSONB)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="routes")
@@ -300,12 +300,12 @@ class TransportationDetail(Base):
         UUID(as_uuid=True), ForeignKey("travel_routes.id"), nullable=False
     )
 
-    departure_time = Column(DateTime)
-    arrival_time = Column(DateTime)
+    departure_time = Column(DateTime(timezone=True))
+    arrival_time = Column(DateTime(timezone=True))
     cost = Column(Integer)
     booking_info = Column(JSONB)
     notes = Column(String)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     route = relationship("TravelRoute", back_populates="transport_details")
@@ -340,7 +340,7 @@ class Destination(Base):
     image_url = Column(String)
     rating = Column(Float)
     recommendation_weight = Column(DECIMAL(3, 2))
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     weather_data = relationship("WeatherData", back_populates="destination")
@@ -404,9 +404,9 @@ class TouristAttraction(Base):
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     region = relationship("Region", back_populates="tourist_attractions")
@@ -476,9 +476,9 @@ class CulturalFacility(Base):
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     region = relationship("Region", back_populates="cultural_facilities")
@@ -554,9 +554,9 @@ class FestivalEvent(Base):
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     region = relationship("Region", back_populates="festivals_events")
@@ -620,9 +620,9 @@ class Restaurant(Base):
     # 메타데이터
     data_quality_score = Column(Float)
     processing_status = Column(String, default="processed")
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     region = relationship("Region", back_populates="restaurants")
@@ -665,7 +665,7 @@ class Accommodation(Base):
     parking = Column(String)
 
     # 메타데이터
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     region = relationship("Region", back_populates="accommodations")
@@ -758,9 +758,9 @@ class Shopping(Base):
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class LeisureSports(Base):
@@ -797,9 +797,9 @@ class LeisureSports(Base):
     first_image_small = Column(String)
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    last_sync_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
     booktour = Column(CHAR(1))
     createdtime = Column(String(14))
     modifiedtime = Column(String(14))
@@ -844,9 +844,9 @@ class TravelCourse(Base):
     data_quality_score = Column(Float)
     processing_status = Column(String)
     raw_data_id = Column(UUID(as_uuid=True))
-    created_at = Column(DateTime)
-    updated_at = Column(DateTime)
-    last_sync_at = Column(DateTime)
+    created_at = Column(DateTime(timezone=True))
+    updated_at = Column(DateTime(timezone=True))
+    last_sync_at = Column(DateTime(timezone=True))
     mlevel = Column(Integer)
     detail_intro_info = Column(JSONB)
     detail_additional_info = Column(JSONB)
@@ -907,9 +907,9 @@ class PetTourInfo(Base):
     # 메타데이터
     data_quality_score = Column(DECIMAL(5, 2))
     processing_status = Column(String(20), default="processed")
-    last_sync_at = Column(DateTime, server_default=func.now())
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Transportation(Base):
@@ -928,7 +928,7 @@ class Transportation(Base):
     schedule = Column(JSONB)
     fare = Column(String)
     contact = Column(String)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class CityInfo(Base):
@@ -948,7 +948,7 @@ class CityInfo(Base):
     description = Column(Text)
     attractions = Column(JSONB)
     weather_info = Column(JSONB)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 # ===========================================
@@ -1002,7 +1002,7 @@ class WeatherData(Base):
     # 원본 데이터
     raw_data = Column(JSONB)  # 원본 API 응답 데이터
 
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     destination = relationship("Destination", back_populates="weather_data")
@@ -1030,8 +1030,8 @@ class ApiRawData(Base):
     response_size = Column(Integer)  # bytes
     request_duration = Column(Integer)  # milliseconds
     api_key_hash = Column(String(64))  # API 키의 해시값 (보안)
-    created_at = Column(DateTime, server_default=func.now())
-    expires_at = Column(DateTime)  # 데이터 만료 시간
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True))  # 데이터 만료 시간
     is_archived = Column(Boolean, default=False)
     file_path = Column(String(500))  # 아카이브된 파일 경로
 
@@ -1052,7 +1052,7 @@ class HistoricalWeatherDaily(Base):
     max_temp = Column(Float)
     min_temp = Column(Float)
     raw_data_id = Column(String(64))  # api_raw_data 참조
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 복합 인덱스: region_code + weather_date 조합으로 자주 조회
     __table_args__ = (
@@ -1086,7 +1086,7 @@ class WeatherCurrent(Base):
     visibility = Column(Float)
     uv_index = Column(Float)
     raw_data_id = Column(String(64))  # api_raw_data 참조
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class WeatherForecast(Base):
@@ -1107,9 +1107,9 @@ class WeatherForecast(Base):
     max_temp = Column(Float)
     precipitation_prob = Column(Float)
     weather_condition = Column(String(100))
-    forecast_issued_at = Column(DateTime)
+    forecast_issued_at = Column(DateTime(timezone=True))
     raw_data_id = Column(String(64))  # api_raw_data 참조
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 복합 인덱스
     __table_args__ = (
@@ -1137,8 +1137,8 @@ class Region(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     region_level = Column(Integer)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(Boolean, default=True)
     grid_x = Column(Integer)
     grid_y = Column(Integer)
@@ -1176,8 +1176,8 @@ class CategoryCode(Base):
     content_type_id = Column(String)
     parent_category_code = Column(String)
     category_level = Column(Integer)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 # ===========================================
@@ -1205,7 +1205,7 @@ class Review(Base):
     rating = Column(Integer, nullable=False)
     content = Column(Text)
     photos = Column(JSONB)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="reviews")
@@ -1228,7 +1228,7 @@ class RecommendReview(Base):
     nickname = Column(String(50), nullable=False)
     rating = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     parent_id = Column(
         UUID(as_uuid=True), ForeignKey("reviews_recommend.id"), nullable=True
     )  # 답글용
@@ -1249,7 +1249,7 @@ class RecommendLike(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     course_id = Column(Integer, nullable=False, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint("course_id", "user_id", name="uq_likes_recommend_course_user"),
@@ -1277,7 +1277,7 @@ class ReviewLike(Base):
     )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     is_like = Column(Boolean, nullable=False)  # True=Like, False=Dislike
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint(
@@ -1308,7 +1308,7 @@ class TravelCourseLike(Base):
     description = Column(Text)
     region = Column(String(50))
     itinerary = Column(JSONB)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 유니크 제약조건: 한 사용자가 같은 코스에 중복 좋아요 방지
     __table_args__ = (
@@ -1333,8 +1333,8 @@ class TravelCourseSave(Base):
         String, ForeignKey("travel_courses.content_id"), nullable=False, index=True
     )
     note = Column(Text)  # 사용자 메모
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     user = relationship("User", backref="travel_course_saves")
@@ -1360,7 +1360,7 @@ class DestinationLike(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     destination_id = Column(UUID(as_uuid=True), ForeignKey("destinations.destination_id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 관계 설정
     user = relationship("User", backref="destination_likes")
@@ -1385,7 +1385,7 @@ class DestinationSave(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     destination_id = Column(UUID(as_uuid=True), ForeignKey("destinations.destination_id", ondelete="CASCADE"), nullable=False)
     note = Column(Text, nullable=True)  # 사용자 메모
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 관계 설정
     user = relationship("User", backref="destination_saves")
@@ -1482,7 +1482,7 @@ class ChatMessage(Base):
     )  # 'user' 또는 'bot'
     context = Column(JSONB, nullable=True)  # 대화 컨텍스트 정보
     suggestions = Column(ARRAY(Text), nullable=True)  # 추천 질문 목록
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="chat_messages")
@@ -1505,7 +1505,7 @@ class FavoritePlace(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     description = Column(Text)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 # ===========================================
@@ -1527,7 +1527,7 @@ class SystemLog(Base):
     source = Column(String, nullable=False)
     message = Column(Text, nullable=False)
     context = Column(JSONB)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class UserActivityLog(Base):
@@ -1546,7 +1546,7 @@ class UserActivityLog(Base):
     ip_address = Column(String)
     user_agent = Column(String)
     session_id = Column(String)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="activity_logs")
@@ -1573,7 +1573,7 @@ class AdminActivityLog(Base):
     severity = Column(String, default="NORMAL")  # 심각도 (NORMAL, HIGH, CRITICAL)
     ip_address = Column(String, nullable=True)  # IP 주소
     user_agent = Column(String, nullable=True)  # 사용자 에이전트
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     admin = relationship("Admin", foreign_keys=[admin_id])
@@ -2788,7 +2788,7 @@ class CustomTravelRecommendationResponse(BaseModel):
 #     parking = Column(String)
 #
 #     # 메타데이터
-#     created_at = Column(DateTime, server_default=func.now())
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
 #
 #     # 기존 API 호환성을 위한 프로퍼티
 #     @property
@@ -2848,8 +2848,8 @@ class TravelCourseSpot(Base):
     description = Column(Text)
     tips = Column(Text)  # 팁이나 주의사항
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class WeatherInfo(Base):
@@ -2890,8 +2890,8 @@ class WeatherInfo(Base):
     # 여행 적합도
     travel_score = Column(Integer)  # 1-10 여행 적합도 점수
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -2917,7 +2917,7 @@ class WeatherForecastDetail(Base):
     region_code = Column(
         String, ForeignKey("regions.region_code"), nullable=False, index=True
     )
-    forecast_datetime = Column(DateTime, nullable=False, index=True)
+    forecast_datetime = Column(DateTime(timezone=True), nullable=False, index=True)
 
     # 기온 정보
     temperature = Column(Float)
@@ -2943,7 +2943,7 @@ class WeatherForecastDetail(Base):
     visibility = Column(Float)
     cloud_coverage = Column(Integer)
 
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -2972,12 +2972,12 @@ class RawApiData(Base):
 
     # 처리 상태
     is_processed = Column(Boolean, default=False)
-    processed_at = Column(DateTime)
+    processed_at = Column(DateTime(timezone=True))
     processing_error = Column(Text)
 
     # 메타데이터
-    collected_at = Column(DateTime, server_default=func.now())
-    expires_at = Column(DateTime)  # 데이터 만료 시간
+    collected_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True))  # 데이터 만료 시간
 
     # 인덱스
     __table_args__ = (
@@ -3017,7 +3017,7 @@ class ErrorLog(Base):
     user_id = Column(UUID(as_uuid=True))
     ip_address = Column(String(45))
 
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -3051,7 +3051,7 @@ class EventLog(Base):
     user_id = Column(UUID(as_uuid=True))
     admin_id = Column(Integer)
 
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -3076,7 +3076,7 @@ class SystemSettings(Base):
     setting_type = Column(String, nullable=False)  # string, number, boolean, json
     description = Column(Text)
     is_public = Column(Boolean, default=False)  # 클라이언트에 노출 가능 여부
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by = Column(Integer)  # admin_id
 
 
@@ -3111,16 +3111,16 @@ class DataSyncStatus(Base):
     records_failed = Column(Integer, default=0)
 
     # 시간 정보
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
-    next_sync_at = Column(DateTime)
+    started_at = Column(DateTime(timezone=True))
+    completed_at = Column(DateTime(timezone=True))
+    next_sync_at = Column(DateTime(timezone=True))
 
     # 에러 정보
     error_message = Column(Text)
     error_details = Column(JSONB)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 유니크 제약조건
     __table_args__ = (
@@ -3154,9 +3154,9 @@ class SystemConfiguration(Base):
     default_value = Column(JSONB)  # 기본값
 
     # 감사 정보
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by = Column(Integer)  # admin_id
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by = Column(Integer)  # admin_id
 
     # 유니크 제약조건
@@ -3180,13 +3180,13 @@ class TravelPlanShare(Base):
     plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
     share_token = Column(String(100), unique=True, nullable=False, index=True)
     permission = Column(String(20), default="view")  # 'view', 'edit'
-    expires_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     max_uses = Column(Integer, nullable=True)  # 최대 사용 횟수
     use_count = Column(Integer, default=0)  # 현재 사용 횟수
     is_active = Column(Boolean, default=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="shares")
@@ -3209,7 +3209,7 @@ class TravelPlanVersion(Base):
     itinerary = Column(JSONB)
     change_description = Column(String(500))  # 변경 사항 설명
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="versions")
@@ -3232,8 +3232,8 @@ class TravelPlanComment(Base):
     day_number = Column(Integer, nullable=True)  # 특정 일차에 대한 댓글
     place_index = Column(Integer, nullable=True)  # 특정 장소에 대한 댓글
     is_deleted = Column(Boolean, default=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="comments")
@@ -3254,8 +3254,8 @@ class TravelPlanCollaborator(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     permission = Column(String(20), default="edit")  # 'view', 'edit'
     invited_by = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
-    joined_at = Column(DateTime, server_default=func.now())
-    last_viewed_at = Column(DateTime, nullable=True)
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_viewed_at = Column(DateTime(timezone=True), nullable=True)
     
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="collaborators")
@@ -3287,7 +3287,7 @@ class TravelPlanDestination(Base):
     visit_date = Column(Date)
     visit_order = Column(Integer)
     notes = Column(Text)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="plan_destinations")
@@ -3316,7 +3316,7 @@ class DestinationImage(Base):
     )
     image_url = Column(String, nullable=False)
     is_main = Column(Boolean, default=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class DestinationRating(Base):
@@ -3336,7 +3336,7 @@ class DestinationRating(Base):
     )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5 평점
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 유니크 제약조건: 한 사용자는 한 여행지에 하나의 평점만
     __table_args__ = (
@@ -3365,7 +3365,7 @@ class WeatherRecommendation(Base):
     )
     recommendation_score = Column(Float)  # 추천 점수
     reason = Column(Text)  # 추천 이유
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -3394,17 +3394,17 @@ class ApiKey(Base):
     # 현재 사용량
     daily_usage = Column(Integer, default=0)
     monthly_usage = Column(Integer, default=0)
-    last_used_at = Column(DateTime)
-    usage_reset_at = Column(DateTime)
+    last_used_at = Column(DateTime(timezone=True))
+    usage_reset_at = Column(DateTime(timezone=True))
 
     # 상태
     is_active = Column(Boolean, default=True)
     error_count = Column(Integer, default=0)
-    last_error_at = Column(DateTime)
+    last_error_at = Column(DateTime(timezone=True))
     last_error_message = Column(Text)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 유니크 제약조건
     __table_args__ = (
@@ -3442,8 +3442,8 @@ class DataCollectionLog(Base):
     # 에러 정보
     error_message = Column(Text)
 
-    started_at = Column(DateTime, nullable=False)
-    completed_at = Column(DateTime)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    completed_at = Column(DateTime(timezone=True))
 
     # 인덱스
     __table_args__ = (
@@ -3473,9 +3473,9 @@ class BatchJob(Base):
     retry_count = Column(Integer, default=3)
 
     # 마지막 실행 정보
-    last_run_at = Column(DateTime)
-    last_success_at = Column(DateTime)
-    last_failure_at = Column(DateTime)
+    last_run_at = Column(DateTime(timezone=True))
+    last_success_at = Column(DateTime(timezone=True))
+    last_failure_at = Column(DateTime(timezone=True))
     last_error_message = Column(Text)
 
     # 실행 통계
@@ -3483,8 +3483,8 @@ class BatchJob(Base):
     successful_runs = Column(Integer, default=0)
     failed_runs = Column(Integer, default=0)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class BatchJobSchedule(Base):
@@ -3500,21 +3500,21 @@ class BatchJobSchedule(Base):
     job_id = Column(Integer, ForeignKey("batch_jobs.job_id"), nullable=False)
 
     # 스케줄 정보
-    scheduled_time = Column(DateTime, nullable=False, index=True)
+    scheduled_time = Column(DateTime(timezone=True), nullable=False, index=True)
     priority = Column(Integer, default=5)  # 1-10, 높을수록 우선순위 높음
 
     # 실행 상태
     status = Column(
         String, default="pending"
     )  # pending, running, completed, failed, cancelled
-    started_at = Column(DateTime)
-    completed_at = Column(DateTime)
+    started_at = Column(DateTime(timezone=True))
+    completed_at = Column(DateTime(timezone=True))
 
     # 실행 결과
     result_summary = Column(JSONB)
     error_message = Column(Text)
 
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -3596,8 +3596,8 @@ class UserNotificationSettings(Base):
     digest_enabled = Column(Boolean, default=False)  # 요약 알림
     digest_frequency = Column(String(20), default="daily")  # daily, weekly
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="notification_settings")
@@ -3628,15 +3628,15 @@ class UserDeviceToken(Base):
 
     # 토큰 상태
     is_active = Column(Boolean, default=True)
-    last_used = Column(DateTime)
+    last_used = Column(DateTime(timezone=True))
 
     # 메타데이터
     user_agent = Column(String)
     app_version = Column(String)
     os_version = Column(String)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="device_tokens")
@@ -3678,13 +3678,13 @@ class Notification(Base):
 
     # 우선순위 및 만료
     priority = Column(Integer, default=5)  # 1-10, 높을수록 우선순위 높음
-    expires_at = Column(DateTime)
+    expires_at = Column(DateTime(timezone=True))
 
     # 전송 관련
-    scheduled_at = Column(DateTime)  # 예약 전송 시간
-    sent_at = Column(DateTime)
-    delivered_at = Column(DateTime)
-    read_at = Column(DateTime)
+    scheduled_at = Column(DateTime(timezone=True))  # 예약 전송 시간
+    sent_at = Column(DateTime(timezone=True))
+    delivered_at = Column(DateTime(timezone=True))
+    read_at = Column(DateTime(timezone=True))
 
     # 실패 관련
     failure_reason = Column(String)
@@ -3695,8 +3695,8 @@ class Notification(Base):
     external_id = Column(String)  # FCM 메시지 ID 등
     external_response = Column(JSONB)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     user = relationship("User", back_populates="notifications")
@@ -3738,8 +3738,8 @@ class NotificationTemplate(Base):
     description = Column(Text)
     version = Column(String(10), default="1.0")
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 인덱스
     __table_args__ = (
@@ -3769,7 +3769,7 @@ class NotificationLog(Base):
     details = Column(JSONB)
 
     # 시간 정보
-    timestamp = Column(DateTime, server_default=func.now(), index=True)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # 관계 설정
     notification = relationship("Notification")
@@ -3830,8 +3830,8 @@ class NotificationLog(Base):
 #     data_quality_score = Column(DECIMAL(5, 2))
 #     processing_status = Column(String(20), default="processed")
 #     last_sync_at = Column(DateTime, server_default=func.now())
-#     created_at = Column(DateTime, server_default=func.now())
-#     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
+#     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class NotificationQueue(Base):
@@ -3858,20 +3858,20 @@ class NotificationQueue(Base):
     )  # pending, processing, completed, failed
 
     # 스케줄링
-    scheduled_for = Column(DateTime, nullable=False, index=True)
-    processed_at = Column(DateTime)
+    scheduled_for = Column(DateTime(timezone=True), nullable=False, index=True)
+    processed_at = Column(DateTime(timezone=True))
 
     # 재시도 정보
     attempt_count = Column(Integer, default=0)
     max_attempts = Column(Integer, default=3)
-    next_retry_at = Column(DateTime)
+    next_retry_at = Column(DateTime(timezone=True))
 
     # 처리 결과
     result = Column(JSONB)
     error_message = Column(Text)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # 관계 설정
     notification = relationship("Notification")

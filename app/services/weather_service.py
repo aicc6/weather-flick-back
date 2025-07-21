@@ -14,19 +14,22 @@ class WeatherService:
 
     @cache_result(prefix="weather:current", expire=600, include_cache_info=True)  # 10분 캐싱
     async def get_current_weather(
-        self, city: str, country: str | None = None
+        self, city: str, country: str | None = None, lang: str = "ko"
     ) -> dict[str, Any]:
-        """현재 날씨 정보 조회"""
+        """현재 날씨 정보 조회 (한글 지원)"""
         try:
-            # 도시명과 국가코드를 결합
+            # 도시명과 국가코드를 결합 (URL 인코딩 포함)
+            import urllib.parse
             location = f"{city},{country}" if country else city
+            encoded_location = urllib.parse.quote(location, safe=',')
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.base_url}/current.json",
                     params={
                         "key": self.api_key,
-                        "q": location,
+                        "q": encoded_location,
+                        "lang": lang,  # 언어 설정 추가
                         "aqi": "no",  # 대기질 정보 제외
                     },
                     timeout=10.0,
@@ -49,19 +52,23 @@ class WeatherService:
 
     @cache_result(prefix="weather:forecast", expire=1800, include_cache_info=True)  # 30분 캐싱
     async def get_forecast(
-        self, city: str, days: int = 3, country: str | None = None
+        self, city: str, days: int = 3, country: str | None = None, lang: str = "ko"
     ) -> dict[str, Any]:
-        """날씨 예보 조회"""
+        """날씨 예보 조회 (한글 지원)"""
         try:
+            # 도시명과 국가코드를 결합 (URL 인코딩 포함)
+            import urllib.parse
             location = f"{city},{country}" if country else city
+            encoded_location = urllib.parse.quote(location, safe=',')
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.base_url}/forecast.json",
                     params={
                         "key": self.api_key,
-                        "q": location,
+                        "q": encoded_location,
                         "days": min(days, 14),  # 최대 14일
+                        "lang": lang,  # 언어 설정 추가
                         "aqi": "no",
                     },
                     timeout=10.0,

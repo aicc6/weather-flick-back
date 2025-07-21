@@ -34,11 +34,12 @@ async def get_current_weather(request: WeatherRequest):
 async def get_current_weather_by_city(
     city: str,
     country: str | None = Query(None, description="국가 코드 (예: KR, US)"),
+    lang: str = Query("ko", description="언어 코드 (ko, en, ja, zh)"),
 ):
-    """도시명으로 현재 날씨 조회"""
+    """도시명으로 현재 날씨 조회 (한글 지원)"""
     try:
         weather_data = await weather_service.get_current_weather(
-            city=city, country=country
+            city=city, country=country, lang=lang
         )
         return WeatherResponse(**weather_data)
     except HTTPException:
@@ -52,11 +53,12 @@ async def get_weather_forecast(
     city: str,
     days: int = Query(3, ge=1, le=14, description="예보 일수 (1-14일)"),
     country: str | None = Query(None, description="국가 코드 (예: KR, US)"),
+    lang: str = Query("ko", description="언어 코드 (ko, en, ja, zh)"),
 ):
-    """날씨 예보 조회"""
+    """날씨 예보 조회 (한글 지원)"""
     try:
         forecast_data = await weather_service.get_forecast(
-            city=city, days=days, country=country
+            city=city, days=days, country=country, lang=lang
         )
         return ForecastResponse(**forecast_data)
     except HTTPException:

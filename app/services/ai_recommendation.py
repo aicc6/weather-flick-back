@@ -14,6 +14,7 @@ from app.models import (
     PlaceRecommendation,
 )
 from app.services.route_optimizer import RouteOptimizer, Place, RouteConstraints
+from app.utils.timezone_utils import TimezoneUtils
 # KMA Weather Service removed - weather features temporarily disabled
 
 # OpenAI 클라이언트 초기화
@@ -434,7 +435,7 @@ JSON만:
             # Generate default daily forecast
             daily_weather = []
             for i in range(min(days, 3)):
-                date = datetime.now() + timedelta(days=i)
+                date = TimezoneUtils.now_kst() + timedelta(days=i)
                 date_str = date.strftime("%Y%m%d")
                 day_weather = {
                     "date": date_str,
@@ -466,7 +467,7 @@ JSON만:
             else:
                 # forecast 원시 데이터에서 추출
                 for i in range(min(days, 3)):  # 최대 3일
-                    date = datetime.now() + timedelta(days=i)
+                    date = TimezoneUtils.now_kst() + timedelta(days=i)
                     date_str = date.strftime("%Y%m%d")
 
                     # 해당 날짜의 날씨 정보 찾기

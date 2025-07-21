@@ -5,6 +5,11 @@ from app.routers import google
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import setup_logging
 from app.middleware.activity_tracking import ActivityTrackingMiddleware
+from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware
+from app.middleware.error_handling import ErrorHandlingMiddleware, TimeoutMiddleware, HealthCheckMiddleware
+from app.middleware.monitoring import MonitoringMiddleware, MetricsEndpoint, collect_system_metrics
+from app.middleware.json_encoder import setup_json_encoding
+from app.middleware.timezone_middleware import setup_timezone_middleware
 from app.routers import (
     advanced_travel,
     attractions,
@@ -67,9 +72,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"OpenAI 서비스 확인 중 오류: {e}")
     
+    # 모니터링 백그라운드 작업 시작
+    import asyncio
+    monitoring_task = asyncio.create_task(collect_system_metrics())
+    logger.info("시스템 모니터링 백그라운드 작업 시작")
+    
     yield
     
-    # Shutdown (필요시 정리 작업 추가)
+    # Shutdown (정리 작업)
+    monitoring_task.cancel()
     logger.info("Shutting down Weather Flick API...")
 
 app = FastAPI(
@@ -82,17 +93,88 @@ app = FastAPI(
 # 글로벌 예외 핸들러 등록
 register_exception_handlers(app)
 
-# CORS 미들웨어 설정
+# 미들웨어 추가 (순서 중요: 외부 → 내부)
+app.add_middleware(ErrorHandlingMiddleware)  # 최상위 에러 처리
+app.add_middleware(TimeoutMiddleware, timeout_seconds=30)  # 타임아웃 처리
+app.add_middleware(HealthCheckMiddleware)  # 헬스체크 처리
+app.add_middleware(SecurityHeadersMiddleware)  # 보안 헤더
+app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)  # Rate limiting
+
+# CORS 미들웨어 설정 (개발 환경용으로 수정)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 특정 도메인으로 제한
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174", 
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
-# 사용자 활동 추적 미들웨어 추가
-app.add_middleware(ActivityTrackingMiddleware)
+# 완전한 타임존 미들웨어 추가
+from datetime import datetime, timezone
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class TimezoneMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, default_timezone: str = "Asia/Seoul"):
+        super().__init__(app)
+        self.default_timezone = default_timezone
+    
+    async def dispatch(self, request, call_next):
+        # 클라이언트 타임존 정보 수집
+        client_timezone = self._extract_client_timezone(request)
+        
+        # 요청 상태에 타임존 정보 저장
+        request.state.client_timezone = client_timezone
+        request.state.server_timezone = "UTC"
+        request.state.recommended_timezone = self.default_timezone
+        
+        # 다음 미들웨어/라우터 실행
+        response = await call_next(request)
+        
+        # 응답 헤더에 타임존 정보 추가
+        self._add_timezone_headers(response, client_timezone)
+        
+        return response
+    
+    def _extract_client_timezone(self, request):
+        # X-Client-Timezone 헤더 확인
+        client_timezone = request.headers.get("X-Client-Timezone")
+        if client_timezone:
+            return client_timezone
+        
+        # Accept-Language에서 추론
+        accept_language = request.headers.get("Accept-Language", "")
+        if "ko" in accept_language.lower():
+            return "Asia/Seoul"
+        
+        return self.default_timezone
+    
+    def _add_timezone_headers(self, response, client_timezone):
+        # 서버 타임존 정보
+        response.headers["X-Server-Timezone"] = "UTC"
+        response.headers["X-Server-Time"] = datetime.now(timezone.utc).isoformat()
+        
+        # 클라이언트 권장 타임존
+        response.headers["X-Recommended-Timezone"] = self.default_timezone
+        response.headers["X-Detected-Client-Timezone"] = client_timezone
+        
+        # 시간 형식 정보
+        response.headers["X-Datetime-Format"] = "ISO8601"
+        response.headers["X-Timezone-Note"] = "All server times are in UTC. Convert to local timezone for display."
+
+app.add_middleware(TimezoneMiddleware, default_timezone="Asia/Seoul")
+logger.info("완전한 타임존 미들웨어가 추가되었습니다.")
+
+# JSON 직렬화 설정 적용
+setup_json_encoding(app)
+
+# 모니터링 및 사용자 활동 추적 미들웨어 추가
+app.add_middleware(MonitoringMiddleware)  # 모니터링 (성능 메트릭)
+app.add_middleware(ActivityTrackingMiddleware)  # 사용자 활동 추적
 
 # 라우터 포함 - 모든 라우터에 /api prefix 추가
 app.include_router(contact.router, prefix="/api")
@@ -125,6 +207,7 @@ app.include_router(regions.router)  # 지역 API 라우터 (prefix는 라우터�
 app.include_router(system.router, prefix="/api")
 app.include_router(route_optimization.router, prefix="/api")  # 경로 최적화 API 라우터 추가
 # app.include_router(notifications.router, prefix="/api")  # 2025-07-20: 알림 시스템 재활성화 (임시 비활성화)
+app.include_router(auth.router, prefix="/api")  # 인증 API 라우터
 app.include_router(google.router, prefix="/api")
 app.include_router(realtime_travel.router, prefix="/api")  # 실시간 여행 정보 API 라우터 추가
 app.include_router(travel_plan_share.router, prefix="/api")  # 여행 계획 공유 API 라우터

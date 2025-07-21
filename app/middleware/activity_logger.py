@@ -11,6 +11,7 @@ from starlette.responses import Response
 
 from app.database import SessionLocal
 from app.models import UserActivityLog
+from app.utils.timezone_utils import TimezoneUtils
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class ActivityLoggerMiddleware(BaseHTTPMiddleware):
                 activity_type=activity_type,
                 resource_type=self._get_resource_type(path),
                 details=details,
-                created_at=datetime.utcnow()
+                created_at=TimezoneUtils.now_utc()
             )
             
             db.add(log)
@@ -125,7 +126,7 @@ class ActivityLoggerMiddleware(BaseHTTPMiddleware):
         details = {
             "path": path,
             "method": request.method,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": TimezoneUtils.format_for_api(TimezoneUtils.now_utc())
         }
         
         # 검색 쿼리 추출
