@@ -27,7 +27,7 @@ from app.routers import (
     likes_recommend,
     local_info,
     location,
-    # notifications,  # 2025-07-20: 알림 시스템 재활성화 - 문의 답변 알림 기능 추가 (임시 비활성화)
+    # notifications,  # 2025-07-20: Notification system reactivation - Added inquiry response notification feature (temporarily disabled)
     personalized_recommendations,
     plan,
     realtime_travel,
@@ -46,40 +46,40 @@ from app.routers import (
 )
 from app.utils.redis_client import test_redis_connection
 
-# 로깅 설정 초기화
+# Initialize logging configuration
 logger = setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """애플리케이션 생명주기 관리"""
+    """Application lifecycle management"""
     # Startup
     logger.info("Starting Weather Flick API...")
     
-    # Redis 연결 테스트
+    # Redis connection test
     redis_connected = test_redis_connection()
     if redis_connected:
-        logger.info("Redis 캐시 서버 연결 성공")
+        logger.info("Redis cache server connection successful")
     else:
-        logger.warning("Redis 캐시 서버 연결 실패 - 캐시 없이 실행됩니다")
+        logger.warning("Redis cache server connection failed - running without cache")
     
-    # OpenAI 초기화 상태 확인
+    # OpenAI initialization status check
     try:
         from app.services.openai_service import openai_service
         if openai_service.client:
-            logger.info("OpenAI 서비스 초기화 성공")
+            logger.info("OpenAI service initialization successful")
         else:
-            logger.warning("OpenAI 서비스 초기화 실패 - API 키를 확인하세요")
+            logger.warning("OpenAI service initialization failed - check API key")
     except Exception as e:
-        logger.error(f"OpenAI 서비스 확인 중 오류: {e}")
+        logger.error(f"Error checking OpenAI service: {e}")
     
-    # 모니터링 백그라운드 작업 시작
+    # Start monitoring background task
     import asyncio
     monitoring_task = asyncio.create_task(collect_system_metrics())
-    logger.info("시스템 모니터링 백그라운드 작업 시작")
+    logger.info("System monitoring background task started")
     
     yield
     
-    # Shutdown (정리 작업)
+    # Shutdown (cleanup)
     monitoring_task.cancel()
     logger.info("Shutting down Weather Flick API...")
 
@@ -90,17 +90,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# 글로벌 예외 핸들러 등록
+# Register global exception handlers
 register_exception_handlers(app)
 
-# 미들웨어 추가 (순서 중요: 외부 → 내부)
-app.add_middleware(ErrorHandlingMiddleware)  # 최상위 에러 처리
-app.add_middleware(TimeoutMiddleware, timeout_seconds=30)  # 타임아웃 처리
-app.add_middleware(HealthCheckMiddleware)  # 헬스체크 처리
-app.add_middleware(SecurityHeadersMiddleware)  # 보안 헤더
+# Add middleware (order matters: external → internal)
+app.add_middleware(ErrorHandlingMiddleware)  # Top-level error handling
+app.add_middleware(TimeoutMiddleware, timeout_seconds=30)  # Timeout handling
+app.add_middleware(HealthCheckMiddleware)  # Health check handling
+app.add_middleware(SecurityHeadersMiddleware)  # Security headers
 app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)  # Rate limiting
 
-# CORS 미들웨어 설정 (개발 환경용으로 수정)
+# CORS middleware configuration (modified for development environment)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -114,7 +114,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 완전한 타임존 미들웨어 추가
+# Add complete timezone middleware
 from datetime import datetime, timezone
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -124,29 +124,29 @@ class TimezoneMiddleware(BaseHTTPMiddleware):
         self.default_timezone = default_timezone
     
     async def dispatch(self, request, call_next):
-        # 클라이언트 타임존 정보 수집
+        # Collect client timezone information
         client_timezone = self._extract_client_timezone(request)
         
-        # 요청 상태에 타임존 정보 저장
+        # Store timezone information in request state
         request.state.client_timezone = client_timezone
         request.state.server_timezone = "UTC"
         request.state.recommended_timezone = self.default_timezone
         
-        # 다음 미들웨어/라우터 실행
+        # Execute next middleware/router
         response = await call_next(request)
         
-        # 응답 헤더에 타임존 정보 추가
+        # Add timezone information to response headers
         self._add_timezone_headers(response, client_timezone)
         
         return response
     
     def _extract_client_timezone(self, request):
-        # X-Client-Timezone 헤더 확인
+        # Check X-Client-Timezone header
         client_timezone = request.headers.get("X-Client-Timezone")
         if client_timezone:
             return client_timezone
         
-        # Accept-Language에서 추론
+        # Infer from Accept-Language
         accept_language = request.headers.get("Accept-Language", "")
         if "ko" in accept_language.lower():
             return "Asia/Seoul"
@@ -154,20 +154,20 @@ class TimezoneMiddleware(BaseHTTPMiddleware):
         return self.default_timezone
     
     def _add_timezone_headers(self, response, client_timezone):
-        # 서버 타임존 정보
+        # Server timezone information
         response.headers["X-Server-Timezone"] = "UTC"
         response.headers["X-Server-Time"] = datetime.now(timezone.utc).isoformat()
         
-        # 클라이언트 권장 타임존
+        # Client recommended timezone
         response.headers["X-Recommended-Timezone"] = self.default_timezone
         response.headers["X-Detected-Client-Timezone"] = client_timezone
         
-        # 시간 형식 정보
+        # Time format information
         response.headers["X-Datetime-Format"] = "ISO8601"
         response.headers["X-Timezone-Note"] = "All server times are in UTC. Convert to local timezone for display."
 
 app.add_middleware(TimezoneMiddleware, default_timezone="Asia/Seoul")
-logger.info("완전한 타임존 미들웨어가 추가되었습니다.")
+logger.info("Complete timezone middleware has been added.")
 
 # JSON 직렬화 설정 적용
 setup_json_encoding(app)
