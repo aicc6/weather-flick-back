@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app.routers import travel_course, notifications, auth
-from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware, CORS보안미들웨어
+from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware, CORSSecurityMiddleware
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -18,7 +18,7 @@ app = FastAPI(
 # Add security middlewares
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
-app.add_middleware(CORS보안미들웨어, production=False)
+app.add_middleware(CORSSecurityMiddleware, production=False)
 
 # Include routers
 app.include_router(auth.router)
@@ -35,7 +35,7 @@ async def health_check():
     from sqlalchemy import text
     
     try:
-        # 데이터베이스 연결 확인
+        # Check database connection
         db = next(get_db())
         db.execute(text("SELECT 1"))
         db_status = "connected"
