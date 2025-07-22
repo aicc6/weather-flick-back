@@ -1,9 +1,9 @@
 from typing import Any
 
 import httpx
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 import sqlalchemy as sa
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Region
@@ -29,6 +29,7 @@ class LocalInfoService:
     ) -> list[dict[str, Any]]:
         """DB restaurants 테이블에서 직접 맛집 검색"""
         from app.models import Restaurant
+
         query = db.query(Restaurant)
         if city:
             query = query.filter(Restaurant.address.ilike(f"%{city}%"))
@@ -68,7 +69,9 @@ class LocalInfoService:
                 "delivery": r.delivery,
                 "latitude": float(r.latitude) if r.latitude is not None else None,
                 "longitude": float(r.longitude) if r.longitude is not None else None,
-                "data_quality_score": float(r.data_quality_score) if r.data_quality_score is not None else None,
+                "data_quality_score": float(r.data_quality_score)
+                if r.data_quality_score is not None
+                else None,
                 "raw_data_id": str(r.raw_data_id) if r.raw_data_id else None,
                 "created_at": r.created_at,
                 "updated_at": r.updated_at,
@@ -428,23 +431,24 @@ class LocalInfoService:
     def _categorize_restaurant(self, category_name: str) -> str:
         """카테고리명을 기반으로 맛집 분류 (데이터베이스 기반)"""
         try:
-            from app.services.category_service import get_category_service
             from app.database import get_db
-            
+            from app.services.category_service import get_category_service
+
             # 데이터베이스 세션 획득
             db = next(get_db())
             category_service = get_category_service(db)
-            
+
             # 데이터베이스 기반 분류 사용
             result = category_service.categorize_restaurant_by_name(category_name)
             db.close()
-            
+
             return result
-        except Exception as e:
+        except Exception:
             # 오류 발생 시 기존 로직 사용
             category_name = category_name.lower()
             if any(
-                keyword in category_name for keyword in ["한식", "국밥", "김치", "비빔밥"]
+                keyword in category_name
+                for keyword in ["한식", "국밥", "김치", "비빔밥"]
             ):
                 return "한식"
             elif any(
@@ -461,7 +465,9 @@ class LocalInfoService:
                 for keyword in ["양식", "파스타", "피자", "스테이크"]
             ):
                 return "양식"
-            elif any(keyword in category_name for keyword in ["카페", "커피", "디저트"]):
+            elif any(
+                keyword in category_name for keyword in ["카페", "커피", "디저트"]
+            ):
                 return "카페"
             else:
                 return "기타"
@@ -469,19 +475,19 @@ class LocalInfoService:
     def _categorize_accommodation(self, category_name: str) -> str:
         """카테고리명을 기반으로 숙소 분류 (데이터베이스 기반)"""
         try:
-            from app.services.category_service import get_category_service
             from app.database import get_db
-            
+            from app.services.category_service import get_category_service
+
             # 데이터베이스 세션 획득
             db = next(get_db())
             category_service = get_category_service(db)
-            
+
             # 데이터베이스 기반 분류 사용
             result = category_service.categorize_accommodation_by_name(category_name)
             db.close()
-            
+
             return result
-        except Exception as e:
+        except Exception:
             # 오류 발생 시 기존 로직 사용
             category_name = category_name.lower()
             if "호텔" in category_name:
@@ -825,7 +831,7 @@ class LocalInfoService:
         region_name이 '시' 또는 '군'으로 끝나는 지역만 조회
         """
         query = db.query(Region).filter(
-            (Region.region_name.like('%시')) | (Region.region_name.like('%군'))
+            (Region.region_name.like("%시")) | (Region.region_name.like("%군"))
         )
         regions = query.all()
         return [
@@ -866,12 +872,22 @@ class LocalInfoService:
             {
                 "region_code": r.region_code,
                 "region_name": r.region_name,
-                "region_name_full": r.region_name_full if hasattr(r, 'region_name_full') else r.region_name,
-                "region_name_en": r.region_name_en if hasattr(r, 'region_name_en') else None,
-                "center_latitude": r.center_latitude if hasattr(r, 'center_latitude') else r.latitude,
-                "center_longitude": r.center_longitude if hasattr(r, 'center_longitude') else r.longitude,
-                "administrative_code": r.administrative_code if hasattr(r, 'administrative_code') else None,
-                "is_active": r.is_active if hasattr(r, 'is_active') else True,
+                "region_name_full": r.region_name_full
+                if hasattr(r, "region_name_full")
+                else r.region_name,
+                "region_name_en": r.region_name_en
+                if hasattr(r, "region_name_en")
+                else None,
+                "center_latitude": r.center_latitude
+                if hasattr(r, "center_latitude")
+                else r.latitude,
+                "center_longitude": r.center_longitude
+                if hasattr(r, "center_longitude")
+                else r.longitude,
+                "administrative_code": r.administrative_code
+                if hasattr(r, "administrative_code")
+                else None,
+                "is_active": r.is_active if hasattr(r, "is_active") else True,
             }
             for r in regions
         ]
@@ -884,24 +900,28 @@ class LocalInfoService:
         (auto-correlation 에러 없이 동작)
         """
         # 1. (lat, lon) 중복 그룹 찾기
-        dup_coords = db.query(
-            func.cast(Region.latitude, sa.Float).label("lat"),
-            func.cast(Region.longitude, sa.Float).label("lon")
-        ).filter(
-            Region.region_level == 1,
-            Region.parent_region_code == None
-        ).group_by(
-            func.cast(Region.latitude, sa.Float),
-            func.cast(Region.longitude, sa.Float)
-        ).having(func.count() > 1).all()
+        dup_coords = (
+            db.query(
+                func.cast(Region.latitude, sa.Float).label("lat"),
+                func.cast(Region.longitude, sa.Float).label("lon"),
+            )
+            .filter(Region.region_level == 1, Region.parent_region_code == None)
+            .group_by(
+                func.cast(Region.latitude, sa.Float),
+                func.cast(Region.longitude, sa.Float),
+            )
+            .having(func.count() > 1)
+            .all()
+        )
 
         dup_set = set((float(lat), float(lon)) for lat, lon in dup_coords)
 
         # 2. 전체 후보 조회
-        all_regions = db.query(Region).filter(
-            Region.region_level == 1,
-            Region.parent_region_code == None
-        ).all()
+        all_regions = (
+            db.query(Region)
+            .filter(Region.region_level == 1, Region.parent_region_code == None)
+            .all()
+        )
 
         result = []
         for r in all_regions:
@@ -917,7 +937,7 @@ class LocalInfoService:
 
         return [
             {
-                "region_code": r.region_code,
+                "region_code": r.tour_api_area_code,
                 "region_name": r.region_name,
                 "latitude": r.latitude,
                 "longitude": r.longitude,

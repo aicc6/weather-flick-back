@@ -36,7 +36,7 @@ from app.schemas import (
     BulkNotificationResponse
 )
 from app.auth import get_current_active_user
-# from app.services.fcm_service import FCMService  # 임시 비활성화
+from app.services.fcm_service import FCMService
 from app.services.notification_service import NotificationService
 from sqlalchemy.sql import func, text
 
@@ -342,6 +342,65 @@ async def get_notification_stats(
         by_status=by_status,
         recent_notifications=recent_notifications
     )
+
+
+# ===========================================
+# FCM 테스트 관련 엔드포인트
+# ===========================================
+
+@router.post("/test")
+async def send_test_notification(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """FCM 테스트 알림 전송"""
+    try:
+        # 사용자의 디바이스 토큰 조회
+        device_tokens = db.query(UserDeviceToken).filter(
+            UserDeviceToken.user_id == current_user.user_id,
+            UserDeviceToken.is_active == True
+        ).all()
+        
+        if not device_tokens:
+            raise HTTPException(
+                status_code=404, 
+                detail="등록된 FCM 토큰이 없습니다. 먼저 알림 권한을 허용해주세요."
+            )
+        
+        fcm_service = FCMService()
+        sent_count = 0
+        failed_count = 0
+        
+        for device_token in device_tokens:
+            success = await fcm_service.send_notification(
+                token=device_token.device_token,
+                title="테스트 알림",
+                body=f"안녕하세요 {current_user.nickname or current_user.email}님! FCM 푸시 알림이 정상적으로 작동합니다.",
+                data={
+                    "type": "test",
+                    "url": "/",
+                    "user_id": str(current_user.user_id)
+                }
+            )
+            
+            if success:
+                sent_count += 1
+            else:
+                failed_count += 1
+        
+        return {
+            "success": True,
+            "message": f"테스트 알림을 전송했습니다.",
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "total_tokens": len(device_tokens)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"테스트 알림 전송 실패: {str(e)}"
+        )
 
 
 # ===========================================

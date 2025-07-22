@@ -15,6 +15,7 @@ from app.models import (
     TravelPlanStatus,
     User,
 )
+from app.services.region_service import RegionService
 from app.utils import (
     create_error_response,
     create_standard_response,
@@ -123,15 +124,8 @@ async def get_recommendations_with_plan_format(
         start_date = datetime.now().date() + timedelta(days=7)  # 기본값: 일주일 후
         end_date = start_date + timedelta(days=request.days - 1)
 
-        # 지역 이름 매핑
-        region_names = {
-            "11": "서울", "26": "부산", "27": "대구", "28": "인천",
-            "29": "광주", "30": "대전", "31": "울산", "36": "세종",
-            "41": "경기", "43": "충북", "44": "충남", "46": "전남",
-            "47": "경북", "48": "경남", "50": "제주", "51": "강원", "52": "전북"
-        }
-
-        region_name = region_names.get(request.region_code, "지역")
+        # 데이터베이스에서 지역 이름 조회 (프론트엔드 코드 매핑 사용)
+        region_name = RegionService.get_region_name_by_frontend_code(db, request.region_code)
 
         # 여행 계획 형식
         travel_plan_format = {
