@@ -8,6 +8,7 @@ from app.models import ForecastResponse, User, WeatherRequest, WeatherResponse
 from app.services.weather_service import weather_service
 
 router = APIRouter(prefix="/weather", tags=["weather"])
+# 2025-07-23: 좌표 기반 날씨 조회 기능 추가 - 라우트 순서 변경
 
 
 @router.get("/")
@@ -30,6 +31,26 @@ async def get_current_weather(request: WeatherRequest):
         raise HTTPException(status_code=500, detail=f"Weather service error: {str(e)}")
 
 
+@router.get("/current/coordinates")
+async def get_current_weather_by_coordinates(
+    lat: float = Query(..., description="위도"),
+    lon: float = Query(..., description="경도"),
+    lang: str = Query("ko", description="언어 코드 (ko, en, ja, zh)"),
+):
+    """좌표로 현재 날씨 조회"""
+    print(f"[Weather Router] Current weather by coordinates: lat={lat}, lon={lon}, lang={lang}")
+    try:
+        # 좌표 기반 조회 시 city 매개변수 없이 호출
+        weather_data = await weather_service.get_current_weather(
+            city=None, country=None, lang=lang, lat=lat, lon=lon
+        )
+        return WeatherResponse(**weather_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather service error: {str(e)}")
+
+
 @router.get("/current/{city}")
 async def get_current_weather_by_city(
     city: str,
@@ -42,6 +63,27 @@ async def get_current_weather_by_city(
             city=city, country=country, lang=lang
         )
         return WeatherResponse(**weather_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather service error: {str(e)}")
+
+
+@router.get("/forecast/coordinates")
+async def get_weather_forecast_by_coordinates(
+    lat: float = Query(..., description="위도"),
+    lon: float = Query(..., description="경도"),
+    days: int = Query(3, ge=1, le=14, description="예보 일수 (1-14일)"),
+    lang: str = Query("ko", description="언어 코드 (ko, en, ja, zh)"),
+):
+    """좌표로 날씨 예보 조회"""
+    print(f"[Weather Router] Forecast by coordinates: lat={lat}, lon={lon}, days={days}, lang={lang}")
+    try:
+        # 좌표 기반 조회 시 city 매개변수 없이 호출
+        forecast_data = await weather_service.get_forecast(
+            city=None, country=None, days=days, lang=lang, lat=lat, lon=lon
+        )
+        return ForecastResponse(**forecast_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -198,6 +240,47 @@ async def get_weather_by_place_id(place_id: str):
             "temp": current.get("temp_c"),
             "summary": condition.get("text"),
         }
+
+
+@router.get("/current/coordinates")
+async def get_current_weather_by_coordinates(
+    lat: float = Query(..., description="위도"),
+    lon: float = Query(..., description="경도"),
+    lang: str = Query("ko", description="언어 코드 (ko, en, ja, zh)"),
+):
+    """좌표로 현재 날씨 조회"""
+    print(f"[Weather Router] Current weather by coordinates: lat={lat}, lon={lon}, lang={lang}")
+    try:
+        # 좌표 기반 조회 시 city 매개변수 없이 호출
+        weather_data = await weather_service.get_current_weather(
+            city=None, country=None, lang=lang, lat=lat, lon=lon
+        )
+        return WeatherResponse(**weather_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather service error: {str(e)}")
+
+
+@router.get("/forecast/coordinates")
+async def get_weather_forecast_by_coordinates(
+    lat: float = Query(..., description="위도"),
+    lon: float = Query(..., description="경도"),
+    days: int = Query(3, ge=1, le=14, description="예보 일수 (1-14일)"),
+    lang: str = Query("ko", description="언어 코드 (ko, en, ja, zh)"),
+):
+    """좌표로 날씨 예보 조회"""
+    print(f"[Weather Router] Forecast by coordinates: lat={lat}, lon={lon}, days={days}, lang={lang}")
+    try:
+        # 좌표 기반 조회 시 city 매개변수 없이 호출
+        forecast_data = await weather_service.get_forecast(
+            city=None, country=None, days=days, lang=lang, lat=lat, lon=lon
+        )
+        return ForecastResponse(**forecast_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weather service error: {str(e)}")
 
 
 @router.get("/forecast-by-place-id")

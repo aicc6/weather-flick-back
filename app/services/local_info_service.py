@@ -905,7 +905,12 @@ class LocalInfoService:
                 func.cast(Region.latitude, sa.Float).label("lat"),
                 func.cast(Region.longitude, sa.Float).label("lon"),
             )
-            .filter(Region.region_level == 1, Region.parent_region_code == None)
+            .filter(
+                Region.region_level == 1, 
+                Region.parent_region_code == None,
+                Region.latitude != None,
+                Region.longitude != None
+            )
             .group_by(
                 func.cast(Region.latitude, sa.Float),
                 func.cast(Region.longitude, sa.Float),
@@ -914,17 +919,25 @@ class LocalInfoService:
             .all()
         )
 
-        dup_set = set((float(lat), float(lon)) for lat, lon in dup_coords)
+        dup_set = set((float(lat), float(lon)) for lat, lon in dup_coords if lat is not None and lon is not None)
 
         # 2. 전체 후보 조회
         all_regions = (
             db.query(Region)
-            .filter(Region.region_level == 1, Region.parent_region_code == None)
+            .filter(
+                Region.region_level == 1, 
+                Region.parent_region_code == None,
+                Region.latitude != None,
+                Region.longitude != None
+            )
             .all()
         )
 
         result = []
         for r in all_regions:
+            # Skip regions without coordinates
+            if r.latitude is None or r.longitude is None:
+                continue
             key = (float(r.latitude), float(r.longitude))
             if key in dup_set:
                 if len(r.region_name) == 2:

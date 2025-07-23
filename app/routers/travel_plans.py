@@ -153,6 +153,9 @@ async def get_travel_plans(
 
         # 응답 데이터 구성
         response_data = []
+        
+        # 북마크 상태 조회를 위한 import
+        from app.models import TravelPlanBookmark
 
         for plan in plans:
             # weather_info가 JSON 문자열인 경우 파싱
@@ -171,8 +174,18 @@ async def get_travel_plans(
 
             # 카테고리 코드를 한글로 변환
             plan.itinerary = convert_category_codes_in_itinerary(plan.itinerary, db)
+            
+            # 플랜 데이터 변환
+            plan_dict = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
+            
+            # 북마크 상태 확인
+            bookmark = db.query(TravelPlanBookmark).filter(
+                TravelPlanBookmark.user_id == current_user.id,
+                TravelPlanBookmark.plan_id == plan.plan_id
+            ).first()
+            plan_dict['is_bookmarked'] = bookmark is not None
 
-            response_data.append(convert_uuids_to_strings(TravelPlanResponse.from_orm(plan)))
+            response_data.append(plan_dict)
 
         # 페이지네이션 정보
         pagination = create_pagination_info(page, limit, total)
@@ -226,6 +239,14 @@ async def get_travel_plan(
         plan.itinerary = convert_category_codes_in_itinerary(plan.itinerary, db)
 
         response_data = convert_uuids_to_strings(TravelPlanResponse.from_orm(plan))
+        
+        # 북마크 상태 확인
+        from app.models import TravelPlanBookmark
+        bookmark = db.query(TravelPlanBookmark).filter(
+            TravelPlanBookmark.user_id == current_user.id,
+            TravelPlanBookmark.plan_id == plan.plan_id
+        ).first()
+        response_data['is_bookmarked'] = bookmark is not None
 
         return create_standard_response(success=True, data=response_data)
 

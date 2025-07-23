@@ -14,24 +14,37 @@ class WeatherService:
 
     @cache_result(prefix="weather:current", expire=600, include_cache_info=True)  # 10분 캐싱
     async def get_current_weather(
-        self, city: str, country: str | None = None, lang: str = "ko"
+        self, city: str = None, country: str | None = None, lang: str = "ko", lat: float = None, lon: float = None
     ) -> dict[str, Any]:
-        """현재 날씨 정보 조회 (한글 지원)"""
+        """현재 날씨 정보 조회 (한글 지원, 좌표 기반 조회 지원)"""
         try:
-            # 도시명과 국가코드를 결합 (URL 인코딩 포함)
-            import urllib.parse
-            location = f"{city},{country}" if country else city
-            encoded_location = urllib.parse.quote(location, safe=',')
+            # 좌표가 제공된 경우 우선 사용
+            if lat is not None and lon is not None:
+                location_query = f"{lat},{lon}"
+                print(f"[WeatherService] Using coordinates: {location_query}")
+            else:
+                # 도시명과 국가코드를 결합 (URL 인코딩 포함)
+                import urllib.parse
+                if not city:
+                    raise HTTPException(status_code=400, detail="Invalid location")
+                location = f"{city},{country}" if country else city
+                location_query = urllib.parse.quote(location, safe=',')
+                print(f"[WeatherService] Using city name: {location_query}")
 
             async with httpx.AsyncClient() as client:
+                params = {
+                    "key": self.api_key,
+                    "q": location_query,
+                    "lang": lang,  # 언어 설정 추가
+                    "aqi": "no",  # 대기질 정보 제외
+                }
+                url = f"{self.base_url}/current.json"
+                print(f"[WeatherService] API Request URL: {url}")
+                print(f"[WeatherService] API Request params (key hidden): q={params['q']}, lang={params['lang']}")
+                
                 response = await client.get(
-                    f"{self.base_url}/current.json",
-                    params={
-                        "key": self.api_key,
-                        "q": encoded_location,
-                        "lang": lang,  # 언어 설정 추가
-                        "aqi": "no",  # 대기질 정보 제외
-                    },
+                    url,
+                    params=params,
                     timeout=10.0,
                 )
 
@@ -52,21 +65,29 @@ class WeatherService:
 
     @cache_result(prefix="weather:forecast", expire=1800, include_cache_info=True)  # 30분 캐싱
     async def get_forecast(
-        self, city: str, days: int = 3, country: str | None = None, lang: str = "ko"
+        self, city: str = None, days: int = 3, country: str | None = None, lang: str = "ko", lat: float = None, lon: float = None
     ) -> dict[str, Any]:
-        """날씨 예보 조회 (한글 지원)"""
+        """날씨 예보 조회 (한글 지원, 좌표 기반 조회 지원)"""
         try:
-            # 도시명과 국가코드를 결합 (URL 인코딩 포함)
-            import urllib.parse
-            location = f"{city},{country}" if country else city
-            encoded_location = urllib.parse.quote(location, safe=',')
+            # 좌표가 제공된 경우 우선 사용
+            if lat is not None and lon is not None:
+                location_query = f"{lat},{lon}"
+                print(f"[WeatherService] Forecast using coordinates: {location_query}")
+            else:
+                # 도시명과 국가코드를 결합 (URL 인코딩 포함)
+                import urllib.parse
+                if not city:
+                    raise HTTPException(status_code=400, detail="Invalid location")
+                location = f"{city},{country}" if country else city
+                location_query = urllib.parse.quote(location, safe=',')
+                print(f"[WeatherService] Forecast using city name: {location_query}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{self.base_url}/forecast.json",
                     params={
                         "key": self.api_key,
-                        "q": encoded_location,
+                        "q": location_query,
                         "days": min(days, 14),  # 최대 14일
                         "lang": lang,  # 언어 설정 추가
                         "aqi": "no",
