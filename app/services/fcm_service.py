@@ -60,13 +60,50 @@ class FCMService:
         """단일 디바이스에 푸시 알림 전송"""
         
         try:
+            # 입력 값 검증 및 정규화
+            if not token or not isinstance(token, str):
+                logger.error(f"Invalid FCM token: {token}")
+                return False
+            
+            # 제목과 본문 길이 제한 및 정규화
+            title = str(title).strip() if title else "\uc54c\ub9bc"
+            body = str(body).strip() if body else ""
+            
+            # FCM 제한사항: 제목 최대 200자, 본문 최대 4000자
+            if len(title) > 200:
+                title = title[:197] + "..."
+            if len(body) > 4000:
+                body = body[:3997] + "..."
+            
             # 데이터 페이로드 준비 (모든 값은 문자열이어야 함)
+            data_payload = {}
             if data:
-                data_payload = {k: str(v) for k, v in data.items()}
-            else:
-                data_payload = {}
+                for k, v in data.items():
+                    # 키와 값 모두 문자열로 변환
+                    key = str(k).strip()
+                    if v is None:
+                        value = ""
+                    elif isinstance(v, (list, dict)):
+                        # 복잡한 객체는 JSON 문자열로 변환
+                        import json
+                        try:
+                            value = json.dumps(v, ensure_ascii=False)
+                        except:
+                            value = str(v)
+                    else:
+                        value = str(v)
+                    
+                    # FCM 데이터 페이로드 키와 값 길이 제한
+                    if len(key) > 1024:
+                        key = key[:1024]
+                    if len(value) > 1024:
+                        value = value[:1021] + "..."
+                    
+                    data_payload[key] = value
+            
+            logger.debug(f"Sending FCM notification: title='{title[:50]}...', token='{token[:20]}...'")
 
-            # FCM 메시지 생성
+            # FCM 메시지 생성 - Firefox 호환성 개선
             message = Message(
                 token=token,
                 notification=Notification(
@@ -94,9 +131,18 @@ class FCMService:
                     notification=messaging.WebpushNotification(
                         title=title,
                         body=body,
-                        icon=image,
-                        badge=str(badge) if badge else None
-                    )
+                        icon=image or '/pwa-192x192.png',
+                        badge='/pwa-64x64.png',
+                        tag=data_payload.get('notification_id', str(int(datetime.now().timestamp()))),
+                        require_interaction=False,
+                        silent=False,
+                        data=data_payload  # Firefox를 위해 데이터도 포함
+                    ),
+                    headers={
+                        'TTL': '86400',  # 24시간
+                        'Urgency': 'high' if priority == 'high' else 'normal'
+                    },
+                    data=data_payload  # 데이터 페이로드도 웹푸시에 포함
                 )
             )
 
@@ -110,9 +156,11 @@ class FCMService:
             return False
         except ValueError as e:
             logger.error(f"Invalid FCM message arguments: {str(e)}")
+            logger.error(f"Title: '{title}', Body: '{body[:100]}...', Data: {data_payload}")
             return False
         except Exception as e:
             logger.error(f"Error sending FCM notification: {str(e)}")
+            logger.error(f"Token: {token[:20]}..., Title: '{title}', Data keys: {list(data_payload.keys()) if data_payload else []}")
             return False
 
     async def send_multicast_notification(
@@ -138,7 +186,7 @@ class FCMService:
             else:
                 data_payload = {}
 
-            # MulticastMessage 생성
+            # MulticastMessage 생성 - Firefox 호환성 개선
             message = messaging.MulticastMessage(
                 tokens=tokens,
                 notification=Notification(
@@ -166,9 +214,18 @@ class FCMService:
                     notification=messaging.WebpushNotification(
                         title=title,
                         body=body,
-                        icon=image,
-                        badge=str(badge) if badge else None
-                    )
+                        icon=image or '/pwa-192x192.png',
+                        badge='/pwa-64x64.png',
+                        tag=data_payload.get('notification_id', str(int(datetime.now().timestamp()))),
+                        require_interaction=False,
+                        silent=False,
+                        data=data_payload
+                    ),
+                    headers={
+                        'TTL': '86400',
+                        'Urgency': 'high' if priority == 'high' else 'normal'
+                    },
+                    data=data_payload
                 )
             )
 

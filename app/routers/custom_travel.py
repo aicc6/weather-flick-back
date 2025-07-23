@@ -103,6 +103,21 @@ async def get_custom_travel_recommendations(
         # if cache_key in recommendation_cache:
         #     cached_data = recommendation_cache[cache_key]
         #     return CustomTravelRecommendationResponse(**cached_data["response"])
+        
+        # 요청 검증
+        if not request.region_code:
+            logger.error("Region code is missing in request")
+            raise HTTPException(
+                status_code=400,
+                detail="지역 코드가 누락되었습니다."
+            )
+        
+        if request.days < 1 or request.days > 30:
+            logger.error(f"Invalid number of days: {request.days}")
+            raise HTTPException(
+                status_code=400,
+                detail="여행 일수는 1일에서 30일 사이여야 합니다."
+            )
         # 동행자 유형별 태그 매핑
         who_tags = {
             "solo": ["혼자", "자유로운", "개인적인", "조용한"],
@@ -142,6 +157,7 @@ async def get_custom_travel_recommendations(
         region = db.query(Region).filter(Region.region_code == request.region_code).first()
         if region and region.tour_api_area_code:
             db_region_code = region.tour_api_area_code
+            region_name = region.region_name
             logger.info(f"Found region in DB: {region.region_name}, using tour_api_area_code: {db_region_code}")
         else:
             # 기존 하드코딩된 매핑 유지 (fallback)
@@ -164,7 +180,37 @@ async def get_custom_travel_recommendations(
                 "51": "32",   # 강원
                 "52": "37",   # 전북
             }
+            
+            # 지역명 매핑도 추가
+            region_name_mapping = {
+                "11": "서울",
+                "26": "부산",
+                "27": "대구",
+                "28": "인천",
+                "29": "광주",
+                "30": "대전",
+                "31": "울산",
+                "36": "세종",
+                "41": "경기",
+                "43": "충북",
+                "44": "충남",
+                "46": "전남",
+                "47": "경북",
+                "48": "경남",
+                "50": "제주",
+                "51": "강원",
+                "52": "전북",
+            }
+            
+            if request.region_code not in region_code_mapping:
+                logger.error(f"Unknown region code: {request.region_code}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"알 수 없는 지역 코드입니다: {request.region_code}"
+                )
+            
             db_region_code = region_code_mapping.get(request.region_code, request.region_code)
+            region_name = region_name_mapping.get(request.region_code, "알 수 없는 지역")
             logger.info(f"Using hardcoded mapping: {request.region_code} -> {db_region_code}")
 
         # 순차적 DB 쿼리 실행 (안정성 우선)
@@ -232,16 +278,28 @@ async def get_custom_travel_recommendations(
                     for item in pet_tour_info if item[0]
                 }
             
-            # 데이터가 부족한 경우 로그만 남기고 다른 지역 데이터를 섞지 않음
-            if len(cultural_facilities) == 0 and len(restaurants) == 0 and len(accommodations) == 0:
-                logger.warning(f"No cultural/restaurant/accommodation data found for region {db_region_code}")
-                # 다른 지역의 데이터를 섞지 않고, 있는 데이터만 사용
+            # 데이터가 부족한 경우 처리
+            total_places = len(attractions) + len(cultural_facilities) + len(restaurants) + len(shopping_places) + len(accommodations)
+            
+            if total_places == 0:
+                logger.error(f"No data found for region {db_region_code} (region_code: {request.region_code})")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"{region_name} 지역의 여행 정보를 찾을 수 없습니다. 다른 지역을 선택해주세요."
+                )
+            
+            if total_places < request.days * 3:  # 하루에 최소 3곳은 필요
+                logger.warning(f"Insufficient data for region {db_region_code}: only {total_places} places found for {request.days} days")
+                # 데이터가 부족하지만 진행은 가능하도록 함
 
+        except HTTPException:
+            # HTTPException은 그대로 전달
+            raise
         except Exception as e:
-            logger.error(f"Database query error: {str(e)}")
+            logger.error(f"Database query error: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500,
-                detail=f"데이터베이스 조회 중 오류 발생: {str(e)}"
+                detail="데이터베이스 조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
             )
 
         # 모든 장소를 하나의 리스트로 통합
@@ -666,9 +724,14 @@ async def get_custom_travel_recommendations(
 
         return response
 
+    except HTTPException:
+        # HTTPException은 그대로 전달
+        raise
     except Exception as e:
+        logger.error(f"Unexpected error in custom travel recommendation: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"추천 생성 중 오류 발생: {str(e)}"
+            status_code=500, 
+            detail="추천 생성 중 예상치 못한 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
         ) from e
 
 

@@ -140,6 +140,9 @@ class User(Base):
         back_populates="user", 
         cascade="all, delete-orphan"
     )
+    travel_plan_bookmarks = relationship(
+        "TravelPlanBookmark", back_populates="user", cascade="all, delete-orphan"
+    )
 
     # 알림 관련 관계
     notification_settings = relationship(
@@ -252,6 +255,11 @@ class TravelPlan(Base):
     )
     collaborators = relationship(
         "TravelPlanCollaborator",
+        back_populates="travel_plan",
+        cascade="all, delete-orphan",
+    )
+    bookmarks = relationship(
+        "TravelPlanBookmark",
         back_populates="travel_plan",
         cascade="all, delete-orphan",
     )
@@ -3191,6 +3199,29 @@ class TravelPlanShare(Base):
     # 관계 설정
     travel_plan = relationship("TravelPlan", back_populates="shares")
     creator = relationship("User", back_populates="created_shares")
+
+
+class TravelPlanBookmark(Base):
+    """
+    여행 계획 즐겨찾기 테이블
+    사용처: weather-flick-back
+    설명: 사용자가 즐겨찾기한 여행 계획 관리
+    """
+    __tablename__ = "travel_plan_bookmarks"
+    
+    bookmark_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("travel_plans.plan_id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # 관계 설정
+    user = relationship("User", back_populates="travel_plan_bookmarks")
+    travel_plan = relationship("TravelPlan", back_populates="bookmarks")
+    
+    # 유니크 제약 조건: 사용자는 같은 계획을 중복 즐겨찾기할 수 없음
+    __table_args__ = (
+        UniqueConstraint('user_id', 'plan_id', name='_user_plan_bookmark_uc'),
+    )
 
 
 class TravelPlanVersion(Base):

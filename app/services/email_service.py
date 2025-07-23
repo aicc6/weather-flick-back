@@ -691,28 +691,59 @@ class EmailVerificationService:
         alert_type: str = "weather_change",
     ) -> bool:
         """날씨 알림 이메일 전송"""
+        try:
+            # 입력 값 검증 및 정규화
+            if not location:
+                location = "알 수 없는 지역"
+            else:
+                location = str(location).strip()
+                # 너무 긴 지역명 처리
+                if len(location) > 50:
+                    location = location[:50]
+            
+            if not weather_condition:
+                weather_condition = "정보 없음"
+            else:
+                weather_condition = str(weather_condition).strip()
+            
+            # 온도 값 검증
+            try:
+                temperature = int(temperature)
+            except (ValueError, TypeError):
+                self.logger.warning(f"Invalid temperature value: {temperature}")
+                temperature = 0
+            
+            self.logger.info(f"Sending weather alert email to {to_email} for location: {location}")
 
-        if alert_type == "weather_change":
-            subject = f"🌤️ {location} 날씨 변화 알림"
-            content = f"현재 {weather_condition}, 기온 {temperature}°C"
-        elif alert_type == "rain_alert":
-            subject = f"🌧️ {location} 비 예보 알림"
-            content = (
-                f"비 예보가 있습니다. 우산을 준비하세요! (현재 기온: {temperature}°C)"
-            )
-        elif alert_type == "extreme_weather":
-            subject = f"⚠️ {location} 악천후 경보"
-            content = f"악천후 경보: {weather_condition} (기온: {temperature}°C)"
-        else:
-            subject = f"🌤️ {location} 날씨 정보"
-            content = f"날씨: {weather_condition}, 기온: {temperature}°C"
+            if alert_type == "weather_change":
+                subject = f"🌤️ {location} 날씨 변화 알림"
+                content = f"현재 {weather_condition}, 기온 {temperature}°C"
+            elif alert_type == "rain_alert":
+                subject = f"🌧️ {location} 비 예보 알림"
+                content = (
+                    f"비 예보가 있습니다. 우산을 준비하세요! (현재 기온: {temperature}°C)"
+                )
+            elif alert_type == "extreme_weather":
+                subject = f"⚠️ {location} 악천후 경보"
+                content = f"악천후 경보: {weather_condition} (기온: {temperature}°C)"
+            else:
+                subject = f"🌤️ {location} 날씨 정보"
+                content = f"날씨: {weather_condition}, 기온: {temperature}°C"
 
-        template_data = {
-            "location": location,
-            "weather_condition": weather_condition,
-            "temperature": temperature,
-            "alert_type": alert_type,
-        }
+            template_data = {
+                "location": location,
+                "weather_condition": weather_condition,
+                "temperature": str(temperature),
+                "alert_type": alert_type,
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error preparing weather alert email: {str(e)}")
+            self.logger.error(f"Parameters: location={location}, condition={weather_condition}, temp={temperature}")
+            # 기본값으로 설정
+            subject = "날씨 알림"
+            content = "날씨 정보가 업데이트되었습니다."
+            template_data = {"alert_type": "error"}
 
         return await self.send_notification_email(
             to_email=to_email,

@@ -87,12 +87,23 @@ async def create_share_link(
         db.refresh(db_share)
         
         # 응답 데이터 구성
-        response = TravelPlanShareResponse.from_orm(db_share)
-        response.share_link = f"/shared/{share_token}"  # 프론트엔드에서 전체 URL 구성
+        response_data = {
+            "share_id": db_share.share_id,
+            "plan_id": db_share.plan_id,
+            "share_token": db_share.share_token,
+            "share_link": f"/shared/{share_token}",  # 프론트엔드에서 전체 URL 구성
+            "permission": db_share.permission,
+            "expires_at": db_share.expires_at,
+            "max_uses": db_share.max_uses,
+            "use_count": db_share.use_count,
+            "is_active": db_share.is_active,
+            "created_at": db_share.created_at,
+            "created_by": db_share.created_by,
+        }
         
         return create_standard_response(
             success=True, 
-            data=convert_uuids_to_strings(response)
+            data=convert_uuids_to_strings(response_data)
         )
         
     except Exception as e:
@@ -135,9 +146,20 @@ async def get_share_links(
         
         response_data = []
         for share in shares:
-            share_response = TravelPlanShareResponse.from_orm(share)
-            share_response.share_link = f"/shared/{share.share_token}"
-            response_data.append(convert_uuids_to_strings(share_response))
+            share_dict = {
+                "share_id": share.share_id,
+                "plan_id": share.plan_id,
+                "share_token": share.share_token,
+                "share_link": f"/shared/{share.share_token}",
+                "permission": share.permission,
+                "expires_at": share.expires_at,
+                "max_uses": share.max_uses,
+                "use_count": share.use_count,
+                "is_active": share.is_active,
+                "created_at": share.created_at,
+                "created_by": share.created_by,
+            }
+            response_data.append(convert_uuids_to_strings(share_dict))
         
         return create_standard_response(success=True, data=response_data)
         
@@ -181,12 +203,23 @@ async def update_share_link(
         db.commit()
         db.refresh(share)
         
-        share_response = TravelPlanShareResponse.from_orm(share)
-        share_response.share_link = f"/shared/{share.share_token}"
+        share_dict = {
+            "share_id": share.share_id,
+            "plan_id": share.plan_id,
+            "share_token": share.share_token,
+            "share_link": f"/shared/{share.share_token}",
+            "permission": share.permission,
+            "expires_at": share.expires_at,
+            "max_uses": share.max_uses,
+            "use_count": share.use_count,
+            "is_active": share.is_active,
+            "created_at": share.created_at,
+            "created_by": share.created_by,
+        }
         
         return create_standard_response(
             success=True, 
-            data=convert_uuids_to_strings(share_response)
+            data=convert_uuids_to_strings(share_dict)
         )
         
     except Exception as e:

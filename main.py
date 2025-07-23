@@ -48,6 +48,7 @@ from app.routers import (
     system,
     travel_course,
     travel_course_saves,
+    travel_plan_bookmarks,
     travel_plan_share,
     travel_plans,
     weather,
@@ -241,6 +242,7 @@ app.include_router(travel_plan_share.router, prefix="/api")  # 여행 계획 공
 app.include_router(
     travel_plan_share.shared_router, prefix="/api"
 )  # 공유된 계획 조회 라우터
+app.include_router(travel_plan_bookmarks.router, prefix="/api")  # 여행 계획 즐겨찾기 API 라우터
 
 
 @app.get("/")
